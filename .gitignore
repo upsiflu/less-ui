@@ -1,0 +1,13 @@
+# Distribution
+build
+
+# Elm
+elm-stuff
+repl-temp-*
+tests/VerifyExamples
+
+# Node
+node_modules
+
+# Tipp: add editor and OS specific excludes into your global excludefile before committing.
+

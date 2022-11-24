@@ -1,0 +1,70 @@
+[
+  {
+    "command": [
+      "elm-watch",
+      "hot"
+    ],
+    "title": "elm-watch",
+    "status": {
+      "⏳": [
+        "⏳",
+        "W"
+      ],
+      "🚨": [
+        "🚨",
+        "E"
+      ],
+      "✅": [
+        "🪴",
+        "+"
+      ]
+    },
+    "defaultStatus": [
+      "⏳",
+      "W"
+    ]
+  },
+  {
+    "command": [
+      "npm",
+      "run",
+      "esbuild",
+      "--",
+      "--serve=9000",
+      "--servedir=public"
+    ],
+    "title": "esbuild",
+    "status": {
+      "ERROR": [
+        "🚨",
+        "E"
+      ],
+      "200": null
+    }
+  },
+  {
+    "command": [
+      "node",
+      "dev-server.js",
+      "9000"
+    ],
+    "title": "dev-server"
+  },
+  {
+    "command": [
+      "edp",
+      "--no-browser"
+    ],
+    "title": "elm-doc-preview",
+    "status": {
+      "ERROR": [
+        "🚨",
+        "E"
+      ]
+    },
+    "defaultStatus": [
+      "📚",
+      "+"
+    ]
+  }
+]

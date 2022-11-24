@@ -1,0 +1,20 @@
+{
+    "postprocess": [
+        "elm-watch-node",
+        "postprocess.js"
+    ],
+    "targets": {
+        "Garden": {
+            "inputs": [
+                "src/Garden.elm"
+            ],
+            "output": "public/build/Garden.js"
+        },
+        "Application": {
+            "inputs": [
+                "src/ApplicationMain.elm"
+            ],
+            "output": "public/build/ApplicationMain.js"
+        }
+    }
+}

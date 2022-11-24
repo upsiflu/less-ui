@@ -1,0 +1,40 @@
+.handle,
+.info,
+.control {
+    border     : 0.5px solid black;
+    padding    : 1rem;
+    flex-grow  : 0;
+    box-sizing : border-box;
+    flex-shrink: 0;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    display       : flex;
+    flex-direction: column;
+}
+
+.scene {
+    flex-grow : 1;
+    background: black;
+    color     : white;
+    overflow  : auto;
+}
+
+.control {
+    flex-basis: 10rem;
+    background: silver;
+}
+
+.info {
+    width     : fit-content;
+    position  : absolute;
+    bottom    : 9rem;
+    right     : 1rem;
+    background: greenyellow;
+}
