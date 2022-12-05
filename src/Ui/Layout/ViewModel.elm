@@ -1,8 +1,9 @@
 module Ui.Layout.ViewModel exposing
     ( ViewModel, Foliage
     , empty
-    , mapGet, mapHandle
+    , appendGet, mapGet, appendHandle, mapHandle
     , merge
+    , concat, concatMap
     )
 
 {-| Intermediate model before applying a [Layout](Ui.Layout)
@@ -17,12 +18,13 @@ module Ui.Layout.ViewModel exposing
 
 # Map
 
-@docs mapGet, mapHandle
+@docs appendGet, mapGet, appendHandle, mapHandle
 
 
 # Compose
 
 @docs merge
+@docs concat, concatMap
 
 -}
 
@@ -48,7 +50,7 @@ empty =
     { handle = [], get = Get.empty }
 
 
-{-| combines two ViewModels into one, concatenating its contents.
+{-| Combine two ViewModels into one, concatenating its contents.
 
     import Ui.Aspect exposing (Aspect(..))
 
@@ -62,8 +64,22 @@ empty =
 merge : ViewModel msg -> ViewModel msg -> ViewModel msg
 merge a b =
     { handle = a.handle ++ b.handle
-    , get = Get.concat a.get b.get
+    , get = Get.append a.get b.get
     }
+
+
+{-| `concat = List.foldl merge empty`
+-}
+concat : List (ViewModel msg) -> ViewModel msg
+concat =
+    List.foldl merge empty
+
+
+{-| Merge the results of `fu`
+-}
+concatMap : (a -> ViewModel msg) -> List a -> ViewModel msg
+concatMap fu =
+    List.map fu >> concat
 
 
 {-| -}
@@ -73,6 +89,18 @@ mapGet fu =
 
 
 {-| -}
+appendGet : Get (Foliage msg) -> ViewModel msg -> ViewModel msg
+appendGet =
+    Get.append >> mapGet
+
+
+{-| -}
 mapHandle : (Foliage msg -> Foliage msg) -> ViewModel msg -> ViewModel msg
 mapHandle fu =
     \v -> { v | handle = fu v.handle }
+
+
+{-| -}
+appendHandle : Foliage msg -> ViewModel msg -> ViewModel msg
+appendHandle fo =
+    mapHandle ((++) fo)

@@ -1,4 +1,7 @@
-module Garden exposing (main)
+module Garden exposing
+    ( main
+    , Msg
+    )
 
 {-|
 
@@ -6,7 +9,7 @@ module Garden exposing (main)
 
 -}
 
-import Browser
+import Garden.Rhododendron exposing (Rhododendron)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Ui exposing (Ui)
@@ -14,31 +17,40 @@ import Ui.Layout exposing (Layout)
 import Ui.Layout.Aspect exposing (Aspect(..))
 
 
+{-| -}
 type Msg
-    = Noop
+    = RhododendronMsg Garden.Rhododendron.Msg
 
 
-type alias Model =
-    ()
+type alias Garden =
+    { rhododendron : Rhododendron }
 
 
-init : ( Model, Cmd Msg )
+init : ( Garden, Cmd Msg )
 init =
-    ( (), Cmd.none )
+    ( { rhododendron = Garden.Rhododendron.singleton "Root" }, Cmd.none )
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update : Msg -> Garden -> ( Garden, Cmd Msg )
+update msg garden =
     case msg of
-        Noop ->
-            ( model, Cmd.none )
+        RhododendronMsg rhodoMsg ->
+            ( { garden | rhododendron = Garden.Rhododendron.update rhodoMsg garden.rhododendron }
+            , Cmd.none
+            )
 
 
-view : Ui.Path -> Model -> { body : Ui Msg, layout : Maybe Layout, title : String }
-view _ _ =
+view : Ui.Path -> Garden -> { body : Ui Msg, layout : Maybe Layout, title : String }
+view path garden =
     { title = "Welcome to the Garden!"
     , layout = Nothing
-    , body = page
+    , body =
+        page
+            |> Ui.with Scene
+                (Ui.toggle "rhododendron" [ Html.text "Rhododendron" ]
+                    |> Ui.with Control
+                        (Garden.Rhododendron.view RhododendronMsg garden.rhododendron)
+                )
     }
 
 
@@ -78,7 +90,7 @@ myInfo =
 
 
 {-| -}
-main : Ui.Application () Msg
+main : Ui.Application Garden Msg
 main =
     Ui.application
         { init = init

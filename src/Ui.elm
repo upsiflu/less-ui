@@ -4,14 +4,13 @@ module Ui exposing
     , wrap
     , with
     , view, toHtml
-    , toggle, constant, summarize, alternate
+    , toggle, constant, summarize, bounce
     , Path, Flag, Handle(..)
     , addLabel, addTextLabel
     , setAspect
     , repeat
     , map, indexedMap, mapList
     , map2
-    , application, Application, Document, Msg
     , uncons
     , ifJust, notIf, none
     )
@@ -48,7 +47,7 @@ To merge two `Ui`s on the same level, use [`++`](https://package.elm-lang.org/pa
 
 # Add Interactivity
 
-@docs toggle, constant, summarize, alternate
+@docs toggle, constant, summarize, bounce
 
 @docs Path, Flag, Handle
 
@@ -74,11 +73,6 @@ It is usually easier to build exactly the `Ui` you need instead of altering and 
 @docs map2
 
 
-# Separating Concerns
-
-@docs application, Application, Document, Msg
-
-
 ## Decompose
 
 You can directly use List decomposition functions such as `List.head`, `List.isEmpty`, `List.take n` etc. but
@@ -93,8 +87,6 @@ You can directly use List decomposition functions such as `List.head`, `List.isE
 -}
 
 import Bool.Extra as Bool
-import Browser
-import Browser.Navigation as Nav
 import Html exposing (Html)
 import Html.Attributes exposing (..)
 import Html.Keyed exposing (node, ul)
@@ -117,7 +109,7 @@ type alias Ui msg =
 
 {-| -}
 type Descendant msg
-    = Leaf (Foliage msg) (Maybe (Item msg))
+    = Twig (Foliage msg) (Maybe (Item msg))
     | Wrap (Foliage msg -> Foliage msg) (Ui msg)
 
 
@@ -135,7 +127,7 @@ type alias Item msg =
 {-| -}
 singleton : Ui msg
 singleton =
-    [ Leaf [] Nothing ]
+    [ Twig [] Nothing ]
 
 
 {-| -}
@@ -160,7 +152,7 @@ keyed key =
 -}
 foliage : Foliage msg -> Ui msg
 foliage =
-    Leaf >> (|>) Nothing >> List.singleton
+    Twig >> (|>) Nothing >> List.singleton
 
 
 labelFromString : String -> Ui msg
@@ -177,7 +169,7 @@ fromList =
 
 fromItem : Item msg -> Ui msg
 fromItem =
-    Just >> Leaf [] >> List.singleton
+    Just >> Twig [] >> List.singleton
 
 
 
@@ -202,13 +194,13 @@ with aspect subUi =
     List.map
         (\original ->
             case original of
-                Leaf foliage_ maybeItem ->
+                Twig foliage_ maybeItem ->
                     maybeItem
                         |> Maybe.unpack
                             (\() -> { handle = Constant [], get = Get.singleton aspect subUi })
                             (\it -> { it | get = Get.addList aspect subUi it.get })
                         |> Just
-                        |> Leaf foliage_
+                        |> Twig foliage_
 
                 Wrap fu ui ->
                     Wrap fu (with aspect subUi ui)
@@ -340,6 +332,38 @@ map fu =
 
 
 
+{-
+   mapMsg : (msg -> msg2) -> Ui msg -> Ui msg2
+   mapMsg fu =
+       let
+           mapHandleMsg : Handle msg -> Handle msg2
+           mapHandleMsg handle =
+               case handle of
+                   Constant (List (Html msg))
+                   Toggle Flag (List (Html Never))
+                   Summarize Flag (Bool -> List (Html Never))
+                   Alternate ( Path, Path ) (List (Html Never))
+
+
+
+           mapItemMsg : Item msg -> Item msg2
+           mapItemMsg ({ handle, get }) =
+               { handle = mapHandleMsg handle
+               , get = get>>mapMsg fu
+               }
+
+           mapDescMsg : Descendant msg -> Descendant msg2
+           mapDescMsg desc =
+               case desc of
+                   Leaf (foliage) (maybeItem) ->
+                       Leaf
+                           (List.map (Tuple.mapSecond (Html.map fu)) foliage)
+                           (Maybe.map (mapItemMsg))
+                   Wrap (foliageFu) (ui) ->
+                       Wrap identity (mapMsg fu ui)
+       in
+       List.map mapDescMsg
+-}
 ---- DECOMPOSE ----
 
 
@@ -367,9 +391,10 @@ lowerLayerMask =
 
 
 {-| Generate [keyed Html (Foliage)](Ui.Layout.ViewModel#Foliage)
+TODO: Remove the Maybe. Why? It's no big convenience but it makes the semantics very fuzzy: what is a "Nothing" layout?
 -}
-view : Url -> Maybe Layout -> Ui msg -> Foliage msg
-view url maybeLayout =
+view : Url -> Layout -> Ui msg -> Foliage msg
+view url layout =
     let
         query : String
         query =
@@ -445,47 +470,44 @@ view url maybeLayout =
                         , Mask.opaque
                         )
 
-                Alternate ( path0, path1 ) face ->
+                Bounce ( path0, path1 ) face ->
                     if List.member path0 paths then
                         ( keyByIndex [ Html.a [ href (path0 ++ query ++ "?rerouteLink=" ++ path1) ] (static face) ], Mask.transparent )
 
                     else
                         ( keyByIndex [ Html.a [ href (path0 ++ query) ] (static face) ], Mask.transparent )
 
-        viewUi : (Descendant msg -> ViewModel msg) -> Ui msg -> ViewModel msg
-        viewUi howToViewDescendant =
-            List.foldr (howToViewDescendant >> ViewModel.merge) ViewModel.empty
-
-        viewGet : ( Aspect, Mask (Ui msg) ) -> Get (Ui msg) -> ViewModel msg
-        viewGet ( aspect, mask ) =
-            Get.mapByKey (\key -> viewUi (viewDesc ( key, mask )))
-                >> Get.values [ Scene, Control, Info ]
-                >> List.foldl ViewModel.merge ViewModel.empty
-
         viewItem : ( Aspect, Mask (Ui msg) ) -> Item msg -> ViewModel msg
         viewItem ( aspect, mask ) item =
             let
-                ( handle, itemMask ) =
+                ( itemHandle, itemMask ) =
                     viewHandle item.handle
             in
-            viewGet ( aspect, mask >> itemMask ) item.get
-                |> ViewModel.mapHandle (\_ -> handle)
+            item.get
+                |> Get.mapByKey
+                    (\key -> viewUi ( key, mask >> itemMask ))
+                |> Get.values [ Scene, Control, Info ]
+                |> ViewModel.concat
+                |> ViewModel.appendHandle itemHandle
 
-        viewDesc : ( Aspect, Mask (Ui msg) ) -> Descendant msg -> ViewModel msg
-        viewDesc ( aspect, mask ) d =
-            case d of
-                Leaf foliage_ maybeItem ->
-                    maybeItem
-                        |> Maybe.unwrap ViewModel.empty (viewItem ( aspect, mask ))
-                        |> ViewModel.mapGet (Get.addList aspect foliage_)
+        viewUi : ( Aspect, Mask (Ui msg) ) -> Ui msg -> ViewModel msg
+        viewUi ( aspect, mask ) =
+            ViewModel.concatMap <|
+                \descendant ->
+                    case descendant of
+                        Twig foliage_ maybeItem ->
+                            maybeItem
+                                |> Maybe.unwrap ViewModel.empty (viewItem ( aspect, mask ))
+                                |> ViewModel.appendGet (Get.singleton aspect foliage_)
 
-                Wrap wrapper descList ->
-                    descList
-                        |> viewUi (viewDesc ( aspect, mask ))
-                        |> ViewModel.mapGet (Get.update aspect wrapper)
+                        Wrap wrapper descList ->
+                            descList
+                                |> viewUi ( aspect, mask )
+                                |> ViewModel.mapGet (Get.update aspect wrapper)
     in
-    viewUi (viewDesc ( Scene, Mask.transparent ))
-        >> (\viewModel -> Maybe.withDefault Layout.Default maybeLayout |> Layout.view viewModel)
+    viewUi ( Scene, Mask.transparent )
+        >> Layout.view
+        >> (|>) layout
 
 
 
@@ -574,7 +596,7 @@ type Handle msg
     = Constant (List (Html msg))
     | Toggle Flag (List (Html Never))
     | Summarize Flag (Bool -> List (Html Never))
-    | Alternate ( Path, Path ) (List (Html Never))
+    | Bounce ( Path, Path ) (List (Html Never))
 
 
 
@@ -596,12 +618,12 @@ toggle =
 {-| Link to `path 1`. When active, link to `path 2` instead.
 Use for unique accordion expansion, or tree-shaped scenes in general.
 
-**CSS:** `a:active`, `a:link:active`, `a:visited:active`; `a.alternate`
+**CSS:** `a:active`, `a:link:active`, `a:visited:active`; `a.bounce`
 
 -}
-alternate : ( Path, Path ) -> List (Html Never) -> Ui msg
-alternate =
-    Alternate >> (<<) createHandle
+bounce : ( Path, Path ) -> List (Html Never) -> Ui msg
+bounce =
+    Bounce >> (<<) createHandle
 
 
 {-| Prepend a summary to the scene, which the user can collapse or expand.
@@ -632,140 +654,6 @@ createHandle h =
 
 type alias Static =
     List (Html Never)
-
-
-{-| An Api for `href` composition!
-
-Discussion: Is `Handle` just for the links in the top area of the
-app, or for all Flag manipulating links (including tabs inside
-the Control), or for all internal links?
-
-  - It is very reassuring to know which layout area a node is drawn in
-
-  - Nesting a Scene in a Control means that the Control 'controls' the
-    Scene. So it may be feasible to say:
-
-    Scene a
-    Handle h (with some static content)
-    Control c
-    Scene b
-
-    which means, Scene a contains Scene b if Handle h is `on`
-    (Control c is transparent)
-
-  - We don't know enough about links. It would be smart to visualise
-    all hrefs in the google docs example.
-    For example, the Menu link implements a dropdown, i.e. 'spring-
-    loaded' state, so the flag must auto-delete when a new context is
-    opened.
-
--}
-type alias Application model modelMsg =
-    Program () ( Nav.Key, Url, model ) (Msg modelMsg)
-
-
-{-| -}
-type alias Document modelMsg =
-    { body : Ui modelMsg, layout : Maybe Layout, title : String }
-
-
-{-| Separate Url update from Model update
--}
-application :
-    { init : ( model, Cmd modelMsg )
-    , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : Path -> model -> { body : Ui modelMsg, layout : Maybe Layout, title : String }
-    }
-    ---> Application model modelMsg
-    -> Program () ( Nav.Key, Url, model ) (Msg modelMsg)
-application config =
-    Browser.application
-        { --init : () -> Url -> Key -> ( ( Nav.Key, Url, model ), Cmd (Msg modelMsg) )
-          init =
-            \_ url key ->
-                config.init
-                    |> (\( updatedModel, modelCmd ) ->
-                            ( ( key, canonical.init url, updatedModel ), Cmd.map ModelMsg modelCmd )
-                       )
-
-        --view : ( Nav.Key, Url, model ) -> Document (Msg modelMsg)
-        , view =
-            \( _, url, model ) ->
-                config.view url.path model
-                    |> (\document ->
-                            { title = document.title
-                            , body = view url document.layout document.body |> List.map (Tuple.second >> Html.map ModelMsg)
-                            }
-                       )
-
-        --update : msg -> ( Nav.Key, Url, model ) -> ( ( Nav.Key, Url, model ), Cmd (Msg modelMsg) )
-        , update =
-            \msg ( key, url, model ) ->
-                case msg of
-                    UrlChanged receivedUrl ->
-                        let
-                            canonicalUrl : Url
-                            canonicalUrl =
-                                canonical.update receivedUrl url
-                        in
-                        ( ( key, canonicalUrl, model )
-                        , if canonicalUrl == url then
-                            Cmd.none
-
-                          else
-                            Nav.replaceUrl key (Url.toString canonicalUrl)
-                        )
-
-                    LinkClicked (Browser.Internal newUrl) ->
-                        ( ( key, url, model ), Nav.pushUrl key (Url.toString newUrl) )
-
-                    LinkClicked (Browser.External href) ->
-                        ( ( key, url, model ), Nav.load href )
-
-                    ModelMsg modelMsg ->
-                        config.update modelMsg model
-                            |> (\( updatedModel, modelCmd ) ->
-                                    ( ( key, url, updatedModel ), Cmd.map ModelMsg modelCmd )
-                               )
-        , subscriptions = \_ -> Sub.none
-        , onUrlChange = UrlChanged
-        , onUrlRequest = LinkClicked
-        }
-
-
-{-| Use cases 1:
-
-The user toggles a Ui handle, for example the avatar, to open or close a menu.
-
-(a)
-They decide to share the link of the handle, so they right-click on the toggle and choose 'copy link'.
-Their friend opens the link and the handle is activated.
-
-(b)
-They copy the Url and paste it in another tab or browser or device.
-The app loads and restores exactly the same Ui state.
-
-In the case of (a), we share a href, which is a string.
-The friend opens the link, and Elm turns it into the initial Url.
-Now, `canonical.init` canonicalises the initial Url
-
--}
-canonical : { init : Url -> Url, update : Url -> Url -> Url }
-canonical =
-    { init = \received -> received
-    , update = \received previous -> received
-    }
-
-
-
----- Update ----
-
-
-{-| -}
-type Msg modelMsg
-    = UrlChanged Url
-    | LinkClicked Browser.UrlRequest
-    | ModelMsg modelMsg
 
 
 

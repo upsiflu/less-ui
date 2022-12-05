@@ -1,4 +1,4 @@
-module ApplicationMain exposing (Model, main)
+module Writing exposing (main)
 
 {-|
 

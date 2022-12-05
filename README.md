@@ -45,7 +45,6 @@ Since the Dom has the shape of a tree, most Ui libraries let you construct hiera
 
 [Case study: Reproducing the Google Docs mobile Ui](cases/Case.md)
 
-
 ### (2) Separate the Route from your Model
 
 **Why?** In the conventional Elm architecture, if you want the `view` to respect state encoded in the `Url` such as queries or flags, you need your `update` to incorporate this state into the in-memory application Model, which is eventually interpreted in the `view`:

@@ -28,7 +28,8 @@ type Layout
     | SceneOnly
 
 
-{-| -}
+{-| Traverses the tree from leaves to root, building up the vDom
+-}
 view : ViewModel msg -> Layout -> Foliage msg
 view { handle, get } layout =
     case layout of

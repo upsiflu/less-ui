@@ -6,7 +6,7 @@ module Ui.Get exposing
     , consList, addList
     , map, mapValue, map2, map2WithDefaults, map2Value, filter
     , mapByKey, mapValueByKey, map2ByKey
-    , concat
+    , append
     , join, unlockInner, unlockOuter
     , orElse
     , andThen, andThenFlat, andThenMaybe, andMap, andMapFlat
@@ -49,7 +49,7 @@ module Ui.Get exposing
 
 ### Map `Get (List a)`
 
-@docs concat
+@docs append
 
 
 ### Map `Get (Get a)`
@@ -419,7 +419,9 @@ mapValue =
     (<<)
 
 
-{-| -}
+{-| Parametrize map over key.
+Same as andMapFlat!
+-}
 mapByKey : (Aspect -> a -> b) -> Get a -> Get b
 mapByKey fu getA key =
     Maybe.map (fu key) (getA key)
@@ -468,7 +470,9 @@ map2ByKey fu getA getB =
     \key -> Maybe.map2 (fu key) (getA key) (getB key)
 
 
-{-| interprets Nothing as []
+{-| Interprets Nothing as [].
+
+Difference to `addList`: Both lists to append can be Nothing.
 
     import Ui.Layout.Aspect exposing (Aspect(..))
 
@@ -483,8 +487,8 @@ map2ByKey fu getA getB =
             --> Just [1]
 
 -}
-concat : Get (List a) -> Get (List a) -> Get (List a)
-concat =
+append : Get (List a) -> Get (List a) -> Get (List a)
+append =
     map2Value (mapLists (++))
 
 
@@ -606,7 +610,8 @@ andMap getAB getA =
             )
 
 
-{-| like `andMap`, but apply the same key twice
+{-| Like `andMap`, but apply the same key twice.
+Same as `mapByKey`!
 -}
 andMapFlat : Get (a -> b) -> Get a -> Get b
 andMapFlat =
@@ -696,7 +701,7 @@ fromList =
 {-| -}
 toListBy : Get (a -> b) -> List Aspect -> Get a -> List b
 toListBy getAB aspects =
-    andMap getAB >> join >> values aspects
+    andMapFlat getAB >> values aspects
 
 
 {-|
