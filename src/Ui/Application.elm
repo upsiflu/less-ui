@@ -1,8 +1,40 @@
 module Ui.Application exposing (application, Application, Document, Msg)
 
-{-|
+{-| In contrast to `Browser.Application`, this module maks the `Url` the
+single source of truth for the state of your user interface.
 
 @docs application, Application, Document, Msg
+
+---
+
+
+## Why?
+
+In the conventional Elm architecture, if you want the `view` to respect state encoded in the `Url` such as queries or flags, you need your `update` to incorporate this state into the in-memory application Model, which is eventually interpreted in the `view`:
+
+     - - Url ↘               Cmd ⭢ Url' - - -
+             Message ↘      ↗
+                      update
+     - - - - - Model ↗      ↘ Model' - - - - -
+                                  ↘
+                                  view
+
+This opens two possible pitfalls:
+
+  - The Url can potentially manipulate parts of the Model that are not only intended for viewing, for example data shared with the backend
+  - The Model needs to parse the `Url` and pass it to the `view`, potentially losing or misinterpreting information.
+
+
+## How?
+
+    - - - - - - Url ↘     ↗ ↗ Url' - - -
+                     Flags, Path
+                               ↘
+                               view
+                               ↗
+    - - - - -  Model ↘    ↗ Model' - - -
+                     update
+             Message ↗    ↘ Cmd
 
 -}
 
@@ -12,7 +44,7 @@ import Html
 import Html.Attributes exposing (..)
 import Ui exposing (Ui)
 import Ui.Layout exposing (Layout)
-import Ui.Link as Href exposing (Path)
+import Ui.Link as Link exposing (Path)
 import Url exposing (Url)
 
 
@@ -22,24 +54,24 @@ Discussion: Is `Handle` just for the links in the top area of the
 app, or for all Flag manipulating links (including tabs inside
 the Control), or for all internal links?
 
-  - It is very reassuring to know which layout area a node is drawn in
+     - It is very reassuring to know which layout area a node is drawn in
 
-  - Nesting a Scene in a Control means that the Control 'controls' the
-    Scene. So it may be feasible to say:
+     - Nesting a Scene in a Control means that the Control 'controls' the
+       Scene. So it may be feasible to say:
 
-    Scene a
-    Handle h (with some static content)
-    Control c
-    Scene b
+       Scene a
+       Handle h (with some static content)
+       Control c
+       Scene b
 
-    which means, Scene a contains Scene b if Handle h is `on`
-    (Control c is transparent)
+       which means, Scene a contains Scene b if Handle h is `on`
+       (Control c is transparent)
 
-  - We don't know enough about links. It would be smart to visualise
-    all hrefs in the google docs example.
-    For example, the Menu link implements a dropdown, i.e. 'spring-
-    loaded' state, so the flag must auto-delete when a new context is
-    opened.
+     - We don't know enough about links. It would be smart to visualise
+       all hrefs in the google docs example.
+       For example, the Menu link implements a dropdown, i.e. 'spring-
+       loaded' state, so the flag must auto-delete when a new context is
+       opened.
 
 -}
 type alias Application model modelMsg =
@@ -130,7 +162,7 @@ Now, `canonical.init` canonicalises the initial Url
 canonical : { init : Url -> Url, update : Url -> Url -> Url }
 canonical =
     { init = \received -> received
-    , update = Href.update
+    , update = Link.update
     }
 
 

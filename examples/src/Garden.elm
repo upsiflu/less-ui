@@ -1,11 +1,8 @@
-module Garden exposing
-    ( main
-    , Msg
-    )
+module Garden exposing (main, Msg)
 
 {-|
 
-@docs main
+@docs main, Msg
 
 -}
 

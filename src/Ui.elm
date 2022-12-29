@@ -395,7 +395,7 @@ view url layout =
         viewItem : ( Aspect, Mask (Ui msg) ) -> Item msg -> ViewModel msg
         viewItem ( aspect, mask ) item =
             let
-                ( itemHandle, itemMask, appendHandle ) =
+                ( appendHandle, itemMask ) =
                     viewHandle item.handle
             in
             item.get
@@ -403,31 +403,36 @@ view url layout =
                     (\key -> viewUi ( key, mask >> itemMask ))
                 |> Get.values [ Scene, Control, Info ]
                 |> ViewModel.concat
-                |> appendHandle aspect itemHandle
+                |> appendHandle aspect
 
-        viewHandle : Handle msg -> ( Foliage msg, Mask (Ui msg), Aspect -> Foliage msg -> ViewModel msg -> ViewModel msg )
+        viewHandle : Handle msg -> ( Aspect -> ViewModel msg -> ViewModel msg, Mask (Ui msg) )
         viewHandle h =
             case h of
                 Constant html_ ->
-                    ( keyByIndex html_, Mask.transparent, \_ -> ViewModel.appendHandle )
+                    ( \_ -> keyByIndex html_ |> ViewModel.appendHandle
+                    , Mask.transparent
+                    )
 
                 Link aspects link_ ->
                     Link.view url link_
                         |> (\( foliage_, mask_ ) ->
-                                ( [ ( Url.toString url, Html.map never (foliage_ [] []) ) ]
+                                ( \_ -> ViewModel.appendHandle [ ( Url.toString url, Html.map never (foliage_ [] []) ) ]
                                 , mask_ aspects
-                                , \_ -> ViewModel.appendHandle
                                 )
                            )
 
                 Inline aspects link_ ->
                     Link.view url link_
                         |> (\( foliage_, mask_ ) ->
-                                ( [ ( Url.toString url, Html.map never (foliage_ [] []) ) ]
+                                ( Get.singleton
+                                    >> (|>) [ ( Url.toString url, Html.map never (foliage_ [] []) ) ]
+                                    >> ViewModel.appendGet
                                 , mask_ aspects
-                                , Get.singleton >> (<<) ViewModel.appendGet
                                 )
                            )
+
+                Custom c ->
+                    c
     in
     viewUi ( Scene, Mask.transparent )
         >> Layout.view
@@ -457,6 +462,7 @@ type Handle msg
     = Constant (List (Html msg))
     | Link (List Aspect) Link
     | Inline (List Aspect) Link
+    | Custom ( Aspect -> ViewModel msg -> ViewModel msg, Mask (Ui msg) )
 
 
 {-| Here you can add your own link, button, input, or indicator.
@@ -486,19 +492,7 @@ fromHandle h =
 
 
 
----- Creating Links ----
 ---- Conditional Views ----
-
-
-isDebugging : Bool
-isDebugging =
-    False
-
-
-{-| -}
-debugOnly : Html msg -> Html msg
-debugOnly =
-    notIf (not isDebugging)
 
 
 {-| -}

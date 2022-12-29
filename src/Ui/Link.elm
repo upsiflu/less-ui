@@ -237,7 +237,26 @@ replaceRoute r previousUrl =
 ---- Update ----
 
 
-{-| -}
+{-|
+
+
+## Motivation
+
+The user toggles a Ui handle, for example the avatar, to open or close a menu.
+
+(a)
+They decide to share the link of the handle, so they right-click on the toggle and choose
+'copy link'. Their friend opens the link and the handle is activated.
+
+(b)
+They copy the Url and paste it in another tab or browser or device.
+The app loads and restores exactly the same Ui state.
+
+In the case of (a), we share a href, which is a string.
+The friend opens the link, and Elm turns it into the initial Url.
+Now, `canonical.init` canonicalises the initial Url
+
+-}
 update : Url -> Url -> Url
 update receivedUrl =
     let

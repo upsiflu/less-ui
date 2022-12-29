@@ -48,38 +48,14 @@ Since the Dom has the shape of a tree, most Ui libraries let you construct hiera
 
 ### (2) Separate the Route from your Model
 
-**Why?** In the conventional Elm architecture, if you want the `view` to respect state encoded in the `Url` such as queries or flags, you need your `update` to incorporate this state into the in-memory application Model, which is eventually interpreted in the `view`:
- 
-     - - Url ↘               Cmd ⭢ Url' - - -
-             Message ↘      ↗ 
-                      update       
-     - - - - - Model ↗      ↘ Model' - - - - -
-                                  ↘ 
-                                  view
+_Consult [the `Application` docs](Ui.Application) for details._
 
-This opens two possible pitfalls:
+- Define your `Model` and `update` indepenent from the `Url` query
+- Use declarative relative Links to respond to the state of your Ui:
+  - [`Toggle`](Ui.Link) some [Controls](Ui.Layout.Aspect), for example user preferences or a toolbar
+  - [`Bounce`](Ui.Link) between expanded and collapsed states inside an interactive tree view, accordion, or nested diagram
 
-- The Url can potentially manipulate parts of the Model that are not only intended for viewing, for example data shared with the backend
-- The Model needs to parse the `Url` and pass it to the `view`, potentially losing or misinterpreting information.
-
-**How?**
-
-    - - - Url ⭢ (Route) ⭢ Url' - - - -
-                               ↘
-                               view  
-                               ↗
-    - - - - -  Model ↘    ↗ Model' - - -
-                     update       
-             Message ↗    ↘ Cmd
-
-
-
-- Your `update` doesn't know about the `Url`
-- Your `view` sees the `Url`, but you may not need to parse it because `Ui` provides some common patterns to manipulate the Route interactively:
-  - [toggle](Ui#toggle) some [Controls](Ui.Layout.Aspect), for example user preferences or a toolbar
-  - [alternate](Ui#alternate) between expanded and collapsed states inside an interactive tree view, accordion, or nested diagram.
-
-The `Ui` module provides a simplified `application` type:
+The [`Application`](Ui.Application) module catches changes to the `Url` and provides a simplified `application` function:
 
 ```elm
    application :
@@ -88,7 +64,4 @@ The `Ui` module provides a simplified `application` type:
         , view : ( ( Url, Key ), model ) -> Document modelMsg
         }
         -> Application model modelMsg
-
-    type alias Application model modelMsg =
-        Program () ( ( Url, Key ), model ) (Msg modelMsg)
 ```
