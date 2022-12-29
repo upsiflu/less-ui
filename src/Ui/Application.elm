@@ -1,4 +1,4 @@
-module Ui.Application exposing (application, Application, Document)
+module Ui.Application exposing (application, Application, Document, Msg)
 
 {-|
 
@@ -10,9 +10,9 @@ import Browser
 import Browser.Navigation as Nav
 import Html
 import Html.Attributes exposing (..)
-import Ui exposing (Path, Ui)
+import Ui exposing (Ui)
 import Ui.Layout exposing (Layout)
-import Ui.Layout.Aspect exposing (Aspect(..))
+import Ui.Link as Href exposing (Path)
 import Url exposing (Url)
 
 
@@ -62,25 +62,15 @@ application :
     -> Program () ( Nav.Key, Url, model ) (Msg modelMsg)
 application config =
     Browser.application
-        { --init : () -> Url -> Key -> ( ( Nav.Key, Url, model ), Cmd (Msg modelMsg) )
-          init =
+        { init =
             \_ url key ->
                 config.init
                     |> (\( updatedModel, modelCmd ) ->
                             ( ( key, canonical.init url, updatedModel ), Cmd.map ModelMsg modelCmd )
                        )
-
-        --view : ( Nav.Key, Url, model ) -> Document (Msg modelMsg)
-        , view =
-            \( _, url, model ) ->
-                config.view url.path model
-                    |> (\document ->
-                            { title = document.title
-                            , body = Ui.view url document.layout document.body |> List.map (Tuple.second >> Html.map ModelMsg)
-                            }
-                       )
-
-        --update : msg -> ( Nav.Key, Url, model ) -> ( ( Nav.Key, Url, model ), Cmd (Msg modelMsg) )
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
+        , subscriptions = \_ -> Sub.none
         , update =
             \msg ( key, url, model ) ->
                 case msg of
@@ -109,9 +99,14 @@ application config =
                             |> (\( updatedModel, modelCmd ) ->
                                     ( ( key, url, updatedModel ), Cmd.map ModelMsg modelCmd )
                                )
-        , subscriptions = \_ -> Sub.none
-        , onUrlChange = UrlChanged
-        , onUrlRequest = LinkClicked
+        , view =
+            \( _, url, model ) ->
+                config.view url.path model
+                    |> (\document ->
+                            { title = document.title
+                            , body = Ui.view url document.layout document.body |> List.map (Tuple.second >> Html.map ModelMsg)
+                            }
+                       )
         }
 
 
@@ -135,7 +130,7 @@ Now, `canonical.init` canonicalises the initial Url
 canonical : { init : Url -> Url, update : Url -> Url -> Url }
 canonical =
     { init = \received -> received
-    , update = \received previous -> received
+    , update = Href.update
     }
 
 

@@ -13,8 +13,10 @@ import Garden.Rhododendron exposing (Rhododendron)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Ui exposing (Ui)
-import Ui.Layout exposing (Layout)
+import Ui.Application exposing (Application, application)
+import Ui.Layout as Layout exposing (Layout)
 import Ui.Layout.Aspect exposing (Aspect(..))
+import Ui.Link as Link
 
 
 {-| -}
@@ -40,14 +42,14 @@ update msg garden =
             )
 
 
-view : Ui.Path -> Garden -> { body : Ui Msg, layout : Maybe Layout, title : String }
+view : Link.Path -> Garden -> { body : Ui Msg, layout : Layout, title : String }
 view path garden =
     { title = "Welcome to the Garden!"
-    , layout = Nothing
+    , layout = Layout.Default
     , body =
         page
             |> Ui.with Scene
-                (Ui.toggle "rhododendron" [ Html.text "Rhododendron" ]
+                (Ui.link [ Control ] (Link.Toggle "rhododendron")
                     |> Ui.with Control
                         (Garden.Rhododendron.view RhododendronMsg garden.rhododendron)
                 )
@@ -90,9 +92,9 @@ myInfo =
 
 
 {-| -}
-main : Ui.Application Garden Msg
+main : Application Garden Msg
 main =
-    Ui.application
+    application
         { init = init
         , update = update
         , view = view

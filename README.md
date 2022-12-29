@@ -3,6 +3,7 @@
 ### Try the examples:
 ```shell
 cd examples
+
 npm install -g elm-watch
 npm ci
 

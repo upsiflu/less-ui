@@ -11,7 +11,9 @@ import Html.Attributes as Attr
 import Html.Events as Events
 import Ui exposing (Ui)
 import Ui.Application exposing (Application, application)
+import Ui.Layout as Layout
 import Ui.Layout.Aspect exposing (Aspect(..))
+import Ui.Link as Link
 
 
 {-| -}
@@ -34,7 +36,7 @@ init =
     ( 0, Cmd.none )
 
 
-pageFromPath : Ui.Path -> Path
+pageFromPath : Link.Path -> Path
 pageFromPath path =
     case path of
         "/" ->
@@ -50,7 +52,7 @@ pageFromPath path =
             NotFound
 
 
-pathFromPage : Page -> Ui.Path
+pathFromPage : Page -> Link.Path
 pathFromPage page =
     case page of
         Home ->
@@ -69,7 +71,7 @@ update () model =
 --view : Path -> model -> Document modelMsg
 
 
-view : Ui.Path -> Model -> Ui.Application.Document ()
+view : Link.Path -> Model -> Ui.Application.Document ()
 view rawPath model =
     let
         appendCounter : Ui () -> Ui ()
@@ -139,7 +141,7 @@ viewPage title route content =
     , body =
         Ui.constant [ viewNav route ]
             |> Ui.with Scene content
-    , layout = Nothing
+    , layout = Layout.Default
     }
 
 

@@ -6,7 +6,9 @@ module Ui.Layout.ViewModel exposing
     , concat, concatMap
     )
 
-{-| Intermediate model before applying a [Layout](Ui.Layout)
+{-| Intermediate model calculated before applying a [Layout](Ui.Layout)
+
+You can probably ignore this module.
 
 @docs ViewModel, Foliage
 
@@ -102,5 +104,5 @@ mapHandle fu =
 
 {-| -}
 appendHandle : Foliage msg -> ViewModel msg -> ViewModel msg
-appendHandle fo =
-    mapHandle ((++) fo)
+appendHandle foliage =
+    mapHandle ((++) foliage)

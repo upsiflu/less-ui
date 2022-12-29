@@ -16,7 +16,7 @@ module Ui.Get exposing
     , sequence
     )
 
-{-| This is a very simple dictionary type with `Aspect` as key.
+{-| Dictionary [`Aspect`](Ui.Layout.Aspect) -> `ui`
 
 @docs Get
 

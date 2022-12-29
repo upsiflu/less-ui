@@ -16,7 +16,7 @@ module Ui.Layout exposing
 
 import Html exposing (Html)
 import Html.Attributes exposing (..)
-import Html.Keyed exposing (node, ul)
+import Html.Keyed exposing (node)
 import Ui.Get as Get exposing (Get)
 import Ui.Layout.Aspect exposing (Aspect(..))
 import Ui.Layout.ViewModel exposing (Foliage, ViewModel)

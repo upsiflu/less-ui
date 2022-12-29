@@ -16,6 +16,7 @@
 ```
 - [ ] **Relative links**. A link may act differently, depending on the previous Route.
   - `bounce` _`Path p`_ _`Path q`_: Links to _p_, unless you are already there, in which case it links to _q_.
+  - on LinkClicked, the incoming urlRequest is interpreted as relative: an incoming urlRequest `abc` on top of `xyz?f&q=r` will yield `abc?f&q=r`. This will enable manual relative links in precomposed Html.
 
 ### Patterns to implement later:
 There is one open question which I am postponing to v1.1.0. I feel it requires some groundwork now to keep the concerns orthogonal.
@@ -26,6 +27,8 @@ There is one open question which I am postponing to v1.1.0. I feel it requires s
 Plans for versions beyond 1.1:
 
 - [ ] **Restrictive Controls**. What if the `Model` type implies a comprehensive Widget? Instead of manually designing a `Ui` and wiring it up with the Model, introducing potential omissions or undesired states, an algorithm can derive a comprehensive Control Sheet for each of your Model constructors. Caveat is that for each constructor, the previously chosen parameters need to be kept in-memory (which is traditionally done by the Html DOM). We need to encode them either in the Url or in some local storage. Of course, in user-facing situations, you will want to handcraft a design instead, so it should be very easy to opt in and out locally.
+
+- [ ] **Search Pattern**. How would a restrictive Api enable a search Api? Would it be a filter Api? Would it pertain to the window or separately to certain Scenes? What about autocompete tokens in a Control?
 
 # Tabs
 

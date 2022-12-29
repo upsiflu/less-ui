@@ -4,8 +4,8 @@ module Ui exposing
     , wrap
     , with
     , view, toHtml
-    , toggle, constant, summarize, bounce
-    , Path, Flag, Handle(..)
+    , constant, inline, link
+    , Handle
     , addLabel, addTextLabel
     , setAspect
     , repeat
@@ -47,9 +47,9 @@ To merge two `Ui`s on the same level, use [`++`](https://package.elm-lang.org/pa
 
 # Add Interactivity
 
-@docs toggle, constant, summarize, bounce
+@docs constant, inline, link
 
-@docs Path, Flag, Handle
+@docs Handle
 
 
 # Convenience
@@ -89,17 +89,16 @@ You can directly use List decomposition functions such as `List.head`, `List.isE
 import Bool.Extra as Bool
 import Html exposing (Html)
 import Html.Attributes exposing (..)
-import Html.Keyed exposing (node, ul)
+import Html.Keyed exposing (node)
 import List.Extra as List
 import Maybe.Extra as Maybe
 import Ui.Get as Get exposing (Get)
 import Ui.Layout as Layout exposing (Layout)
 import Ui.Layout.Aspect exposing (Aspect(..))
 import Ui.Layout.ViewModel as ViewModel exposing (Foliage, ViewModel)
+import Ui.Link as Link exposing (Link)
 import Ui.Mask as Mask exposing (Mask)
-import Ui.State exposing (State)
 import Url exposing (Url)
-import Url.Codec exposing (Codec)
 
 
 {-| -}
@@ -178,11 +177,6 @@ fromItem =
 
 {-| Nest a sub-Ui to each descendant, via a [semantic aspect](Ui.Layout.Aspect):
 
-  - [`Handle`](#Handle) (Avatars, view-options, hamburger icon...)
-  - [`Scene`](Ui.Layout.Aspect) (the objects of interest)
-  - [`Control`](Ui.Layout.Aspect) (tools and config sheet)
-  - [`Info`](Ui.Layout.Aspect) (snacks and status)
-
 Note that `[] |> with ...` will always produce `[]`
 
     [] |> with Scene (textLabel "I want to be a scene")
@@ -197,7 +191,7 @@ with aspect subUi =
                 Twig foliage_ maybeItem ->
                     maybeItem
                         |> Maybe.unpack
-                            (\() -> { handle = Constant [], get = Get.singleton aspect subUi })
+                            (\() -> { get = Get.singleton aspect subUi, handle = Constant [] })
                             (\it -> { it | get = Get.addList aspect subUi it.get })
                         |> Just
                         |> Twig foliage_
@@ -378,118 +372,11 @@ uncons =
 ---- VIEW ----
 
 
-sameLayerMask : Mask (Ui msg)
-sameLayerMask =
-    Mask.occludeList
-        [ Control, Info ]
-
-
-lowerLayerMask : Mask (Ui msg)
-lowerLayerMask =
-    Mask.occludeList
-        [ Control, Info ]
-
-
 {-| Generate [keyed Html (Foliage)](Ui.Layout.ViewModel#Foliage)
-TODO: Remove the Maybe. Why? It's no big convenience but it makes the semantics very fuzzy: what is a "Nothing" layout?
 -}
 view : Url -> Layout -> Ui msg -> Foliage msg
 view url layout =
     let
-        query : String
-        query =
-            Maybe.map (\q -> "?" ++ q) url.query
-                |> Maybe.withDefault ""
-
-        flags : List String
-        flags =
-            String.split "&" query
-
-        paths : List String
-        paths =
-            String.split "/" url.path
-
-        static : List (Html Never) -> List (Html msg)
-        static =
-            List.map (Html.map never)
-
-        viewHandle : Handle msg -> ( Foliage msg, Mask (Ui msg) )
-        viewHandle h =
-            case h of
-                Constant html_ ->
-                    ( keyByIndex html_, Mask.transparent )
-
-                Toggle flag face ->
-                    if List.member flag flags then
-                        ( keyByIndex
-                            [ Html.a
-                                [ href (url.path ++ "?toggle=" ++ flag)
-                                , attribute "role" "switch"
-                                , attribute "aria-checked" "true"
-                                ]
-                                (static face)
-                            ]
-                        , Mask.transparent
-                        )
-
-                    else
-                        ( keyByIndex
-                            [ Html.a
-                                [ href (url.path ++ "?toggle=" ++ flag)
-                                , attribute "role" "switch"
-                                , attribute "aria-checked" "false"
-                                ]
-                                (static face)
-                            ]
-                        , Mask.occlude Control
-                        )
-
-                -- TODO: Check if you can have a summary/details inside an <a>.
-                Summarize flag conditionalFace ->
-                    if List.member flag flags then
-                        ( keyByIndex
-                            [ Html.a
-                                [ href (url.path ++ "?summarize=" ++ flag)
-                                , attribute "role" "switch"
-                                , attribute "aria-expanded" "true"
-                                ]
-                                (static (conditionalFace True))
-                            ]
-                        , Mask.transparent
-                        )
-
-                    else
-                        ( keyByIndex
-                            [ Html.a
-                                [ href (url.path ++ "?summarize=" ++ flag)
-                                , attribute "role" "switch"
-                                , attribute "aria-expanded" "false"
-                                ]
-                                (static (conditionalFace False))
-                            ]
-                        , Mask.opaque
-                        )
-
-                Bounce ( path0, path1 ) face ->
-                    if List.member path0 paths then
-                        ( keyByIndex [ Html.a [ href (path0 ++ query ++ "?rerouteLink=" ++ path1) ] (static face) ], Mask.transparent )
-
-                    else
-                        ( keyByIndex [ Html.a [ href (path0 ++ query) ] (static face) ], Mask.transparent )
-
-        viewItem : ( Aspect, Mask (Ui msg) ) -> Item msg -> ViewModel msg
-        viewItem ( aspect, mask ) item =
-            let
-                ( itemHandle, itemMask ) =
-                    viewHandle item.handle
-            in
-            item.get
-                |> Get.mapByKey
-                    (\key -> viewUi ( key, mask >> itemMask ))
-                |> Get.values [ Scene, Control, Info ]
-                |> ViewModel.concat
-                |> ViewModel.appendHandle itemHandle
-
         viewUi : ( Aspect, Mask (Ui msg) ) -> Ui msg -> ViewModel msg
         viewUi ( aspect, mask ) =
             ViewModel.concatMap <|
@@ -504,6 +391,43 @@ view url layout =
                             descList
                                 |> viewUi ( aspect, mask )
                                 |> ViewModel.mapGet (Get.update aspect wrapper)
+
+        viewItem : ( Aspect, Mask (Ui msg) ) -> Item msg -> ViewModel msg
+        viewItem ( aspect, mask ) item =
+            let
+                ( itemHandle, itemMask, appendHandle ) =
+                    viewHandle item.handle
+            in
+            item.get
+                |> Get.mapByKey
+                    (\key -> viewUi ( key, mask >> itemMask ))
+                |> Get.values [ Scene, Control, Info ]
+                |> ViewModel.concat
+                |> appendHandle aspect itemHandle
+
+        viewHandle : Handle msg -> ( Foliage msg, Mask (Ui msg), Aspect -> Foliage msg -> ViewModel msg -> ViewModel msg )
+        viewHandle h =
+            case h of
+                Constant html_ ->
+                    ( keyByIndex html_, Mask.transparent, \_ -> ViewModel.appendHandle )
+
+                Link aspects link_ ->
+                    Link.view url link_
+                        |> (\( foliage_, mask_ ) ->
+                                ( [ ( Url.toString url, Html.map never (foliage_ [] []) ) ]
+                                , mask_ aspects
+                                , \_ -> ViewModel.appendHandle
+                                )
+                           )
+
+                Inline aspects link_ ->
+                    Link.view url link_
+                        |> (\( foliage_, mask_ ) ->
+                                ( [ ( Url.toString url, Html.map never (foliage_ [] []) ) ]
+                                , mask_ aspects
+                                , Get.singleton >> (<<) ViewModel.appendGet
+                                )
+                           )
     in
     viewUi ( Scene, Mask.transparent )
         >> Layout.view
@@ -514,77 +438,14 @@ view url layout =
 ---- Working with Handles ----
 
 
-{-| [`State`](Ui.State) reflects the cumulative state of all [`Handle`](#Handle)s.
-Turning off a `Flag` renders invisible the corresponding [`Control`](Ui.Layout.Aspect) with its descendants, as well as
-one-layer deep nested [`Control`s](Ui.Layout.Aspect) with their descendants.
--}
-type alias Flag =
-    String
-
-
-{-| -}
-type alias Path =
-    String
-
-
-{-| The Route represents both `href`s and `Url`s
--}
-type alias Route =
-    { path : Path
-    , flags : List Flag
-    , reroute : Maybe Path
-    , toggle : Maybe Flag
-    }
-
-
-
-{- -}
-
-
-route : Codec Route
-route =
-    Url.Codec.succeed Route (always True)
-        |> Url.Codec.string (.path >> Just)
-        |> Url.Codec.allQueryFlags .flags
-        |> Url.Codec.queryString "reroute" .reroute
-        |> Url.Codec.queryString "toggle" .toggle
-
-
-getRoute : Url -> Route
-getRoute =
-    Url.Codec.parseUrl [ route ]
-        >> Result.withDefault
-            { path = ""
-            , flags = []
-            , reroute = Nothing
-            , toggle = Nothing
-            }
-
-
-{-| Attention: Fails silently!
--}
-modifyRoute : (Route -> Route) -> Url -> Url
-modifyRoute fu previousUrl =
-    replaceRoute
-        (getRoute previousUrl |> fu)
-        previousUrl
-
-
-{-| Attention: Fails silently!
--}
-replaceRoute : Route -> Url -> Url
-replaceRoute r previousUrl =
-    Url.Codec.toString [ route ] r
-        |> Maybe.andThen Url.fromString
-        |> Maybe.withDefault previousUrl
-
-
-{-| **Handle:**
+{-| **Constant:** Add your own stuff into the Handle aspect
+**Link:** Add a [Link](Ui.Link#Link) into the Handle aspect
+**Inline>** Add a [Link](Ui.Link#Link) into the current aspect
 
   - Popup -> Scene Disclosure in window - volatile - -> TODO
   - Summarize -> Scene Disclosure inline - volatile - -> summary..details [a href="{currentPath}?summarize={flag}"] <- use austinshenk/elm-w3
   - Toggle -> Control Disclosure - persistent - -> a role="switch" href="{currentPath}?toggle={flag}"
-  - Constant -> Noop
+  - Static -> Noop
   - Alternate -> Link to path0 - -> a href="{path0}?rerouteLink=path1"
 
 volatile: `Flag`s are reset when path changes
@@ -594,69 +455,38 @@ unique: A single screen has at most one such `Flag`
 -}
 type Handle msg
     = Constant (List (Html msg))
-    | Toggle Flag (List (Html Never))
-    | Summarize Flag (Bool -> List (Html Never))
-    | Bounce ( Path, Path ) (List (Html Never))
-
-
-
---  | Tab or Radio ...
-
-
-{-| Adds a `Flag` controlling the visibility of adjacent `Control`;
-is represented by a togglebutton in the `handle` area, so it's easy to find.
-Use for implementing a global menu: Settings, User/Avatar, `Edit` button...
-
-**CSS:** `a[role="switch"]:aria-checked`
-
--}
-toggle : Flag -> List (Html Never) -> Ui msg
-toggle =
-    Toggle >> (<<) createHandle
-
-
-{-| Link to `path 1`. When active, link to `path 2` instead.
-Use for unique accordion expansion, or tree-shaped scenes in general.
-
-**CSS:** `a:active`, `a:link:active`, `a:visited:active`; `a.bounce`
-
--}
-bounce : ( Path, Path ) -> List (Html Never) -> Ui msg
-bounce =
-    Bounce >> (<<) createHandle
-
-
-{-| Prepend a summary to the scene, which the user can collapse or expand.
-
-**CSS:** `details[open]`
-
--}
-summarize : Flag -> (Bool -> List (Html Never)) -> Ui msg
-summarize =
-    Summarize >> (<<) createHandle
+    | Link (List Aspect) Link
+    | Inline (List Aspect) Link
 
 
 {-| Here you can add your own link, button, input, or indicator.
 -}
 constant : List (Html msg) -> Ui msg
 constant =
-    Constant >> createHandle
+    Constant >> fromHandle
 
 
-createHandle : Handle msg -> Ui msg
-createHandle h =
+{-| Generate a relative link. (Ui.Href#Msg)[Consuls `Ui.Href#Msg`] for details.
+-}
+link : List Aspect -> Link -> Ui msg
+link aspects =
+    Link aspects >> fromHandle
+
+
+{-| Generate a relative link. (Ui.Href#Msg)[Consuls `Ui.Href#Msg`] for details.
+-}
+inline : List Aspect -> Link -> Ui msg
+inline aspects =
+    Inline aspects >> fromHandle
+
+
+fromHandle : Handle msg -> Ui msg
+fromHandle h =
     fromItem { handle = h, get = \_ -> Nothing }
 
 
 
 ---- Creating Links ----
-
-
-type alias Static =
-    List (Html Never)
-
-
-
 ---- Conditional Views ----
 
 

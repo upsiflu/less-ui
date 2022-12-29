@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Garden</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        .sentinel {
+            width: 100vw;
+            height: 100vh;
+            background: rgba(255, 0, 0, .4);
+        }
+
+        .sentinel,
+        .center {
+            position: absolute;
+            text-align: center;
+        }
+
+        #center {
+            margin-left: -50px;
+            margin-top: -50px;
+            left: 50vw;
+            top: 50vh;
+            background: blue;
+        }
+
+        .sentinels {
+            position: relative;
+            margin-left: 200vw;
+            margin-top: 200vh;
+            outline: 10px solid yellow;
+        }
+
+        a {
+            position: fixed;
+            display: block;
+            background: rgb(173, 173, 173);
+            left: 0;
+            top: 0;
+        }
+
+        a {
+            outline: 10px outset silver;
+        }
+
+        a:active {
+            outline: 10px inset silver;
+        }
+    </style>
+    <script>
+        window.onLoad = e => {
+            console.log(document.querySelector("#center"));
+            document.querySelector("#center").scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+        }
+    </script>
+</head>
+
+<body>
+    <div class="sentinels">
+        <div id="center" style="width:100px; height:100px">Center </div>
+        <div class="sentinel" style="right:100vw; top:-200vh; height:500vh;">Sentinel Left</div>
+        <div class="sentinel" style="bottom:100vh; left:-200vw; width:500vw;">Sentinel Top</div>
+        <div class="sentinel" style="left:200vw; top:-200vh; height:500vh;">Sentinel Right</div>
+        <div class="sentinel" style="top:200vh; left:-200vw; width:500vw;">Sentinel Bottom</div>
+    </div>
+    <a href="?flag">Turn flag on/off</a>
+</body>
+
+</html>

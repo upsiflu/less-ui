@@ -9,6 +9,8 @@
         "Ui.Layout",
         "Ui.Mask",
         "Ui.Get",
+        "Ui.Application",
+        "Ui.Link",
         "Ui.Layout.Aspect",
         "Ui.Layout.ViewModel"
     ],

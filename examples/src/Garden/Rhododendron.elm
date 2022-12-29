@@ -46,28 +46,27 @@ update msg ((Rhododendron label descendants) as rhodo) =
             Rhododendron label (singleton (String.fromInt (count rhodo)) :: descendants)
 
 
-{-|-} 
+{-| -}
 growAt : Path -> Rhododendron -> Rhododendron
 growAt path =
     map
-        (\(Rhododendron label descendants) -> )
+        (\(Rhododendron label descendants) -> label)
 
 
 getPath : Rhododendron -> Path
 getPath (Rhododendron label descendants) =
-    
     String.join ", " (List.map getPath descendants) ++ "🌺"
-
-
 
 
 fromRoot : (List Rhododendron -> Rhododendron) -> Rhododendron -> Rhododendron
 fromRoot fu (Rhododendron label descendants) =
     Rhododendron label <|
-    case descendants of
-        [] -> [fu []]
-        list -> List.map (fromRoot fu) list
+        case descendants of
+            [] ->
+                [ fu [] ]
 
+            list ->
+                List.map (fromRoot fu) list
 
 
 count : Rhododendron -> Int
@@ -77,8 +76,8 @@ count (Rhododendron _ descendants) =
 
 {-| -}
 map : (Rhododendron -> Path) -> Rhododendron -> Rhododendron
-map fu ((Rhododendron label descendants) as rhodo) =
-    Rhododendron (fu rhodo) (List.map (map fu) descendants)
+map toPath ((Rhododendron label descendants) as rhodo) =
+    Rhododendron (toPath rhodo) (List.map (map toPath) descendants)
 
 
 {-| -}
@@ -89,10 +88,10 @@ view howToMessage ((Rhododendron label _) as rhododendron) =
         controls =
             button [ onClick (Grow |> howToMessage) ] [ text "append" ]
                 |> Ui.html
-                |> (++) (input [ onInput (Edit >> howToMessage) ] [ Html.text label ] |> Ui.html |> Ui.addTextLabel "Edit")
+                |> (++) (input [ onInput (Edit label >> howToMessage) ] [ Html.text label ] |> Ui.html |> Ui.addTextLabel "Edit")
 
         scene : Rhododendron -> Ui msg
-        scene (Rhododendron ( s, descendants )) =
+        scene (Rhododendron s descendants) =
             Ui.singleton
                 |> Ui.with Scene (Ui.textLabel s)
                 |> Ui.with Scene (List.concatMap scene descendants)

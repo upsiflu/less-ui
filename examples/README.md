@@ -10,7 +10,7 @@ npm ci
 **Toy around:**
 ```shell
 npm install -g elm-doc-preview
-npm run start
+npm start
 ```
 
 - Edit the files in src/ while watching a browser tab pointing at [localhost:8001](localhost:8001). A note to vscodium users: To activate the language server in your editor, choose "Open Folder..." and select `examples`.
