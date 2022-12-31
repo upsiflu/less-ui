@@ -4,7 +4,7 @@ module Ui exposing
     , wrap
     , with
     , view, toHtml
-    , constant, inline, link
+    , constant
     , Handle
     , addLabel, addTextLabel
     , setAspect
@@ -13,6 +13,7 @@ module Ui exposing
     , map2
     , uncons
     , ifJust, notIf, none
+    , Custom(..), custom
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
@@ -96,7 +97,6 @@ import Ui.Get as Get exposing (Get)
 import Ui.Layout as Layout exposing (Layout)
 import Ui.Layout.Aspect exposing (Aspect(..))
 import Ui.Layout.ViewModel as ViewModel exposing (Foliage, ViewModel)
-import Ui.Link as Link exposing (Link)
 import Ui.Mask as Mask exposing (Mask)
 import Url exposing (Url)
 
@@ -395,44 +395,34 @@ view url layout =
         viewItem : ( Aspect, Mask (Ui msg) ) -> Item msg -> ViewModel msg
         viewItem ( aspect, mask ) item =
             let
-                ( appendHandle, itemMask ) =
-                    viewHandle item.handle
+                ( modifyHandle, itemMask ) =
+                    viewHandle aspect item.handle
+                        |> List.foldr
+                            (\custom_ ( modH, iM ) ->
+                                case custom_ of
+                                    TransformViewModel t ->
+                                        ( modH >> t, iM )
+
+                                    MaskDescendents m ->
+                                        ( modH, iM >> m )
+                            )
+                            ( identity, Mask.transparent )
             in
             item.get
                 |> Get.mapByKey
                     (\key -> viewUi ( key, mask >> itemMask ))
                 |> Get.values [ Scene, Control, Info ]
                 |> ViewModel.concat
-                |> appendHandle aspect
+                |> modifyHandle
 
-        viewHandle : Handle msg -> ( Aspect -> ViewModel msg -> ViewModel msg, Mask (Ui msg) )
-        viewHandle h =
+        viewHandle : Aspect -> Handle msg -> List (Custom msg)
+        viewHandle aspect h =
             case h of
                 Constant html_ ->
-                    ( \_ -> keyByIndex html_ |> ViewModel.appendHandle
-                    , Mask.transparent
-                    )
+                    [ TransformViewModel (ViewModel.appendHandle (keyByIndex html_)) ]
 
-                Link aspects link_ ->
-                    Link.view url link_
-                        |> (\( foliage_, mask_ ) ->
-                                ( \_ -> ViewModel.appendHandle [ ( Url.toString url, Html.map never (foliage_ [] []) ) ]
-                                , mask_ aspects
-                                )
-                           )
-
-                Inline aspects link_ ->
-                    Link.view url link_
-                        |> (\( foliage_, mask_ ) ->
-                                ( Get.singleton
-                                    >> (|>) [ ( Url.toString url, Html.map never (foliage_ [] []) ) ]
-                                    >> ViewModel.appendGet
-                                , mask_ aspects
-                                )
-                           )
-
-                Custom c ->
-                    c
+                Dynamic c ->
+                    c ( aspect, url )
     in
     viewUi ( Scene, Mask.transparent )
         >> Layout.view
@@ -445,7 +435,7 @@ view url layout =
 
 {-| **Constant:** Add your own stuff into the Handle aspect
 **Link:** Add a [Link](Ui.Link#Link) into the Handle aspect
-**Inline>** Add a [Link](Ui.Link#Link) into the current aspect
+**Inline** Add a [Link](Ui.Link#Link) into the current aspect
 
   - Popup -> Scene Disclosure in window - volatile - -> TODO
   - Summarize -> Scene Disclosure inline - volatile - -> summary..details [a href="{currentPath}?summarize={flag}"] <- use austinshenk/elm-w3
@@ -460,9 +450,21 @@ unique: A single screen has at most one such `Flag`
 -}
 type Handle msg
     = Constant (List (Html msg))
-    | Link (List Aspect) Link
-    | Inline (List Aspect) Link
-    | Custom ( Aspect -> ViewModel msg -> ViewModel msg, Mask (Ui msg) )
+    | Dynamic (( Aspect, Url ) -> List (Custom msg))
+
+
+{-| Build your own transformation! Useful for links etc.
+
+Example:
+
+    TransformViewModel
+
+    MaskDescendents
+
+-}
+type Custom msg
+    = TransformViewModel (ViewModel msg -> ViewModel msg)
+    | MaskDescendents (Mask (Ui msg))
 
 
 {-| Here you can add your own link, button, input, or indicator.
@@ -472,18 +474,28 @@ constant =
     Constant >> fromHandle
 
 
-{-| Generate a relative link. (Ui.Href#Msg)[Consuls `Ui.Href#Msg`] for details.
+{-| This interface is mostly interesting for library authors.
 -}
-link : List Aspect -> Link -> Ui msg
-link aspects =
-    Link aspects >> fromHandle
+custom : (( Aspect, Url ) -> List (Custom msg)) -> Ui msg
+custom =
+    Dynamic >> fromHandle
 
 
-{-| Generate a relative link. (Ui.Href#Msg)[Consuls `Ui.Href#Msg`] for details.
+
+{- }
+   custom Generate a relative link. (Ui.Href#Msg)[Consuls `Ui.Href#Msg`] for details.
+
+   link : List Aspect -> Link -> Ui msg
+   link aspects =
+       Link aspects >> fromHandle
+
+
+    Generate a relative link. (Ui.Href#Msg)[Consuls `Ui.Href#Msg`] for details.
+
+   inline : List Aspect -> Link -> Ui msg
+   inline aspects =
+       Inline aspects >> fromHandle
 -}
-inline : List Aspect -> Link -> Ui msg
-inline aspects =
-    Inline aspects >> fromHandle
 
 
 fromHandle : Handle msg -> Ui msg

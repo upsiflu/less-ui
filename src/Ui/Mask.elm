@@ -1,7 +1,7 @@
 module Ui.Mask exposing
     ( Mask
     , transparent, opaque
-    , occlude, occludeList
+    , occlude, occludeList, superimpose
     , concat
     , mapSecond
     )
@@ -14,7 +14,7 @@ module Ui.Mask exposing
 # Create
 
 @docs transparent, opaque
-@docs occlude, occludeList
+@docs occlude, occludeList, superimpose
 
 
 # Compose
@@ -61,12 +61,18 @@ opaque =
     \_ _ -> Nothing
 
 
-{-| occlude an aspect
--}
+{-| -}
 occlude : Aspect -> Mask a
 occlude a fu =
     (/=) a
         >> Bool.ifElse Nothing (fu a)
+
+
+{-| `superimpose = Get.insert`
+-}
+superimpose : Aspect -> a -> Mask a
+superimpose =
+    Get.insert
 
 
 {-| Occlude a list of aspects

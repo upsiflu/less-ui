@@ -1,11 +1,11 @@
-module Ui.Link exposing (Link(..), Flag, Path, update, view)
+module Ui.Link exposing (Link(..), Flag, Path, update, view, Position(..))
 
 {-| Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest) on click
 
 A [restrictive `Application`](Ui.Application) stores the local state in the Url (which then acts as the single source of truth).
 The result of clicking on a link depends on the current state.
 
-@docs Link, Flag, Path, update, view
+@docs Link, Flag, Path, update, view, ViewModel, Position
 
 -}
 
@@ -14,7 +14,10 @@ import Html exposing (Html)
 import Html.Attributes exposing (..)
 import List.Extra as List
 import Maybe.Extra as Maybe
+import Ui exposing (Ui)
+import Ui.Get as Get
 import Ui.Layout.Aspect exposing (Aspect)
+import Ui.Layout.ViewModel as ViewModel
 import Ui.Mask as Mask exposing (Mask)
 import Url exposing (Url)
 import Url.Codec exposing (Codec)
@@ -105,35 +108,56 @@ hasFlag flag =
 
 
 {-| -}
-view : Url -> Link -> ( List (Html.Attribute Never) -> List (Html Never) -> Html Never, List Aspect -> Mask ui )
-view url link =
+view : ViewModel -> Link -> Ui msg
+view { occlusions, attributes, contents, position } link =
     let
-        ( attributes, mask ) =
+        appendAt : Aspect -> List (Html.Attribute Never) -> List (Ui.Custom msg)
+        appendAt aspect additionalAttributes =
+            a link (attributes ++ additionalAttributes) contents
+                |> Tuple.pair (toId link)
+                |> List.singleton
+                |> (case position of
+                        Inline ->
+                            Get.singleton aspect
+                                >> ViewModel.appendGet
+
+                        Global ->
+                            ViewModel.appendHandle
+                   )
+                |> Ui.TransformViewModel
+                |> List.singleton
+    in
+    Ui.custom <|
+        \( aspect, url ) ->
             case link of
                 Toggle flag ->
-                    ( [ attribute "role" "switch"
-                      , attribute "aria-checked" <| Bool.ifElse "true" "false" (hasFlag flag url)
-                      ]
-                    , if hasFlag flag url then
-                        \_ -> Mask.transparent
-
-                      else
-                        Mask.occludeList
-                    )
+                    let
+                        ( isChecked, mask ) =
+                            Bool.ifElse
+                                ( "true", [] )
+                                ( "false", [ Mask.occludeList occlusions |> Ui.MaskDescendents ] )
+                                (hasFlag flag url)
+                    in
+                    appendAt aspect
+                        [ attribute "role" "switch"
+                        , attribute "aria-checked" isChecked
+                        ]
+                        |> (++) mask
 
                 _ ->
-                    ( [], \_ -> Mask.transparent )
+                    appendAt aspect []
 
-        href : List (Html.Attribute msg)
-        href =
-            Url.Codec.toString [ codec ] link
-                |> Maybe.map Html.Attributes.href
-                |> Maybe.toList
-    in
-    ( (++) (href ++ attributes)
-        >> Html.a
-    , mask
-    )
+
+{-| Not part of the Link itself but of the Ui declaration
+-}
+type alias ViewModel =
+    { occlusions : List Aspect, attributes : List (Html.Attribute Never), contents : List (Html Never), position : Position }
+
+
+{-| -}
+type Position
+    = Inline
+    | Global
 
 
 {-| The Route represents both `href`s and `Url`s.
@@ -231,6 +255,38 @@ replaceRoute r previousUrl =
     Url.Codec.toString [ route ] r
         |> Maybe.andThen Url.fromString
         |> Maybe.withDefault previousUrl
+
+
+{-| -}
+toString : Link -> Maybe String
+toString =
+    Url.Codec.toString [ codec ]
+
+
+{-| -}
+toId : Link -> String
+toId link =
+    case link of
+        SetPath path ->
+            path
+
+        Bounce { there, here } ->
+            there ++ "<>" ++ here
+
+        Toggle flag ->
+            flag
+
+
+{-| -}
+a : Link -> List (Html.Attribute Never) -> List (Html Never) -> Html msg
+a link attrs contents =
+    toString link
+        |> Maybe.map Html.Attributes.href
+        |> Maybe.cons
+        |> (|>) attrs
+        |> Html.a
+        |> (|>) contents
+        |> Html.map never
 
 
 
