@@ -7,6 +7,7 @@ module Ui exposing
     , addLabel, addTextLabel
     , setAspect
     , repeat
+    , ol, ul
     , uncons
     , constant
     , custom, Custom(..)
@@ -53,6 +54,8 @@ To merge two `Ui`s on the same level, use [`++`](https://package.elm-lang.org/pa
 
 In addition, many List functions directly work with `Ui`, for example `List.length`, `List.reverse` or `List.Extra.permutations`.
 Caveats are discussed in [Advanced Usage](advanced-usage)
+
+@docs ol, ul
 
 
 ## Decompose
@@ -260,6 +263,20 @@ This will output:
 wrap : (Foliage msg -> Foliage msg) -> Ui msg -> Ui msg
 wrap =
     Wrap >> (<<) List.singleton
+
+
+{-| convenience function to wrap a Ui into an unordered list
+-}
+ul : String -> Ui msg -> Ui msg
+ul idString =
+    wrap (Html.Keyed.ul [ id idString ] >> Tuple.pair idString >> List.singleton)
+
+
+{-| convenience function to wrap a Ui into an ordered list
+-}
+ol : String -> Ui msg -> Ui msg
+ol idString =
+    wrap (Html.Keyed.ul [ id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| prepend a text label to the contextual aspect

@@ -39,6 +39,63 @@ body {
     background: greenyellow;
 }
 
+.info:empty {
+    padding     : 0;
+    border-width: 0;
+}
+
+#counter {
+    display   : inline;
+    background: linear-gradient(darkolivegreen, darkblue);
+}
+
+#counter p {
+    border          : 2px outset turquoise;
+    background-color: darkslategray;
+    display         : inline-block;
+    box-shadow      : 3px;
+    box-shadow      : 2px 2px 8px 1px black;
+    position        : relative;
+    animation       : 1s infinite alternate slidein;
+    padding         : 1rem;
+    margin          : 1rem;
+}
+
+#counter p:nth-last-child(odd) {
+    border          : 2px outset magenta;
+    background-color: darkmagenta;
+}
+
+#counter p:hover {
+    border: 2px inset silver;
+}
+
+#counter p:first-of-type {
+    animation: 2s appear;
+
+}
+
+
+@keyframes slidein {
+    from {
+        margin-left : 2rem;
+        margin-right: 0rem;
+    }
+}
+
+@keyframes appear {
+    from {
+        font-size: 0;
+        padding  : 0;
+        margin   : 0;
+    }
+}
+
+* {
+    transition: all 0.3s
+}
+
+
 /*-------------------------------------------*/
 
 .rhododendron {

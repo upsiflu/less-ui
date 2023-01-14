@@ -21,14 +21,11 @@ type alias Model =
     Int
 
 
-type Path
-    = Page Page
-    | NotFound
-
-
 type Page
     = Home
     | About
+    | DomState
+    | NotFound
 
 
 init : ( Model, Cmd () )
@@ -36,17 +33,20 @@ init =
     ( 0, Cmd.none )
 
 
-pageFromPath : Link.Path -> Path
+pageFromPath : Link.Path -> Page
 pageFromPath path =
     case path of
         "/" ->
-            Page Home
-
-        "/About" ->
-            Page About
+            Home
 
         "/Home" ->
-            Page Home
+            Home
+
+        "/DomState" ->
+            DomState
+
+        "/About" ->
+            About
 
         _ ->
             NotFound
@@ -56,10 +56,16 @@ pathFromPage : Page -> Link.Path
 pathFromPage page =
     case page of
         Home ->
-            "/Home"
+            "Home"
 
         About ->
-            "/About"
+            "About"
+
+        DomState ->
+            "DomState"
+
+        NotFound ->
+            "404"
 
 
 update : () -> Model -> ( Model, Cmd () )
@@ -73,105 +79,94 @@ update () model =
 
 view : ( Link.Path, Link.Fragment ) -> Model -> Ui.Application.Document ()
 view ( rawPath, _ ) model =
-    let
-        appendCounter : Ui () -> Ui ()
-        appendCounter =
-            List.repeat model ()
-                |> List.indexedMap
-                    (\i _ ->
-                        let
-                            number : String
-                            number =
-                                String.fromInt i
-                        in
-                        Ui.textLabel number
-                            ++ editable ("(incrementing key " ++ number ++ ")")
-                            ++ editable "(constant key)"
-                            |> Ui.with Scene
-                    )
-                |> List.foldl (<<) identity
+    case pageFromPath rawPath of
+        Home ->
+            viewPage
+                (Ui.textLabel "This is the home page!")
+                Home
 
-        editable : String -> Ui ()
-        editable str =
-            Html.p [ Attr.contenteditable True ]
-                [ Html.text ("Edit me " ++ str)
-                ]
-                |> Ui.keyed ("Edit me " ++ str)
+        About ->
+            viewPage
+                (Ui.textLabel "'About' page here!"
+                    |> Ui.with Info (Ui.textLabel "Check out these links:" ++ Ui.html viewNav ++ myTest)
+                )
+                About
 
-        path : Path
-        path =
-            pageFromPath rawPath
+        DomState ->
+            let
+                counter : Ui ()
+                counter =
+                    List.repeat model ()
+                        |> List.indexedMap
+                            (\i _ ->
+                                if modBy 2 i == 0 then
+                                    editable -1 ("I will be reset (" ++ String.fromInt i ++ ")")
 
-        updater : Ui ()
-        updater =
-            Html.button [ Events.onClick () ]
-                [ Html.text ("Update number " ++ String.fromInt model)
-                ]
-                |> Ui.keyed "updater"
-    in
-    (\doc ->
-        { doc
-            | body =
-                doc.body
+                                else
+                                    editable i ("I store your text in the DOM in position " ++ String.fromInt i ++ "")
+                            )
+                        |> List.concat
+                        |> List.reverse
+                        |> Ui.ul "counter"
+
+                editable : Int -> String -> Ui ()
+                editable key str =
+                    Html.p [ Attr.contenteditable True, Attr.title ("Keyed with: " ++ String.fromInt key) ] [ Html.text str ]
+                        |> Ui.keyed (String.fromInt key)
+
+                updater : Ui ()
+                updater =
+                    Html.button [ Events.onClick () ]
+                        [ Html.text ("Add item #" ++ String.fromInt model) ]
+                        |> Ui.keyed "updater"
+            in
+            viewPage
+                (Ui.textLabel "Play with a stateful Dom :-D"
                     |> Ui.with Control updater
-                    |> appendCounter
-        }
-    )
-    <|
-        case path of
-            Page Home ->
-                viewPage "Home"
-                    path
-                    (Ui.textLabel "This is the home page!")
+                    |> Ui.with Scene counter
+                    |> Ui.with Info (Ui.textLabel "Add boxes to the list and edit their labels. Some boxes retain their data when you add new ones. Note that Elm only stores the number of boxes. All labels are stored by your browser in the DOM. This data will be lost when you navigate through the pages.")
+                )
+                About
 
-            Page About ->
-                viewPage "About"
-                    path
-                    (Ui.textLabel "'About' page here!")
-
-            NotFound ->
-                viewPage "404"
-                    path
-                    (Ui.textLabel ("404 Not found: " ++ rawPath))
+        NotFound ->
+            viewPage
+                (Ui.textLabel ("404 Not found: " ++ rawPath))
+                NotFound
 
 
-viewPage : String -> Path -> Ui () -> Ui.Application.Document ()
-viewPage title route content =
-    { title = title ++ " – SPA"
-    , body =
-        Ui.constant [ viewNav route ]
+myTest : Ui ()
+myTest =
+    Ui.textLabel "The right order: "
+        ++ Ui.textLabel "1"
+        ++ Ui.textLabel "2"
+        ++ Ui.textLabel "3"
+        |> Ui.with Info (Ui.textLabel "a" ++ Ui.textLabel "b")
+
+
+viewPage : Ui () -> Page -> Ui.Application.Document ()
+viewPage content page =
+    { body =
+        Ui.constant [ viewNav ]
             |> Ui.with Scene content
     , layout = Layout.Default
+    , title = pathFromPage page ++ " – SPA"
     }
 
 
-viewNav : Path -> Html ()
-viewNav maybePage =
-    let
-        items =
-            [ ( Home, "Home" )
-            , ( About, "About" )
-            ]
-    in
-    Html.nav []
-        [ Html.ul []
-            (items
-                |> List.map
-                    (\( page, text ) ->
-                        Html.li []
-                            [ Html.a
-                                (if Page page == maybePage then
-                                    []
-
-                                 else
-                                    [ Attr.href (pathFromPage page)
-                                    ]
-                                )
-                                [ Html.text text ]
-                            ]
-                    )
+viewNav : Html ()
+viewNav =
+    [ Home, DomState, About ]
+        |> List.map
+            (\page ->
+                Html.li []
+                    [ Html.a
+                        [ Attr.href (pathFromPage page) ]
+                        [ Html.text (pathFromPage page) ]
+                    ]
             )
-        ]
+        |> Html.ul []
+        |> List.singleton
+        |> Html.nav []
 
 
 {-| -}

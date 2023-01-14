@@ -93,7 +93,7 @@ update : Link -> (State -> State)
 update link state =
     case link of
         GoTo ( path, fragment ) ->
-            { state | path = path, fragment = fragment }
+            { state | path = "/" ++ path, fragment = fragment }
 
         Bounce { isAbsolute } { there, here } ->
             let

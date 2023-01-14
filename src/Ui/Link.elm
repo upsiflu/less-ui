@@ -294,9 +294,9 @@ codecs =
                 _ ->
                     Nothing
 
-        is : Link -> { error : Bool, toggle : Bool, bounce : Bool }
+        is : Link -> { bounceOrGoto : Bool, error : Bool, toggle : Bool }
         is l =
-            (\fu -> fu { bounce = False, error = False, toggle = False }) <|
+            (|>) { bounceOrGoto = False, error = False, toggle = False } <|
                 case l of
                     Toggle _ _ ->
                         \b -> { b | toggle = True }
@@ -305,18 +305,19 @@ codecs =
                         \b -> { b | error = True }
 
                     _ ->
-                        \b -> { b | bounce = True }
+                        \b -> { b | bounceOrGoto = True }
     in
     [ Url.Codec.succeed
         (\isAbsolute_ path_ fragment_ reroute_ ->
-            case reroute_ of
-                Just there ->
-                    Bounce { isAbsolute = isAbsolute_ } { there = locationFromString there, here = ( path_, fragment_ ) }
+            (\n -> Debug.log "(isAbsolute_, (path_, fragment_), reroute_)" ( isAbsolute_, ( path_, fragment_ ), reroute_ ) |> (\_ -> n)) <|
+                case reroute_ of
+                    Just there ->
+                        Bounce { isAbsolute = isAbsolute_ } { there = locationFromString there, here = ( path_, fragment_ ) }
 
-                Nothing ->
-                    GoTo ( path_, fragment_ )
+                    Nothing ->
+                        GoTo ( path_, fragment_ )
         )
-        (is >> .bounce)
+        (is >> .bounceOrGoto)
         |> absoluteQueryFlag
         |> Url.Codec.string
             (getDestination >> Maybe.map Tuple.first)
@@ -334,7 +335,7 @@ codecs =
     , Url.Codec.succeed
         (\isAbsolute_ ->
             Maybe.map (Toggle { isAbsolute = isAbsolute_ })
-                >> Maybe.withDefault (ErrorMessage "Ëmpty String as Toggle-flag")
+                >> Maybe.withDefault (ErrorMessage "Toggle -- Error: Empty String as Toggle-flag")
         )
         (is >> .toggle)
         |> absoluteQueryFlag
@@ -439,6 +440,7 @@ relative link =
 toId : Link -> String
 toId link =
     let
+        encodeState : Bool -> String
         encodeState isAbsolute =
             if isAbsolute then
                 "!"

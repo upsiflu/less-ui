@@ -74,7 +74,7 @@ merge a b =
 -}
 concat : List (ViewModel msg) -> ViewModel msg
 concat =
-    List.foldl merge empty
+    List.foldr merge empty
 
 
 {-| Merge the results of `fu`

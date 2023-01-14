@@ -41,10 +41,9 @@ This opens two possible pitfalls:
 import Browser
 import Browser.Navigation as Nav
 import Html
-import Html.Attributes exposing (..)
 import Ui exposing (Ui)
 import Ui.Layout exposing (Layout)
-import Ui.Link as Link exposing (Fragment, Link, Path)
+import Ui.Link as Link exposing (Fragment, Path)
 import Ui.State as State exposing (State)
 import Url exposing (Url)
 
@@ -137,7 +136,8 @@ application config =
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            State.update (Link.fromUrl receivedUrl) state
+                            State.update (Link.fromUrl receivedUrl |> Debug.log "Application.update Url Changed ---> Link.fromUrl ") state
+                                |> Debug.log "     updated:"
                                 |> (\canonicalState ->
                                         ( ( key, canonicalState, model )
                                         , if canonicalState == state then

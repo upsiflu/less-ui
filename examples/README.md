@@ -28,9 +28,13 @@ Walk through the serene Ui Garden and explore what is impossible to build with t
 
 Work in progress!
 
+http://garden.localhost:8001
+
 # Application
 
 A very simple single page app.
+
+http://application.localhost:8001
 
 -------
 
