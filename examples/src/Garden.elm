@@ -39,14 +39,16 @@ update msg garden =
             )
 
 
-view : Link.Path -> Garden -> { body : Ui Msg, layout : Layout, title : String }
-view path garden =
+view : ( Link.Path, Link.Fragment ) -> Garden -> { body : Ui Msg, layout : Layout, title : String }
+view ( path, fragment ) garden =
     { title = "Welcome to the Garden!"
     , layout = Layout.Default
     , body =
         page
             |> Ui.with Scene
-                (Ui.link [ Control ] (Link.Toggle "rhododendron")
+                (Link.toggle "rhododendron"
+                    |> Link.view
+                        (Link.preset.global [] [ Html.text "rhododendron" ])
                     |> Ui.with Control
                         (Garden.Rhododendron.view RhododendronMsg garden.rhododendron)
                 )

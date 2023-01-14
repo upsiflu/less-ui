@@ -44,7 +44,8 @@ import Html
 import Html.Attributes exposing (..)
 import Ui exposing (Ui)
 import Ui.Layout exposing (Layout)
-import Ui.Link as Link exposing (Path)
+import Ui.Link as Link exposing (Fragment, Link, Path)
+import Ui.State as State exposing (State)
 import Url exposing (Url)
 
 
@@ -75,7 +76,7 @@ the Control), or for all internal links?
 
 -}
 type alias Application model modelMsg =
-    Program () ( Nav.Key, Url, model ) (Msg modelMsg)
+    Program () ( Nav.Key, State, model ) (Msg modelMsg)
 
 
 {-| -}
@@ -84,56 +85,94 @@ type alias Document modelMsg =
 
 
 {-| Separate Url update from Model update
+
+**Routing:**
+Use `Link` to generate clickable internal hrefs.
+If you share a `Link`, it highlights its source.
+
+TODO: I don't know what is useful...
+
+The state is really the relevant thing.
+It is encoded in the Url and contains all the stuff.
+
+    link
+    href                 state:url                         new state
+
+    toggle "x"           path#fragment?flags&assign=ments  path#fragment?flags&x&assign=ments
+
+    toggle absolute "x"
+    ?!&toggle="x"        p#f?x&a=b -> p#f?x&a=b
+
 -}
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : Path -> model -> { body : Ui modelMsg, layout : Layout, title : String }
+    , view : ( Path, Fragment ) -> model -> { body : Ui modelMsg, layout : Layout, title : String }
     }
     ---> Application model modelMsg
-    -> Program () ( Nav.Key, Url, model ) (Msg modelMsg)
+    -> Program () ( Nav.Key, State, model ) (Msg modelMsg)
 application config =
     Browser.application
         { init =
-            \_ url key ->
+            \_ state key ->
                 config.init
                     |> (\( updatedModel, modelCmd ) ->
-                            ( ( key, canonical.init url, updatedModel ), Cmd.map ModelMsg modelCmd )
+                            ( ( key, state |> Debug.log "Application.init state:" |> State.init |> Debug.log "|> State.init:", updatedModel )
+                            , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString state) ]
+                            )
                        )
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         , subscriptions = \_ -> Sub.none
         , update =
-            \msg ( key, url, model ) ->
+            \msg ( key, state, model ) ->
                 case msg of
                     UrlChanged receivedUrl ->
-                        let
-                            canonicalUrl : Url
-                            canonicalUrl =
-                                canonical.update receivedUrl url
-                        in
-                        ( ( key, canonicalUrl, model )
-                        , if canonicalUrl == url then
-                            Cmd.none
+                        if
+                            (receivedUrl
+                                |> Debug.log "Application.update UrlChanged"
+                            )
+                                == state
+                        then
+                            ( ( key, state, model ), Cmd.none )
 
-                          else
-                            Nav.replaceUrl key (Url.toString canonicalUrl)
+                        else
+                            State.update (Link.fromUrl receivedUrl) state
+                                |> (\canonicalState ->
+                                        ( ( key, canonicalState, model )
+                                        , if canonicalState == state then
+                                            Cmd.none
+
+                                          else
+                                            Nav.replaceUrl key (State.toUrlString canonicalState)
+                                        )
+                                   )
+
+                    LinkClicked (Browser.Internal url) ->
+                        -- Any clicked link needs to be interpreted as relative
+                        ( ( key, state, model )
+                        , url
+                            |> Debug.log "Href clicked:"
+                            |> Link.fromUrl
+                            |> Debug.log "Equals link:"
+                            |> Link.relative
+                            |> Debug.log "Make relative:"
+                            |> Link.toUrlString
+                            |> Debug.log "To Url String (and pushUrl):"
+                            |> Nav.pushUrl key
                         )
 
-                    LinkClicked (Browser.Internal newUrl) ->
-                        ( ( key, url, model ), Nav.pushUrl key (Url.toString newUrl) )
-
                     LinkClicked (Browser.External href) ->
-                        ( ( key, url, model ), Nav.load href )
+                        ( ( key, state, model ), Nav.load href )
 
                     ModelMsg modelMsg ->
                         config.update modelMsg model
                             |> (\( updatedModel, modelCmd ) ->
-                                    ( ( key, url, updatedModel ), Cmd.map ModelMsg modelCmd )
+                                    ( ( key, state, updatedModel ), Cmd.map ModelMsg modelCmd )
                                )
         , view =
             \( _, url, model ) ->
-                config.view url.path model
+                config.view ( url.path, url.fragment ) model
                     |> (\document ->
                             { title = document.title
                             , body = Ui.view url document.layout document.body |> List.map (Tuple.second >> Html.map ModelMsg)
@@ -142,31 +181,24 @@ application config =
         }
 
 
-{-| Use cases 1:
 
-The user toggles a Ui handle, for example the avatar, to open or close a menu.
+{- Use cases 1:
 
-(a)
-They decide to share the link of the handle, so they right-click on the toggle and choose 'copy link'.
-Their friend opens the link and the handle is activated.
+   The user toggles a Ui handle, for example the avatar, to open or close a menu.
 
-(b)
-They copy the Url and paste it in another tab or browser or device.
-The app loads and restores exactly the same Ui state.
+   (a)
+   They decide to share the link of the handle, so they right-click on the toggle and choose 'copy link'.
+   Their friend opens the link and the handle is activated.
 
-In the case of (a), we share a href, which is a string.
-The friend opens the link, and Elm turns it into the initial Url.
-Now, `canonical.init` canonicalises the initial Url
+   (b)
+   They copy the Url and paste it in another tab or browser or device.
+   The app loads and restores exactly the same Ui state.
+
+   In the case of (a), we share a href, which is a string.
+   The friend opens the link, and Elm turns it into the initial Url.
+   Now, `canonical.init` canonicalises the initial Url
 
 -}
-canonical : { init : Url -> Url, update : Url -> Url -> Url }
-canonical =
-    { init = \received -> received
-    , update = Link.update
-    }
-
-
-
 ---- Update ----
 
 

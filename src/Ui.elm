@@ -4,16 +4,15 @@ module Ui exposing
     , wrap
     , with
     , view, toHtml
-    , constant
-    , Handle
     , addLabel, addTextLabel
     , setAspect
     , repeat
+    , uncons
+    , constant
+    , custom, Custom(..)
     , map, indexedMap, mapList
     , map2
-    , uncons
     , ifJust, notIf, none
-    , Custom(..), custom
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
@@ -46,13 +45,6 @@ To merge two `Ui`s on the same level, use [`++`](https://package.elm-lang.org/pa
 ---
 
 
-# Add Interactivity
-
-@docs constant, inline, link
-
-@docs Handle
-
-
 # Convenience
 
 @docs addLabel, addTextLabel
@@ -63,22 +55,30 @@ In addition, many List functions directly work with `Ui`, for example `List.leng
 Caveats are discussed in [Advanced Usage](advanced-usage)
 
 
+## Decompose
+
+@docs uncons
+
+
 # Advanced Usage
+
+
+## Add Interactivity
+
+@docs constant
+@docs custom, Custom
+
+
+## Map
 
 Since `Ui`s are `List`s, it is easy to use the library functions from the `List` and `List.Extra` packages.
 However, I recommend against it.
+
 The big drawback when using `Ui`s as `List`s is that you cannot inspect (compare, filter, sort) them because the `Descendant` type is opaque.
 It is usually easier to build exactly the `Ui` you need instead of altering and recombining them after the fact.
 
 @docs map, indexedMap, mapList
 @docs map2
-
-
-## Decompose
-
-You can directly use List decomposition functions such as `List.head`, `List.isEmpty`, `List.take n` etc. but
-
-@docs uncons
 
 
 # Conditional helpers
@@ -114,7 +114,7 @@ type Descendant msg
 
 {-| -}
 type alias Item msg =
-    { handle : Handle msg
+    { dynamic : Handle msg
     , get : Get (Ui msg)
     }
 
@@ -191,7 +191,7 @@ with aspect subUi =
                 Twig foliage_ maybeItem ->
                     maybeItem
                         |> Maybe.unpack
-                            (\() -> { get = Get.singleton aspect subUi, handle = Constant [] })
+                            (\() -> { dynamic = \_ -> [], get = Get.singleton aspect subUi })
                             (\it -> { it | get = Get.addList aspect subUi it.get })
                         |> Just
                         |> Twig foliage_
@@ -361,7 +361,7 @@ map fu =
 ---- DECOMPOSE ----
 
 
-{-| Attempt to separate the first descendant in the Ui.
+{-| Attempt to separate the first descendant in the Ui
 -}
 uncons : Ui msg -> Maybe ( Ui msg, Ui msg )
 uncons =
@@ -395,34 +395,25 @@ view url layout =
         viewItem : ( Aspect, Mask (Ui msg) ) -> Item msg -> ViewModel msg
         viewItem ( aspect, mask ) item =
             let
-                ( modifyHandle, itemMask ) =
-                    viewHandle aspect item.handle
+                ( transform, mask_ ) =
+                    item.dynamic ( aspect, url )
                         |> List.foldr
-                            (\custom_ ( modH, iM ) ->
+                            (\custom_ ( t, m ) ->
                                 case custom_ of
-                                    TransformViewModel t ->
-                                        ( modH >> t, iM )
+                                    TransformViewModel t_ ->
+                                        ( t >> t_, m )
 
-                                    MaskDescendents m ->
-                                        ( modH, iM >> m )
+                                    MaskDescendents m_ ->
+                                        ( t, m >> m_ )
                             )
-                            ( identity, Mask.transparent )
+                            ( identity, mask )
             in
             item.get
                 |> Get.mapByKey
-                    (\key -> viewUi ( key, mask >> itemMask ))
+                    (\aspect_ -> viewUi ( aspect_, mask_ ))
                 |> Get.values [ Scene, Control, Info ]
                 |> ViewModel.concat
-                |> modifyHandle
-
-        viewHandle : Aspect -> Handle msg -> List (Custom msg)
-        viewHandle aspect h =
-            case h of
-                Constant html_ ->
-                    [ TransformViewModel (ViewModel.appendHandle (keyByIndex html_)) ]
-
-                Dynamic c ->
-                    c ( aspect, url )
+                |> transform
     in
     viewUi ( Scene, Mask.transparent )
         >> Layout.view
@@ -448,9 +439,8 @@ persistent: `Flag`s persist across path changes
 unique: A single screen has at most one such `Flag`
 
 -}
-type Handle msg
-    = Constant (List (Html msg))
-    | Dynamic (( Aspect, Url ) -> List (Custom msg))
+type alias Handle msg =
+    ( Aspect, Url ) -> List (Custom msg)
 
 
 {-| Build your own transformation! Useful for links etc.
@@ -470,37 +460,16 @@ type Custom msg
 {-| Here you can add your own link, button, input, or indicator.
 -}
 constant : List (Html msg) -> Ui msg
-constant =
-    Constant >> fromHandle
+constant html_ =
+    (always >> custom)
+        [ TransformViewModel (ViewModel.appendHandle (keyByIndex html_)) ]
 
 
 {-| This interface is mostly interesting for library authors.
 -}
 custom : (( Aspect, Url ) -> List (Custom msg)) -> Ui msg
-custom =
-    Dynamic >> fromHandle
-
-
-
-{- }
-   custom Generate a relative link. (Ui.Href#Msg)[Consuls `Ui.Href#Msg`] for details.
-
-   link : List Aspect -> Link -> Ui msg
-   link aspects =
-       Link aspects >> fromHandle
-
-
-    Generate a relative link. (Ui.Href#Msg)[Consuls `Ui.Href#Msg`] for details.
-
-   inline : List Aspect -> Link -> Ui msg
-   inline aspects =
-       Inline aspects >> fromHandle
--}
-
-
-fromHandle : Handle msg -> Ui msg
-fromHandle h =
-    fromItem { handle = h, get = \_ -> Nothing }
+custom h =
+    fromItem { dynamic = h, get = \_ -> Nothing }
 
 
 

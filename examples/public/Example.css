@@ -44,3 +44,26 @@ body {
 .rhododendron {
     border: 1px solid white;
 }
+
+a:link[href] {
+    color          : blue;
+    text-decoration: underline;
+}
+
+a[role="switch"] {
+    background: #bbb;
+    padding   : 2px 10px;
+}
+
+a[aria-checked="false"] {
+    border: 4px #ddd outset;
+}
+
+a[aria-checked="true"],
+a[role="switch"]:active {
+    border: 4px #ccc inset;
+}
+
+:target {
+    filter: invert(1);
+}

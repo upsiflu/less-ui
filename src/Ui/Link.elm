@@ -1,34 +1,80 @@
-module Ui.Link exposing (Link(..), Flag, Path, update, view, Position(..))
+module Ui.Link exposing
+    ( bounce, goTo, toggle
+    , Link(..), fromUrl, Flag, Path, Fragment
+    , relative
+    , view, ViewMode, preset, Position(..)
+    , toUrlString
+    , a
+    )
 
 {-| Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest) on click
 
 A [restrictive `Application`](Ui.Application) stores the local state in the Url (which then acts as the single source of truth).
 The result of clicking on a link depends on the current state.
 
-@docs Link, Flag, Path, update, view, ViewModel, Position
+@docs bounce, goTo, toggle
+
+@docs Link, fromUrl, Flag, Path, Fragment
+
+
+# Map
+
+@docs relative
+
+
+# View
+
+@docs view, ViewMode, preset, Position
+
+
+# Deconstruct
+
+@docs toUrlString
+
+
+# Convenience
+
+@docs a
 
 -}
 
 import Bool.Extra as Bool
 import Html exposing (Html)
 import Html.Attributes exposing (..)
-import List.Extra as List
 import Maybe.Extra as Maybe
 import Ui exposing (Ui)
 import Ui.Get as Get
-import Ui.Layout.Aspect exposing (Aspect)
+import Ui.Layout.Aspect as Aspect exposing (Aspect)
 import Ui.Layout.ViewModel as ViewModel
-import Ui.Mask as Mask exposing (Mask)
+import Ui.Mask as Mask
 import Url exposing (Url)
-import Url.Codec exposing (Codec)
+import Url.Codec exposing (Codec, ParseError(..))
 
 
 {-| Relative reference.
 
 
-### SetPath
+### Lifecycle
 
-Change the path in the Url for the next `view`
+    Opened Url in
+    in new tab           --> init   (initial)
+
+    Clicked
+    internal link        --> update Relative Link
+
+    Manually entered
+    shared Url in
+    running app tab      --> update Absolute Link
+
+-}
+type Link
+    = GoTo ( Path, Fragment )
+    | Bounce { isAbsolute : Bool } { there : ( Path, Fragment ), here : ( Path, Fragment ) }
+    | Toggle { isAbsolute : Bool } Flag
+    | ErrorMessage String
+
+
+{-| Change the path in the Url for the next `view`
 
     a   -> b -> b
     a?f -> b -> b?f
@@ -37,10 +83,13 @@ Change the path in the Url for the next `view`
 a:active, a:link:active, a:visited:active {}
 ```
 
+-}
+goTo : ( Path, Fragment ) -> Link
+goTo =
+    GoTo
 
-### Bounce
 
-If you are `there`, go `here`, else go `there`.
+{-| If you are `there`, go `here`, else go `there`.
 Use for expanding/collapsing nodes, or for tree-shaped scenes in general (in which case, "here" is the parent path).
 
     a -> b?reroute=c -> b
@@ -54,10 +103,13 @@ a:active, a:link:active, a:visited:active {}
 a.bounce {}
 ```
 
+-}
+bounce : { there : ( Path, Fragment ), here : ( Path, Fragment ) } -> Link
+bounce =
+    Bounce { isAbsolute = True }
 
-### Toggle
 
-Turn a flag on or off
+{-| Turn a flag on or off
 
     a?f -> ?toggle=f -> a
 
@@ -65,17 +117,13 @@ Turn a flag on or off
 a[role="switch"]:aria-checked {}
 ```
 
-_Note:_ If you want to create a global Toggle, use Ui.toggle instead.
-
 -}
-type Link
-    = SetPath Path
-    | Bounce { there : Path, here : Path }
-    | Toggle Flag
+toggle : Flag -> Link
+toggle =
+    Toggle { isAbsolute = True }
 
 
-{-| [`State`](Ui.State) reflects the cumulative state of all [`Handle`](#Handle)s.
-Turning off a `Flag` renders invisible the corresponding [`Control`](Ui.Layout.Aspect) with its descendants, as well as
+{-| Turning off a `Flag` renders invisible the corresponding [`Control`](Ui.Layout.Aspect) with its descendants, as well as
 one-layer deep nested [`Control`s](Ui.Layout.Aspect) with their descendants.
 
 The pattern is **progressive disclosure**.
@@ -91,6 +139,17 @@ type alias Path =
     String
 
 
+{-| "Graphical Web browsers typically scroll to position pages so that the top of the element
+identified by the fragment id is aligned with the top of the viewport;
+thus fragment identifiers are often used in tables of content and in permalinks.
+The appearance of the identified element can be changed through
+the `:target` CSS pseudoclass; Wikipedia uses this to highlight the selected reference.
+(from Wikipedia)"
+-}
+type alias Fragment =
+    Maybe String
+
+
 
 ---- Query ----
 
@@ -98,251 +157,324 @@ type alias Path =
 {-| -}
 hasFlag : Flag -> Url -> Bool
 hasFlag flag =
-    getRoute
-        >> .flags
-        >> List.member flag
+    getFlags >> List.member flag
 
 
 
 ---- View ----
 
 
-{-| -}
-view : ViewModel -> Link -> Ui msg
-view { occlusions, attributes, contents, position } link =
-    let
-        appendAt : Aspect -> List (Html.Attribute Never) -> List (Ui.Custom msg)
-        appendAt aspect additionalAttributes =
-            a link (attributes ++ additionalAttributes) contents
-                |> Tuple.pair (toId link)
-                |> List.singleton
-                |> (case position of
-                        Inline ->
-                            Get.singleton aspect
-                                >> ViewModel.appendGet
+{-| Create `ViewMode`s in a similar way to how you compose Html
+-}
+preset :
+    { global : List (Html.Attribute Never) -> List (Html Never) -> ViewMode
+    , inline : List (Html.Attribute Never) -> List (Html Never) -> ViewMode
+    }
+preset =
+    { global = \att con -> { empty | attributes = att, contents = con, position = Global }
+    , inline = \att con -> { empty | attributes = att, contents = con, position = Inline }
+    }
 
-                        Global ->
-                            ViewModel.appendHandle
-                   )
-                |> Ui.TransformViewModel
-                |> List.singleton
-    in
+
+empty : ViewMode
+empty =
+    { attributes = []
+    , contents = []
+    , occlusions = [ Aspect.Control, Aspect.Scene, Aspect.Info ]
+    , position = Global
+    }
+
+
+{-| How to present a Link
+-}
+type alias ViewMode =
+    { attributes : List (Html.Attribute Never)
+    , contents : List (Html Never)
+    , occlusions : List Aspect
+    , position : Position
+    }
+
+
+{-| a bit like `Html.a`
+-}
+a : Link -> List (Html.Attribute Never) -> List (Html Never) -> Html msg
+a link attrs contents =
+    Html.a (Maybe.cons (toHref link) attrs) contents
+        |> Html.map never
+
+
+{-|
+
+    SetPath ""
+        |> view
+            { attributes = []
+            , contents = [ text "Home" ]
+            , occlusions = []
+            , position = Global
+            }
+
+-}
+view :
+    ViewMode
+    -> Link
+    -> Ui msg
+view config link =
     Ui.custom <|
         \( aspect, url ) ->
+            let
+                appendWithAttributes : List (Html.Attribute Never) -> Ui.Custom msg
+                appendWithAttributes additionalAttributes =
+                    let
+                        foliage : ViewModel.Foliage msg
+                        foliage =
+                            [ ( toId link, a link (config.attributes ++ additionalAttributes) config.contents ) ]
+                    in
+                    Ui.TransformViewModel <|
+                        case config.position of
+                            Inline ->
+                                ViewModel.appendGet (Get.singleton aspect foliage)
+
+                            Global ->
+                                ViewModel.appendHandle foliage
+            in
             case link of
-                Toggle flag ->
+                Toggle { isAbsolute } flag ->
                     let
                         ( isChecked, mask ) =
                             Bool.ifElse
                                 ( "true", [] )
-                                ( "false", [ Mask.occludeList occlusions |> Ui.MaskDescendents ] )
+                                ( "false", [ Mask.occludeList config.occlusions |> Ui.MaskDescendents ] )
                                 (hasFlag flag url)
                     in
-                    appendAt aspect
+                    appendWithAttributes
                         [ attribute "role" "switch"
                         , attribute "aria-checked" isChecked
                         ]
-                        |> (++) mask
+                        :: mask
 
                 _ ->
-                    appendAt aspect []
+                    [ appendWithAttributes [] ]
 
 
-{-| Not part of the Link itself but of the Ui declaration
+{-| Define whether the link anchor
+appears as a global handle or in the
+`Aspect` of the current Item
 -}
-type alias ViewModel =
-    { occlusions : List Aspect, attributes : List (Html.Attribute Never), contents : List (Html Never), position : Position }
-
-
-{-| -}
 type Position
     = Inline
     | Global
 
 
-{-| The Route represents both `href`s and `Url`s.
+codecs : List (Codec Link)
+codecs =
+    let
+        absoluteQueryFlag : Url.Codec.CodecInProgress Link (Bool -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
+        absoluteQueryFlag =
+            Url.Codec.queryFlag "!" <|
+                \l ->
+                    case l of
+                        Bounce { isAbsolute } _ ->
+                            isAbsolute
 
-**State**: `path` (editing cursor and viewport), `flags` (progressive disclosure)
+                        Toggle { isAbsolute } _ ->
+                            isAbsolute
 
-**Transition**: `reroute` (change path if it's already active), `toggle` (toggle Flag)
+                        _ ->
+                            False
 
--}
-type alias Route =
-    { path : Path
-    , flags : List Flag
-    }
+        getDestination : Link -> Maybe ( Path, Fragment )
+        getDestination l =
+            case l of
+                GoTo location ->
+                    Just location
 
+                Bounce _ { there } ->
+                    Just there
 
-codec : Codec Link
-codec =
-    Url.Codec.succeed
-        (\p r t ->
-            case ( r, t ) of
-                ( _, Just flag ) ->
-                    Toggle flag
+                _ ->
+                    Nothing
 
-                ( Just there, _ ) ->
-                    Bounce { there = there, here = p }
+        is : Link -> { error : Bool, toggle : Bool, bounce : Bool }
+        is l =
+            (\fu -> fu { bounce = False, error = False, toggle = False }) <|
+                case l of
+                    Toggle _ _ ->
+                        \b -> { b | toggle = True }
 
-                ( Nothing, _ ) ->
-                    SetPath p
+                    ErrorMessage _ ->
+                        \b -> { b | error = True }
+
+                    _ ->
+                        \b -> { b | bounce = True }
+    in
+    [ Url.Codec.succeed
+        (\isAbsolute_ path_ fragment_ reroute_ ->
+            case reroute_ of
+                Just there ->
+                    Bounce { isAbsolute = isAbsolute_ } { there = locationFromString there, here = ( path_, fragment_ ) }
+
+                Nothing ->
+                    GoTo ( path_, fragment_ )
         )
-        (\_ -> True)
+        (is >> .bounce)
+        |> absoluteQueryFlag
         |> Url.Codec.string
-            (\m ->
-                case m of
-                    Bounce properties ->
-                        Just properties.there
-
-                    _ ->
-                        Nothing
-            )
+            (getDestination >> Maybe.map Tuple.first)
+        |> Url.Codec.fragment
+            (getDestination >> Maybe.andThen Tuple.second)
         |> Url.Codec.queryString "reroute"
-            (\m ->
-                case m of
-                    Bounce properties ->
-                        Just properties.here
+            (\l ->
+                case l of
+                    Bounce _ properties ->
+                        Just (locationToString properties.here)
 
                     _ ->
                         Nothing
             )
+    , Url.Codec.succeed
+        (\isAbsolute_ ->
+            Maybe.map (Toggle { isAbsolute = isAbsolute_ })
+                >> Maybe.withDefault (ErrorMessage "Ëmpty String as Toggle-flag")
+        )
+        (is >> .toggle)
+        |> absoluteQueryFlag
         |> Url.Codec.queryString "toggle"
-            (\m ->
-                case m of
-                    Toggle flag ->
+            (\l ->
+                case l of
+                    Toggle _ flag ->
                         Just flag
 
                     _ ->
                         Nothing
             )
+    , Url.Codec.succeed
+        (Maybe.map ErrorMessage >> Maybe.withDefault (ErrorMessage "-"))
+        (is >> .error)
+        |> Url.Codec.queryString "error"
+            (\l ->
+                case l of
+                    ErrorMessage e ->
+                        Just e
+
+                    _ ->
+                        Nothing
+            )
+    ]
 
 
-route : Codec Route
-route =
-    Url.Codec.succeed Route (always True)
-        |> Url.Codec.string (.path >> Just)
-        |> Url.Codec.allQueryFlags .flags
-
-
-getMsg : Url -> Link
-getMsg =
-    Url.Codec.parseUrl [ codec ]
-        >> Result.withDefault (SetPath "")
-
-
-getRoute : Url -> Route
-getRoute =
-    Url.Codec.parseUrl [ route ]
-        >> Result.withDefault
-            { path = ""
-            , flags = []
-            }
-
-
-{-| Attention: Fails silently!
--}
-modifyRoute : (Route -> Route) -> Url -> Url
-modifyRoute fu previousUrl =
-    replaceRoute
-        (getRoute previousUrl |> fu)
-        previousUrl
-
-
-{-| Attention: Fails silently!
--}
-replaceRoute : Route -> Url -> Url
-replaceRoute r previousUrl =
-    Url.Codec.toString [ route ] r
-        |> Maybe.andThen Url.fromString
-        |> Maybe.withDefault previousUrl
+flags : Codec (List String)
+flags =
+    Url.Codec.succeed identity (\_ -> True)
+        |> Url.Codec.allQueryFlags identity
 
 
 {-| -}
-toString : Link -> Maybe String
-toString =
-    Url.Codec.toString [ codec ]
+fromUrl : Url -> Link
+fromUrl =
+    Url.Codec.parseUrl codecs
+        >> (\result ->
+                case result of
+                    Ok link ->
+                        link
+
+                    Err e ->
+                        ErrorMessage <|
+                            String.join ", " <|
+                                case e of
+                                    SegmentMismatch { expected, available } ->
+                                        [ "SegmentMismatch: expected", expected, "available", available ]
+
+                                    SegmentNotAvailable ->
+                                        [ "SegmentNotAvailable" ]
+
+                                    DidNotConsumeEverything strList ->
+                                        "DidNotConsumeEverything" :: strList
+
+                                    NeededSingleQueryParameterValueGotMultiple { key, got } ->
+                                        [ "NeededSingleQueryParameterValueGotMultiple", key ] ++ got
+
+                                    _ ->
+                                        [ "other link parse error" ]
+           )
+
+
+{-| Attention: Fails silently!
+-}
+getFlags : Url -> List Flag
+getFlags =
+    Url.Codec.parseUrl [ flags ]
+        >> Result.withDefault []
+
+
+{-| -}
+toHref : Link -> Maybe (Html.Attribute Never)
+toHref =
+    Url.Codec.toString codecs
+        >> Maybe.map Html.Attributes.href
+
+
+{-| Try to create an UrlString
+-}
+toUrlString : Link -> String
+toUrlString =
+    Url.Codec.toString codecs
+        >> Maybe.withDefault "?error=Error converting link to string"
+
+
+{-| -}
+relative : Link -> Link
+relative link =
+    case link of
+        Bounce _ location ->
+            Bounce { isAbsolute = False } location
+
+        Toggle _ flag ->
+            Toggle { isAbsolute = False } flag
+
+        _ ->
+            link
 
 
 {-| -}
 toId : Link -> String
 toId link =
+    let
+        encodeState isAbsolute =
+            if isAbsolute then
+                "!"
+
+            else
+                ""
+    in
     case link of
-        SetPath path ->
-            path
+        GoTo location ->
+            locationToString location
 
-        Bounce { there, here } ->
-            there ++ "<>" ++ here
+        Bounce { isAbsolute } { there, here } ->
+            locationToString there ++ "<>" ++ locationToString here ++ encodeState isAbsolute
 
-        Toggle flag ->
-            flag
+        Toggle { isAbsolute } flag ->
+            flag ++ encodeState isAbsolute
+
+        ErrorMessage e ->
+            e
 
 
 {-| -}
-a : Link -> List (Html.Attribute Never) -> List (Html Never) -> Html msg
-a link attrs contents =
-    toString link
-        |> Maybe.map Html.Attributes.href
-        |> Maybe.cons
-        |> (|>) attrs
-        |> Html.a
-        |> (|>) contents
-        |> Html.map never
+locationToString : ( Path, Fragment ) -> String
+locationToString ( path, fragment ) =
+    path ++ (fragment |> Maybe.map (String.cons '#') |> Maybe.withDefault "")
 
 
+{-| -}
+locationFromString : String -> ( Path, Fragment )
+locationFromString str =
+    case String.split "#" str of
+        [] ->
+            ( "", Nothing )
 
----- Update ----
+        [ path ] ->
+            ( path, Nothing )
 
-
-{-|
-
-
-## Motivation
-
-The user toggles a Ui handle, for example the avatar, to open or close a menu.
-
-(a)
-They decide to share the link of the handle, so they right-click on the toggle and choose
-'copy link'. Their friend opens the link and the handle is activated.
-
-(b)
-They copy the Url and paste it in another tab or browser or device.
-The app loads and restores exactly the same Ui state.
-
-In the case of (a), we share a href, which is a string.
-The friend opens the link, and Elm turns it into the initial Url.
-Now, `canonical.init` canonicalises the initial Url
-
--}
-update : Url -> Url -> Url
-update receivedUrl =
-    let
-        receivedMsg : Link
-        receivedMsg =
-            getMsg receivedUrl
-
-        toggleFlag : Flag -> List Flag -> List Flag
-        toggleFlag f originalList =
-            if List.member f originalList then
-                List.remove f originalList
-
-            else
-                f :: originalList
-    in
-    modifyRoute <|
-        \originalRoute ->
-            case receivedMsg of
-                SetPath p ->
-                    { originalRoute | path = p }
-
-                Bounce { there, here } ->
-                    { originalRoute
-                        | path =
-                            if originalRoute.path == there then
-                                here
-
-                            else
-                                there
-                    }
-
-                Toggle f ->
-                    { originalRoute | flags = toggleFlag f originalRoute.flags }
+        path :: fragment ->
+            ( path, Just <| String.join "#" fragment )

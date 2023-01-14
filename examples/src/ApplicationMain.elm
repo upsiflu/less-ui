@@ -71,8 +71,8 @@ update () model =
 --view : Path -> model -> Document modelMsg
 
 
-view : Link.Path -> Model -> Ui.Application.Document ()
-view rawPath model =
+view : ( Link.Path, Link.Fragment ) -> Model -> Ui.Application.Document ()
+view ( rawPath, _ ) model =
     let
         appendCounter : Ui () -> Ui ()
         appendCounter =
