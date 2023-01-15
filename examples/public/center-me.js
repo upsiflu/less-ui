@@ -9,15 +9,8 @@ customElements.define(
       super();
     }
     connectedCallback() {
-      var closestAisle = this;
       console.log("connectedCallback", this);
-      window.setTimeout(
-        () =>
-          requestAnimationFrame(() =>
-            this.parentElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" })
-          ),
-        50
-      );
+      this.parentElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" })
     }
 
 

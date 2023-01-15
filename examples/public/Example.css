@@ -20,10 +20,11 @@ body {
 }
 
 .scene {
-    flex-grow : 1;
-    background: black;
-    color     : white;
-    overflow  : auto;
+    flex-grow      : 1;
+    background     : black;
+    color          : white;
+    overflow       : auto;
+    scroll-behavior: smooth;
 }
 
 .control {

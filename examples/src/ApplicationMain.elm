@@ -145,9 +145,13 @@ view ( rawPath, rawFragment ) model =
                     viewArticle title content =
                         Ui.html (Html.h1 [] [ Html.text ("About " ++ title) ])
                             :: (if title == fragment then
-                                    Html.node "center-me" [ Attr.attribute "increment" ("#" ++ fragment) ] []
+                                    Html.node "center-me" [ Attr.attribute "increment" ("->" ++ fragment) ] []
                                         |> Ui.html
                                         |> Ui.with Control clearFragment
+
+                                else if fragment /= "" then
+                                    Html.node "fragment-me" [ Attr.attribute "increment" (title ++ "<-" ++ fragment) ] []
+                                        |> Ui.html
 
                                 else
                                     []
