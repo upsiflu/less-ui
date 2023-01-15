@@ -31,18 +31,79 @@ body {
     background: silver;
 }
 
+
 .info {
     width     : fit-content;
     position  : absolute;
     bottom    : 9rem;
+    max-width : 50%;
     right     : 1rem;
     background: greenyellow;
+}
+
+.control:empty {
+    flex-basis: 0;
 }
 
 .info:empty {
     padding     : 0;
     border-width: 0;
 }
+
+/*-------------------------------------------*/
+
+
+
+a:link[href] {
+    color          : blue;
+    text-decoration: underline;
+}
+
+a[role="switch"],
+button {
+    background: #bbb;
+    padding   : 2px 10px;
+}
+
+a[aria-checked="false"],
+button {
+    border: 4px #ddd outset;
+}
+
+a[aria-checked="true"],
+a[role="switch"]:active,
+button:active {
+    border: 4px #ccc inset;
+}
+
+button:focus {
+    outline       : 2px solid black;
+    outline-offset: 0.5px;
+}
+
+.scene a {
+    background: white;
+}
+
+
+
+/*-------------------------------------------*/
+/* Application */
+
+:has(> #counter) {
+    padding-bottom: 15rem;
+}
+
+:has(> center-me) {
+    background-color: darkgreen;
+}
+
+article {
+    max-width: 23rem;
+    margin   : auto;
+    padding  : 1rem;
+}
+
 
 #counter {
     display   : inline;
@@ -68,11 +129,11 @@ body {
 
 #counter p:hover {
     border: 2px inset silver;
+    cursor: text;
 }
 
 #counter p:first-of-type {
     animation: 2s appear;
-
 }
 
 
@@ -97,30 +158,10 @@ body {
 
 
 /*-------------------------------------------*/
+/* Garden */
 
 .rhododendron {
     border: 1px solid white;
 }
 
-a:link[href] {
-    color          : blue;
-    text-decoration: underline;
-}
-
-a[role="switch"] {
-    background: #bbb;
-    padding   : 2px 10px;
-}
-
-a[aria-checked="false"] {
-    border: 4px #ddd outset;
-}
-
-a[aria-checked="true"],
-a[role="switch"]:active {
-    border: 4px #ccc inset;
-}
-
-:target {
-    filter: invert(1);
-}
+/*-------------------------------------------*/
