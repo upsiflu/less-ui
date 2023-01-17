@@ -88,6 +88,7 @@ button:focus {
 
 
 
+
 /*-------------------------------------------*/
 /* Application */
 
@@ -96,12 +97,22 @@ button:focus {
 }
 
 :has(> center-me) {
-    background-color: darkgreen;
+    background-color: green;
+}
+
+
+article:focus,
+article:focus-within {
+    outline: 2px dashed AccentColor;
+}
+
+.text.label {
+    font-style: italic;
 }
 
 article {
     max-width: 23rem;
-    margin   : auto;
+    margin   : 2rem auto;
     padding  : 1rem;
 }
 

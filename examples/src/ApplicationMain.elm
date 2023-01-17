@@ -145,20 +145,16 @@ view ( rawPath, rawFragment ) model =
                     viewArticle title content =
                         Ui.html (Html.h1 [] [ Html.text ("About " ++ title) ])
                             :: (if title == fragment then
-                                    Html.node "center-me" [ Attr.attribute "increment" ("->" ++ fragment) ] []
-                                        |> Ui.html
+                                    Ui.html (Html.node "center-me" [ Attr.attribute "increment" ("->" ++ fragment) ] [])
                                         |> Ui.with Control clearFragment
-
-                                else if fragment /= "" then
-                                    Html.node "fragment-me" [ Attr.attribute "increment" (title ++ "<-" ++ fragment) ] []
-                                        |> Ui.html
 
                                 else
                                     []
                                )
-                            :: List.map Ui.html content
+                            :: Ui.html (Html.node "focus-when-in-center" [ Attr.attribute "increment" (title ++ "<-" ++ fragment) ] [])
+                            :: List.indexedMap (\i -> Ui.keyed (String.fromInt i)) content
                             |> List.concat
-                            |> Ui.wrap (Html.Keyed.node "article" [ Attr.id title ] >> Tuple.pair title >> List.singleton)
+                            |> Ui.wrap (Html.Keyed.node "article" [ Attr.id title, Attr.contenteditable True ] >> Tuple.pair title >> List.singleton)
 
                     ( fragment, clearFragment ) =
                         case rawFragment of
@@ -174,19 +170,20 @@ view ( rawPath, rawFragment ) model =
                 viewPage
                     (viewArticle "Wolves"
                         [ Html.p [] [ Html.text "Lorem ipsum dolor sit amet, his viris voluptaria ut. Sea ad iusto labitur constituam, viris persius nonumes pro at, detraxit expetendis eu sed. Ut perpetua consequat complectitur sea, eam reque graeci et. Dignissim euripidis intellegat sed ex." ]
-                        , Html.a [ Attr.href "#Surprises" ] [ Html.text "👉 Highlight the Surprises 🎉🎉🎉" ]
+                        , Html.a [ Attr.href "#Surprises" ] [ Html.text "👉 Visit the Surprises 🎉🎉🎉" ]
                         , Html.p [] [ Html.text "Ei legere accumsan sit. Id meis intellegat nec, modo habeo error cum eu. Illud ubique in ius. Meliore nostrum eos an, facilisis reformidans quo in. Ne eruditi assueverit vix, graece eleifend mandamus ut usu. Vis nulla splendide ad." ]
                         ]
                         ++ viewArticle "Canines"
                             [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ]
-                            , Html.a [ Attr.href "#Wolves" ] [ Html.text "👉 Highlight the Wolves 🐺🐺🐺" ]
+                            , Html.a [ Attr.href "#Wolves" ] [ Html.text "👉 Visit the Wolves 🐺🐺🐺" ]
                             , Html.p [] [ Html.text "Lorem ipsum dolor sit amet, his viris voluptaria ut. Sea ad iusto labitur constituam, viris persius nonumes pro at, detraxit expetendis eu sed. Ut perpetua consequat complectitur sea, eam reque graeci et. Dignissim euripidis intellegat sed ex." ]
                             ]
                         ++ viewArticle "Surprises"
                             [ Html.p [] [ Html.text "Ei legere accumsan sit. Id meis intellegat nec, modo habeo error cum eu. Illud ubique in ius. Meliore nostrum eos an, facilisis reformidans quo in. Ne eruditi assueverit vix, graece eleifend mandamus ut usu. Vis nulla splendide ad." ]
-                            , Html.a [ Attr.href "#Canines" ] [ Html.text "👉 Highlight the Canines 🐕🐕🐕" ]
+                            , Html.a [ Attr.href "#Canines" ] [ Html.text "👉 Visit the Canines 🐕🐕🐕" ]
                             , Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ]
                             ]
+                        |> Ui.addTextLabel "Scroll to an article to autofocus it. Click links to set the Url fragment (hash) and autoscroll there."
                     )
 
             NotFound ->

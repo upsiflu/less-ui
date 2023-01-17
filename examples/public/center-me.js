@@ -8,11 +8,11 @@ customElements.define(
     constructor() {
       super();
     }
+
     connectedCallback() {
       console.log("connectedCallback", this);
-      this.parentElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" })
+      window.requestAnimationFrame(() => this.parentElement?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" }));
     }
-
 
     static get observedAttributes() {
       return ["increment"];
