@@ -8,6 +8,7 @@
     "Ui.Layout.Aspect",
     "Ui.Layout.ViewModel",
     "Ui.Link",
+    "Ui.State",
     "Ui.Mask"
   ]
 }

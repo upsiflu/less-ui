@@ -3,7 +3,7 @@ module Ui.Link exposing
     , Link(..), fromUrl, Flag, Path, Fragment
     , relative
     , view, Renderer, preset, Position(..)
-    , toUrlString
+    , toUrlString, getFlags
     , a
     )
 
@@ -32,7 +32,7 @@ module Ui.Link exposing
 
 # Deconstruct
 
-@docs toUrlString
+@docs toUrlString, getFlags
 
 
 # Convenience
@@ -45,6 +45,7 @@ import Bool.Extra as Bool
 import Html exposing (Html)
 import Html.Attributes exposing (..)
 import Maybe.Extra as Maybe
+import String.Extra as String
 import Ui exposing (Ui)
 import Ui.Get as Get
 import Ui.Layout.Aspect as Aspect exposing (Aspect)
@@ -273,8 +274,27 @@ type Position
 codecs : List (Codec Link)
 codecs =
     let
-        absoluteQueryFlag : Url.Codec.CodecInProgress Link (Bool -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
-        absoluteQueryFlag =
+        buildLink : Path -> Maybe String -> Maybe String -> Maybe Flag -> Maybe String -> Bool -> Link
+        buildLink path_ fragment_ reroute_ toggle_ errorMessage_ isAbsolute_ =
+            case reroute_ of
+                Just here ->
+                    Bounce { isAbsolute = isAbsolute_ } { there = ( path_, Maybe.map (String.leftOf "?") fragment_ ), here = locationFromString here }
+
+                Nothing ->
+                    case toggle_ of
+                        Just flag ->
+                            Toggle { isAbsolute = isAbsolute_ } flag
+
+                        Nothing ->
+                            case errorMessage_ of
+                                Just err ->
+                                    ErrorMessage err
+
+                                Nothing ->
+                                    GoTo ( path_, fragment_ )
+
+        getAbsoluteFlag : Url.Codec.CodecInProgress Link (Bool -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
+        getAbsoluteFlag =
             Url.Codec.queryFlag "!" <|
                 \l ->
                     case l of
@@ -287,6 +307,50 @@ codecs =
                         _ ->
                             False
 
+        getError : Url.Codec.CodecInProgress Link (Maybe String -> Bool -> parseResult) -> Url.Codec.CodecInProgress Link (Bool -> parseResult)
+        getError =
+            Url.Codec.queryString "error"
+                (\l ->
+                    case l of
+                        ErrorMessage e ->
+                            Just e
+
+                        _ ->
+                            Nothing
+                )
+
+        getFragment : Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Maybe String -> Maybe String -> Bool -> parseResult) -> Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Maybe String -> Bool -> parseResult)
+        getFragment =
+            Url.Codec.fragment (getDestination >> Maybe.andThen Tuple.second)
+
+        getPath : Url.Codec.CodecInProgress Link (String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
+        getPath =
+            Url.Codec.string (getDestination >> Maybe.map Tuple.first)
+
+        getReroute : Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Maybe String -> Bool -> parseResult) -> Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Bool -> parseResult)
+        getReroute =
+            Url.Codec.queryString "reroute"
+                (\l ->
+                    case l of
+                        Bounce _ properties ->
+                            Just (locationToString properties.here)
+
+                        _ ->
+                            Nothing
+                )
+
+        getToggle : Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Bool -> parseResult) -> Url.Codec.CodecInProgress Link (Maybe String -> Bool -> parseResult)
+        getToggle =
+            Url.Codec.queryString "toggle"
+                (\l ->
+                    case l of
+                        Toggle _ flag ->
+                            Just flag
+
+                        _ ->
+                            Nothing
+                )
+
         getDestination : Link -> Maybe ( Path, Fragment )
         getDestination l =
             case l of
@@ -298,82 +362,68 @@ codecs =
 
                 _ ->
                     Nothing
-
-        is : Link -> { bounceOrGoto : Bool, error : Bool, toggle : Bool }
-        is l =
-            (|>) { bounceOrGoto = False, error = False, toggle = False } <|
-                case l of
-                    Toggle _ _ ->
-                        \b -> { b | toggle = True }
-
-                    ErrorMessage _ ->
-                        \b -> { b | error = True }
-
-                    _ ->
-                        \b -> { b | bounceOrGoto = True }
     in
-    [ Url.Codec.succeed
-        (\isAbsolute_ path_ fragment_ reroute_ ->
-            case reroute_ of
-                Just there ->
-                    Bounce { isAbsolute = isAbsolute_ } { there = locationFromString there, here = ( path_, fragment_ ) }
-
-                Nothing ->
-                    GoTo ( path_, fragment_ )
-        )
-        (is >> .bounceOrGoto)
-        |> absoluteQueryFlag
-        |> Url.Codec.string
-            (getDestination >> Maybe.map Tuple.first)
-        |> Url.Codec.fragment
-            (getDestination >> Maybe.andThen Tuple.second)
-        |> Url.Codec.queryString "reroute"
-            (\l ->
-                case l of
-                    Bounce _ properties ->
-                        Just (locationToString properties.here)
-
-                    _ ->
-                        Nothing
-            )
-    , Url.Codec.succeed
-        (\isAbsolute_ ->
-            Maybe.map (Toggle { isAbsolute = isAbsolute_ })
-                >> Maybe.withDefault (ErrorMessage "Toggle -- Error: Empty String as Toggle-flag")
-        )
-        (is >> .toggle)
-        |> absoluteQueryFlag
-        |> Url.Codec.queryString "toggle"
-            (\l ->
-                case l of
-                    Toggle _ flag ->
-                        Just flag
-
-                    _ ->
-                        Nothing
-            )
-    , Url.Codec.succeed
-        (Maybe.map ErrorMessage >> Maybe.withDefault (ErrorMessage "-"))
-        (is >> .error)
-        |> Url.Codec.queryString "error"
-            (\l ->
-                case l of
-                    ErrorMessage e ->
-                        Just e
-
-                    _ ->
-                        Nothing
-            )
+    [ Url.Codec.succeed buildLink
+        (\_ -> True)
+        |> getPath
+    , Url.Codec.succeed (buildLink "")
+        (\_ -> True)
     ]
+        |> List.map
+            (getFragment
+                >> getReroute
+                >> getToggle
+                >> getError
+                >> getAbsoluteFlag
+            )
 
 
-flags : Codec (List String)
-flags =
-    Url.Codec.succeed identity (\_ -> True)
-        |> Url.Codec.allQueryFlags identity
+{-|
+
+    import Url
+
+    testUrl : String -> Link
+    testUrl =
+        (++) "http://localhost/"
+            >> Url.fromString
+            >> Maybe.map fromUrl
+            >> Maybe.withDefault (ErrorMessage "Url.fromString failed")
 
 
-{-| -}
+    --Bounce
+
+    testUrl "there#f1?reroute=here~f2"
+        --> Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("here", Just "f2") }
+
+    testUrl "#f1?reroute=here~f2"
+        --> Bounce { isAbsolute = False } { there = ("", Just "f1"), here = ("here", Just "f2") }
+
+
+
+    --Toggle
+
+    testUrl "?toggle=flag"
+        --> Toggle {isAbsolute = False} "flag"
+
+    testUrl "?toggle=flag&!"
+        --> Toggle {isAbsolute = True} "flag"
+
+
+    --GoTo
+
+    testUrl "path#fragment"
+        --> GoTo ("path", Just "fragment")
+
+    testUrl "path"
+        --> GoTo ("path", Nothing)
+
+    testUrl "path/"
+        --> GoTo ("path", Nothing)
+
+    testUrl "#fragment"
+        --> GoTo ("", Just "fragment")
+
+-}
 fromUrl : Url -> Link
 fromUrl =
     Url.Codec.parseUrl codecs
@@ -403,12 +453,50 @@ fromUrl =
            )
 
 
+flags : List (Codec (List String))
+flags =
+    [ Url.Codec.succeed identity (\_ -> True)
+        |> Url.Codec.allQueryFlags identity
+    , Url.Codec.succeed (\_ -> identity) (\_ -> True)
+        |> Url.Codec.string (\_ -> Nothing)
+        |> Url.Codec.allQueryFlags identity
+    ]
+
+
 {-| Attention: Fails silently!
+
+    import Url
+
+    testUrl : String -> List String
+    testUrl =
+        (++) "http://localhost/"
+            >> Url.fromString
+            >> Maybe.map getFlags
+            >> Maybe.withDefault ["Url.fromString failed"]
+
+    testUrl
+        "" --> []
+
+    testUrl
+        "?a" --> ["a"]
+
+    testUrl
+        "?a&b" --> ["a", "b"]
+
+    testUrl
+        "path" --> []
+
+    testUrl
+        "path?a" --> ["a"]
+
+    testUrl
+        "path?a&b" --> ["a", "b"]
+
 -}
 getFlags : Url -> List Flag
 getFlags =
-    Url.Codec.parseUrl [ flags ]
-        >> Result.withDefault []
+    Url.Codec.parseUrl flags
+        >> Result.withDefault [ "Error_in_GetFlags" ]
 
 
 {-| -}
@@ -469,13 +557,13 @@ toId link =
 {-| -}
 locationToString : ( Path, Fragment ) -> String
 locationToString ( path, fragment ) =
-    path ++ (fragment |> Maybe.map (String.cons '#') |> Maybe.withDefault "")
+    path ++ (fragment |> Maybe.map (String.cons '~') |> Maybe.withDefault "")
 
 
 {-| -}
 locationFromString : String -> ( Path, Fragment )
 locationFromString str =
-    case String.split "#" str of
+    case String.split "~" str of
         [] ->
             ( "", Nothing )
 
@@ -483,4 +571,4 @@ locationFromString str =
             ( path, Nothing )
 
         path :: fragment ->
-            ( path, Just <| String.join "#" fragment )
+            ( path, Just <| String.join "~" fragment )
