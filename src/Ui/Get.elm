@@ -3,6 +3,7 @@ module Ui.Get exposing
     , empty, full, singleton
     , orAdd, insert, update, updateValue
     , addValue, addWithDefault, maybeAdd
+    , remove
     , consList, addList
     , map, mapValue, map2, map2WithDefaults, map2Value, filter
     , mapByKey, mapValueByKey, map2ByKey
@@ -30,6 +31,7 @@ module Ui.Get exposing
 
 @docs orAdd, insert, update, updateValue
 @docs addValue, addWithDefault, maybeAdd
+@docs remove
 
 
 ### Add to `Get (List a)`
@@ -123,7 +125,7 @@ empty =
 -}
 full : a -> Get a
 full =
-    always << Just
+    Just >> always
 
 
 {-| -}
@@ -259,6 +261,16 @@ addValue composer =
     singleton >> (<<) (map2Value composer)
 
 
+{-| -}
+remove : Aspect -> Get a -> Get a
+remove a get_ aspect =
+    if aspect == a then
+        Nothing
+
+    else
+        get_ aspect
+
+
 mapLists : (List a -> List a -> List a) -> Maybe (List a) -> Maybe (List a) -> List a
 mapLists fu ma mb =
     fu (Maybe.withDefault [] ma) (Maybe.withDefault [] mb)
@@ -345,7 +357,7 @@ consList =
 -}
 addList : Aspect -> List a -> Get (List a) -> Get (List a)
 addList =
-    addWithDefault [] (++)
+    addWithDefault [] (\x y -> y ++ x)
 
 
 
@@ -477,12 +489,12 @@ Difference to `addList`: Both lists to append can be Nothing.
     import Ui.Layout.Aspect exposing (Aspect(..))
 
     singleton Scene [1]
-        |> concat (singleton Scene [2, 3])
+        |> append (singleton Scene [2, 3])
         |> get Scene
             --> Just [2, 3, 1]
 
     full [1]
-        |> concat (singleton Scene [2, 3])
+        |> append (singleton Scene [2, 3])
         |> get Control
             --> Just [1]
 
@@ -546,6 +558,18 @@ orElse : Get a -> Get a -> Get a
 orElse second first key =
     first key
         |> Maybe.orElseLazy (\() -> second key)
+
+
+
+{- logical `&&`
+   and : Get a -> Get a -> Get a
+   and get1 get2 a =
+   let
+   result1 = get1 a
+   result2 = get2 a
+   in
+   case result1 of
+-}
 
 
 {-| -}

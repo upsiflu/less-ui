@@ -231,12 +231,14 @@ wrap =
 
 Note that an empty list will stay an empty list:
 
+    import Ui.Layout.Aspect exposing (Aspect(..))
+
     [] |> with Scene (textLabel "I want to be a scene")
         --> []
 
     singleton ++ singleton
         |> with Scene (textLabel "I want to be a scene")
-        --> ???
+        -> ???
 
 -}
 with : Aspect -> Ui msg -> Ui msg -> Ui msg
@@ -463,8 +465,9 @@ render url =
                             ( identity, mask )
             in
             item.get
+                |> mask_
                 |> Get.mapByKey
-                    (\aspect_ -> viewUi ( aspect_, mask_ ))
+                    (\aspect_ -> viewUi ( aspect_, mask ))
                 |> Get.values [ Scene, Control, Info ]
                 |> ViewModel.concat
                 |> transform

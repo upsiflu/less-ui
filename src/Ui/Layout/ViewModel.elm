@@ -54,13 +54,14 @@ empty =
 
 {-| Combine two ViewModels into one, concatenating its contents.
 
-    import Ui.Aspect exposing (Aspect(..))
+    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Ui.Get
 
     merge
-        { handle = [], get = Get.singleton Scene [] }
-        { handle = [], get = Get.singleton Scene [] }
-        |> {get} -> get Scene
-    --> []
+        { handle = [], get = Ui.Get.singleton Scene [] }
+        { handle = [], get = Ui.Get.singleton Scene [] }
+        |> \{get} -> get Scene
+    --> Just []
 
 -}
 merge : ViewModel msg -> ViewModel msg -> ViewModel msg

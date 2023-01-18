@@ -6,7 +6,7 @@ module Garden exposing (main, Msg)
 
 -}
 
-import Garden.Rhododendron exposing (Rhododendron)
+import Garden.Rhododendron as Rhododendron exposing (Rhododendron)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Ui exposing (Ui)
@@ -18,7 +18,7 @@ import Ui.Link as Link
 
 {-| -}
 type Msg
-    = RhododendronMsg Garden.Rhododendron.Msg
+    = RhododendronMsg Rhododendron.Msg
 
 
 type alias Garden =
@@ -27,14 +27,14 @@ type alias Garden =
 
 init : ( Garden, Cmd Msg )
 init =
-    ( { rhododendron = Garden.Rhododendron.singleton "Root" }, Cmd.none )
+    ( { rhododendron = Rhododendron.singleton "Root" }, Cmd.none )
 
 
 update : Msg -> Garden -> ( Garden, Cmd Msg )
 update msg garden =
     case msg of
         RhododendronMsg rhodoMsg ->
-            ( { garden | rhododendron = Garden.Rhododendron.update rhodoMsg garden.rhododendron }
+            ( { garden | rhododendron = Rhododendron.update rhodoMsg garden.rhododendron }
             , Cmd.none
             )
 
@@ -47,10 +47,9 @@ view ( path, fragment ) garden =
         page
             |> Ui.with Scene
                 (Link.toggle "rhododendron"
-                    |> Link.view
-                        (Link.preset.global [] [ Html.text "rhododendron" ])
+                    |> Link.view (Link.preset.global [] [ Html.text "rhododendron" ])
                     |> Ui.with Control
-                        (Garden.Rhododendron.view RhododendronMsg garden.rhododendron)
+                        (Rhododendron.view RhododendronMsg garden.rhododendron)
                 )
     }
 
@@ -58,8 +57,8 @@ view ( path, fragment ) garden =
 page : Ui Msg
 page =
     Ui.constant [ Html.text "Handle" ]
-        |> Ui.with Scene myScene
-        |> Ui.with Scene myScene
+        |> Ui.with Scene (myScene "Scene 1")
+        |> Ui.with Scene (myScene "Scene 2")
         |> Ui.with Control myControl
         |> Ui.with Info myInfo
 
@@ -74,10 +73,12 @@ square color =
         []
 
 
-myScene : Ui msg
-myScene =
+myScene : String -> Ui msg
+myScene sId =
     Ui.html (square "red")
         ++ Ui.html (square "blue")
+        |> Ui.addTextLabel sId
+        |> Ui.node "section" sId
 
 
 myControl : Ui msg

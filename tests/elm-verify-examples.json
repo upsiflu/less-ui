@@ -1,0 +1,13 @@
+{
+  "root": "../src",
+  "tests": [
+    "Ui",
+    "Ui.Application",
+    "Ui.Get",
+    "Ui.Layout",
+    "Ui.Layout.Aspect",
+    "Ui.Layout.ViewModel",
+    "Ui.Link",
+    "Ui.Mask"
+  ]
+}

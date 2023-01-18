@@ -89,13 +89,13 @@ type alias Document modelMsg =
 ### Lifecycle
 
     Opened Url
-    in new tab           --> init   (initial)
+    in new tab           -> init   (initial)
 
     Clicked
-    internal link        --> update Relative Link
+    internal link        -> update Relative Link
 
     Manually replaced
-    url                  --> update Absolute Link
+    url                  -> update Absolute Link
 
 -}
 application :

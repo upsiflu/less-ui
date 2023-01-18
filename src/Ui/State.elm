@@ -1,6 +1,6 @@
 module Ui.State exposing
     ( State
-    , fromUrl, init
+    , init
     , update
     , toUrlString
     )
@@ -12,7 +12,7 @@ module Ui.State exposing
 
 # Create
 
-@docs fromUrl, init
+@docs init
 
 
 # Update
@@ -34,12 +34,6 @@ import Url exposing (Url)
 {-| -}
 type alias State =
     Url
-
-
-{-| -}
-fromUrl : Url -> State
-fromUrl =
-    identity
 
 
 {-| -}

@@ -2,7 +2,7 @@ module Ui.Mask exposing
     ( Mask
     , transparent, opaque
     , occlude, occludeList, superimpose
-    , concat
+    , concat, and
     , mapSecond
     )
 
@@ -25,7 +25,7 @@ _Note that Masks are functions so you can compose them easily:_
 
 `mask0 get0` : apply a mask to a `get`
 
-@docs concat
+@docs concat, and
 
 
 # Modify
@@ -34,7 +34,6 @@ _Note that Masks are functions so you can compose them easily:_
 
 -}
 
-import Bool.Extra as Bool
 import Ui.Get as Get exposing (Get)
 import Ui.Layout.Aspect exposing (Aspect)
 
@@ -61,11 +60,11 @@ opaque =
     \_ _ -> Nothing
 
 
-{-| -}
+{-| `superimpose = Get.remove`
+-}
 occlude : Aspect -> Mask a
-occlude a fu =
-    (/=) a
-        >> Bool.ifElse Nothing (fu a)
+occlude =
+    Get.remove
 
 
 {-| `superimpose = Get.insert`
@@ -79,40 +78,56 @@ superimpose =
 -}
 occludeList : List Aspect -> Mask a
 occludeList =
-    List.foldl cons transparent
+    List.foldl andOcclude transparent
 
 
 
 ---- COMPOSE ----
 
 
-{-| Layer masks to let only the intersection through
+{-| Add occlusions
+
+    import Ui.Get exposing (Get)
+    import Ui.Layout.Aspect exposing (Aspect(..))
+
+    mask : Mask Bool
+    mask = occlude Scene |> and (occlude Info)
+
+    get : Get Bool
+    get = mask (Ui.Get.full True)
+
+    get Scene --> Nothing
+    get Info --> Nothing
+    get Control --> Just True
+
 -}
 and : Mask a -> Mask a -> Mask a
 and =
     (>>)
 
 
-{-| occlude another aspect
+{-| Occlude one more aspect
 -}
-cons : Aspect -> Mask a -> Mask a
-cons =
+andOcclude : Aspect -> Mask a -> Mask a
+andOcclude =
     occlude
         >> and
 
 
 {-| combine a list of masks to a single masks. Nothing if list is empty.
+
+    import Ui.Get
+    import Ui.Layout.Aspect exposing (Aspect(..))
+
+    Ui.Get.fromList [(Scene, "Scene"), (Control, "Control")]
+        |> concat [occlude Scene, occlude Info]
+        |> Ui.Get.values [Scene, Control, Info]
+        --> ["Control"]
+
 -}
 concat : List (Mask a) -> Mask a
 concat =
-    List.foldl append transparent
-
-
-{-| Layer masks to let only the intersection through
--}
-append : Mask a -> Mask a -> Mask a
-append =
-    and
+    List.foldl and transparent
 
 
 {-| -}
