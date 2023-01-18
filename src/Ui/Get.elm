@@ -346,13 +346,15 @@ consList =
 
     import Ui.Layout.Aspect exposing (Aspect(..))
 
-    addList Scene [1, 2] (full [3, 4])
+    full [1, 2]
+        |> addList Scene [3, 4]
         |> get Scene
         --> Just [1, 2, 3, 4]
 
-    addList Scene [1, 2] (full [3, 4])
+    full [1, 2]
+        |> addList Scene [3, 4]
         |> get Control
-        --> Just [3, 4]
+        --> Just [1, 2]
 
 -}
 addList : Aspect -> List a -> Get (List a) -> Get (List a)

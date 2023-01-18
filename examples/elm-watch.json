@@ -10,6 +10,12 @@
             ],
             "output": "public/build/Garden.js"
         },
+        "Features": {
+            "inputs": [
+                "src/Features.elm"
+            ],
+            "output": "public/build/Features.js"
+        },
         "Application": {
             "inputs": [
                 "src/ApplicationMain.elm"

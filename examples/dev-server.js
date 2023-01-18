@@ -43,6 +43,18 @@ const servers = [
     },
   },
   {
+    port: 8004,
+    subdomain: "features",
+    serve: (req, res, log) => {
+      serveWithEsbuild(
+        req,
+        res,
+        log,
+        looksLikeFile(req.url) ? req.url : "/Features.html"
+      );
+    },
+  },
+  {
     port: 8012,
     subdomain: "application-cached",
     serve: (req, res, log) => {

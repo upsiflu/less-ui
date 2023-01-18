@@ -177,3 +177,12 @@ article {
 }
 
 /*-------------------------------------------*/
+/* Features */
+
+.Features label {
+    display      : inline-block;
+    box-shadow   : 3px 3px currentColor;
+    border-radius: 5px;
+    margin       : 0.5px;
+    padding      : 2px 8px;
+}

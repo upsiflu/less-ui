@@ -125,9 +125,9 @@ application config =
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            Ui.State.update (Ui.Link.fromUrl receivedUrl) state
+                            Ui.State.update (Ui.Link.fromUrl (Debug.log "Application.update received Url" receivedUrl) |> Debug.log "     ") (Debug.log "   * " state)
                                 |> (\canonicalState ->
-                                        ( ( key, canonicalState, model )
+                                        ( ( key, Debug.log "   = " canonicalState, model )
                                         , if canonicalState == state then
                                             Cmd.none
 
