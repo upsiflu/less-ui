@@ -43,8 +43,8 @@ import Browser.Navigation as Nav
 import Html
 import Ui exposing (Ui)
 import Ui.Layout exposing (Layout)
-import Ui.Link as Link exposing (Fragment, Path)
-import Ui.State as State exposing (State)
+import Ui.Link exposing (Fragment, Path)
+import Ui.State
 import Url exposing (Url)
 
 
@@ -54,28 +54,28 @@ Discussion: Is `Handle` just for the links in the top area of the
 app, or for all Flag manipulating links (including tabs inside
 the Control), or for all internal links?
 
-     - It is very reassuring to know which layout area a node is drawn in
+  - It is very reassuring to know which layout area a node is drawn in
 
-     - Nesting a Scene in a Control means that the Control 'controls' the
-       Scene. So it may be feasible to say:
+  - Nesting a Scene in a Control means that the Control 'controls' the
+    Scene. So it may be feasible to say:
 
-       Scene a
-       Handle h (with some static content)
-       Control c
-       Scene b
+    Scene a
+    Handle h (with some static content)
+    Control c
+    Scene b
 
-       which means, Scene a contains Scene b if Handle h is `on`
-       (Control c is transparent)
+which means, Scene a contains Scene b if Handle h is `on`
+(Control c is transparent)
 
-     - We don't know enough about links. It would be smart to visualise
-       all hrefs in the google docs example.
-       For example, the Menu link implements a dropdown, i.e. 'spring-
-       loaded' state, so the flag must auto-delete when a new context is
-       opened.
+  - We don't know enough about links. It would be smart to visualise
+    all hrefs in the google docs example.
+    For example, the Menu link implements a dropdown, i.e. 'spring-
+    loaded' state, so the flag must auto-delete when a new context is
+    opened.
 
 -}
 type alias Application model modelMsg =
-    Program () ( Nav.Key, State, model ) (Msg modelMsg)
+    Program () ( Nav.Key, Url, model ) (Msg modelMsg)
 
 
 {-| -}
@@ -85,22 +85,17 @@ type alias Document modelMsg =
 
 {-| Separate Url update from Model update
 
-**Routing:**
-Use `Link` to generate clickable internal hrefs.
-If you share a `Link`, it highlights its source.
 
-TODO: I don't know what is useful...
+### Lifecycle
 
-The state is really the relevant thing.
-It is encoded in the Url and contains all the stuff.
+    Opened Url
+    in new tab           --> init   (initial)
 
-    link
-    href                 state:url                         new state
+    Clicked
+    internal link        --> update Relative Link
 
-    toggle "x"           path#fragment?flags&assign=ments  path#fragment?flags&x&assign=ments
-
-    toggle absolute "x"
-    ?!&toggle="x"        p#f?x&a=b -> p#f?x&a=b
+    Manually replaced
+    url                  --> update Absolute Link
 
 -}
 application :
@@ -108,15 +103,14 @@ application :
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
     , view : ( Path, Fragment ) -> model -> { body : Ui modelMsg, layout : Layout, title : String }
     }
-    ---> Application model modelMsg
-    -> Program () ( Nav.Key, State, model ) (Msg modelMsg)
+    -> Application model modelMsg
 application config =
     Browser.application
         { init =
             \_ state key ->
                 config.init
                     |> (\( updatedModel, modelCmd ) ->
-                            ( ( key, state |> Debug.log "Application.init state:" |> State.init |> Debug.log "|> State.init:", updatedModel )
+                            ( ( key, Ui.State.init state, updatedModel )
                             , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString state) ]
                             )
                        )
@@ -127,38 +121,27 @@ application config =
             \msg ( key, state, model ) ->
                 case msg of
                     UrlChanged receivedUrl ->
-                        if
-                            (receivedUrl
-                                |> Debug.log "Application.update UrlChanged"
-                            )
-                                == state
-                        then
+                        if receivedUrl == state then
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            State.update (Link.fromUrl receivedUrl |> Debug.log "Application.update Url Changed ---> Link.fromUrl ") state
-                                |> Debug.log "     updated:"
+                            Ui.State.update (Ui.Link.fromUrl receivedUrl) state
                                 |> (\canonicalState ->
                                         ( ( key, canonicalState, model )
                                         , if canonicalState == state then
                                             Cmd.none
 
                                           else
-                                            Nav.replaceUrl key (State.toUrlString canonicalState)
+                                            Nav.replaceUrl key (Ui.State.toUrlString canonicalState)
                                         )
                                    )
 
                     LinkClicked (Browser.Internal url) ->
-                        -- Any clicked link needs to be interpreted as relative
                         ( ( key, state, model )
                         , url
-                            |> Debug.log "Href clicked:"
-                            |> Link.fromUrl
-                            |> Debug.log "Equals link:"
-                            |> Link.relative
-                            |> Debug.log "Make relative:"
-                            |> Link.toUrlString
-                            |> Debug.log "To Url String (and pushUrl):"
+                            |> Ui.Link.fromUrl
+                            |> Ui.Link.relative
+                            |> Ui.Link.toUrlString
                             |> Nav.pushUrl key
                         )
 

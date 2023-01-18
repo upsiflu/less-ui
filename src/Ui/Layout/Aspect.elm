@@ -2,7 +2,7 @@ module Ui.Layout.Aspect exposing (Aspect(..))
 
 {-| Categorise the parts of your [Ui item](Ui)
 
-This helps with [layouting](Ui.Layout)
+This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#toggle)
 
 @docs Aspect
 

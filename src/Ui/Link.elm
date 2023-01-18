@@ -1,18 +1,21 @@
 module Ui.Link exposing
-    ( bounce, goTo, toggle
+    ( goTo, bounce, toggle
     , Link(..), fromUrl, Flag, Path, Fragment
     , relative
-    , view, ViewMode, preset, Position(..)
+    , view, Renderer, preset, Position(..)
     , toUrlString
     , a
     )
 
 {-| Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest) on click
 
-A [restrictive `Application`](Ui.Application) stores the local state in the Url (which then acts as the single source of truth).
-The result of clicking on a link depends on the current state.
+  - [Jump Navigation (goTo)](#goTo)
+      - [With two consecutive navigation steps (bounce)](#bounce)
+  - [Progressive Disclosure (toggle)](#toggle)
+      - unique at a given Ui node (tab) [ToDo]
+      - unique in the browser tab (drowdown, dialog) [ToDo]
 
-@docs bounce, goTo, toggle
+@docs goTo, bounce, toggle
 
 @docs Link, fromUrl, Flag, Path, Fragment
 
@@ -24,7 +27,7 @@ The result of clicking on a link depends on the current state.
 
 # View
 
-@docs view, ViewMode, preset, Position
+@docs view, Renderer, preset, Position
 
 
 # Deconstruct
@@ -51,21 +54,7 @@ import Url exposing (Url)
 import Url.Codec exposing (Codec, ParseError(..))
 
 
-{-| Relative reference.
-
-
-### Lifecycle
-
-    Opened Url in
-    in new tab           --> init   (initial)
-
-    Clicked
-    internal link        --> update Relative Link
-
-    Manually entered
-    shared Url in
-    running app tab      --> update Absolute Link
-
+{-| Encodes a transformation of [the Ui State](Ui.State)
 -}
 type Link
     = GoTo ( Path, Fragment )
@@ -92,11 +81,11 @@ goTo =
 {-| If you are `there`, go `here`, else go `there`.
 Use for expanding/collapsing nodes, or for tree-shaped scenes in general (in which case, "here" is the parent path).
 
+`Bounce {"there" "here"}` yields an `Internal` request of `there?reroute=here`
+
     a -> b?reroute=c -> b
     c -> b?reroute=c -> b
     b -> b?reroute=c -> c
-
-`Bounce {"there" "here"}` yields an `Internal` request of `there?reroute=here`
 
 ```css
 a:active, a:link:active, a:visited:active {}
@@ -164,11 +153,25 @@ hasFlag flag =
 ---- View ----
 
 
-{-| Create `ViewMode`s in a similar way to how you compose Html
+{-| A familiar syntax, similar to how you compose Html:
+
+    import Html
+
+    let
+        link =
+            goTo ("myPath", Nothing)
+
+        renderer =
+            preset.global []
+                [Html.text "go to my Path!"]
+
+    in
+    link |> view renderer
+
 -}
 preset :
-    { global : List (Html.Attribute Never) -> List (Html Never) -> ViewMode
-    , inline : List (Html.Attribute Never) -> List (Html Never) -> ViewMode
+    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer
+    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer
     }
 preset =
     { global = \att con -> { empty | attributes = att, contents = con, position = Global }
@@ -176,7 +179,7 @@ preset =
     }
 
 
-empty : ViewMode
+empty : Renderer
 empty =
     { attributes = []
     , contents = []
@@ -187,7 +190,7 @@ empty =
 
 {-| How to present a Link
 -}
-type alias ViewMode =
+type alias Renderer =
     { attributes : List (Html.Attribute Never)
     , contents : List (Html Never)
     , occlusions : List Aspect
@@ -205,25 +208,27 @@ a link attrs contents =
 
 {-|
 
-    SetPath ""
+    import Html
+
+    toggle "mainMenu"
         |> view
             { attributes = []
-            , contents = [ text "Home" ]
+            , contents = [ Html.text "☰" ]
             , occlusions = []
             , position = Global
             }
 
 -}
 view :
-    ViewMode
+    Renderer
     -> Link
     -> Ui msg
 view config link =
     Ui.custom <|
         \( aspect, url ) ->
             let
-                appendWithAttributes : List (Html.Attribute Never) -> Ui.Custom msg
-                appendWithAttributes additionalAttributes =
+                transformViewModel : List (Html.Attribute Never) -> Ui.Custom msg
+                transformViewModel additionalAttributes =
                     let
                         foliage : ViewModel.Foliage msg
                         foliage =
@@ -238,7 +243,7 @@ view config link =
                                 ViewModel.appendHandle foliage
             in
             case link of
-                Toggle { isAbsolute } flag ->
+                Toggle _ flag ->
                     let
                         ( isChecked, mask ) =
                             Bool.ifElse
@@ -246,14 +251,14 @@ view config link =
                                 ( "false", [ Mask.occludeList config.occlusions |> Ui.MaskDescendents ] )
                                 (hasFlag flag url)
                     in
-                    appendWithAttributes
+                    transformViewModel
                         [ attribute "role" "switch"
                         , attribute "aria-checked" isChecked
                         ]
                         :: mask
 
                 _ ->
-                    [ appendWithAttributes [] ]
+                    [ transformViewModel [] ]
 
 
 {-| Define whether the link anchor
@@ -309,13 +314,12 @@ codecs =
     in
     [ Url.Codec.succeed
         (\isAbsolute_ path_ fragment_ reroute_ ->
-            (\n -> Debug.log "(isAbsolute_, (path_, fragment_), reroute_)" ( isAbsolute_, ( path_, fragment_ ), reroute_ ) |> (\_ -> n)) <|
-                case reroute_ of
-                    Just there ->
-                        Bounce { isAbsolute = isAbsolute_ } { there = locationFromString there, here = ( path_, fragment_ ) }
+            case reroute_ of
+                Just there ->
+                    Bounce { isAbsolute = isAbsolute_ } { there = locationFromString there, here = ( path_, fragment_ ) }
 
-                    Nothing ->
-                        GoTo ( path_, fragment_ )
+                Nothing ->
+                    GoTo ( path_, fragment_ )
         )
         (is >> .bounceOrGoto)
         |> absoluteQueryFlag

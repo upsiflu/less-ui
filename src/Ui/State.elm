@@ -1,8 +1,8 @@
 module Ui.State exposing
     ( State
-    , fromUrl
+    , fromUrl, init
     , update
-    , init, toUrlString
+    , toUrlString
     )
 
 {-| We use the Url query to keep track of the Ui state. This makes sharing a Ui state as easy as copying the Url.
@@ -12,7 +12,7 @@ module Ui.State exposing
 
 # Create
 
-@docs fromUrl
+@docs fromUrl, init
 
 
 # Update
@@ -20,9 +20,9 @@ module Ui.State exposing
 @docs update
 
 
-# Helper
+# Decompose
 
-@docs evaluateQueryAssignments
+@docs toUrlString
 
 -}
 
@@ -116,7 +116,6 @@ update link state =
             { state
                 | query =
                     state
-                        |> Debug.log "update----current state:"
                         |> .query
                         |> Maybe.withDefault ""
                         |> String.split "&"
@@ -143,7 +142,7 @@ update link state =
                             ( [], [] )
                         |> Tuple.mapFirst
                             (\flags_ ->
-                                if not (List.member f (Debug.log "current flags" flags_)) then
+                                if not (List.member f flags_) then
                                     f :: flags_
 
                                 else if isAbsolute then
@@ -155,7 +154,6 @@ update link state =
                         |> Tuple.mapFirst (List.filter ((/=) ""))
                         |> Tuple.mapSecond
                             (List.map (\( k, v ) -> k ++ "=" ++ v))
-                        |> Debug.log "update----(flags, assignments):"
                         |> (\( flags_, assignments_ ) ->
                                 String.join "&" (flags_ ++ assignments_)
                            )
@@ -167,7 +165,6 @@ update link state =
                                     Just str
                            )
             }
-                |> Debug.log "update----Result url:"
 
         ErrorMessage _ ->
             Link.toUrlString link

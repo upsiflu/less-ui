@@ -7,7 +7,7 @@ module Ui exposing
     , addLabel, addTextLabel
     , setAspect
     , repeat
-    , ol, ul
+    , ol, ul, node
     , uncons
     , constant
     , custom, Custom(..)
@@ -55,10 +55,13 @@ To merge two `Ui`s on the same level, use [`++`](https://package.elm-lang.org/pa
 In addition, many List functions directly work with `Ui`, for example `List.length`, `List.reverse` or `List.Extra.permutations`.
 Caveats are discussed in [Advanced Usage](advanced-usage)
 
-@docs ol, ul
+
+### Wrap
+
+@docs ol, ul, node
 
 
-## Decompose
+### Decompose
 
 @docs uncons
 
@@ -66,7 +69,9 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 # Advanced Usage
 
 
-## Add Interactivity
+## Add Handles
+
+For convenient functions, check out the [Link](Ui.Link) module.
 
 @docs constant
 @docs custom, Custom
@@ -93,7 +98,7 @@ It is usually easier to build exactly the `Ui` you need instead of altering and 
 import Bool.Extra as Bool
 import Html exposing (Html)
 import Html.Attributes exposing (..)
-import Html.Keyed exposing (node)
+import Html.Keyed
 import List.Extra as List
 import Maybe.Extra as Maybe
 import Ui.Get as Get exposing (Get)
@@ -122,6 +127,11 @@ type alias Item msg =
     }
 
 
+{-| -}
+type alias Handle msg =
+    ( Aspect, Url ) -> List (Custom msg)
+
+
 
 ---- CREATE ----
 
@@ -144,13 +154,14 @@ html =
     Tuple.pair "" >> List.singleton >> foliage
 
 
-{-| -}
+{-| Preserve data in controls or [custom elements](https://guide.elm-lang.org/interop/custom_elements.html) even [when nodes before this are removed or added](https://guide.elm-lang.org/optimization/keyed.html).
+-}
 keyed : String -> Html msg -> Ui msg
 keyed key =
     Tuple.pair key >> List.singleton >> foliage
 
 
-{-| [Foliage](#Foliage) is a list of String-keyed Html
+{-| [Foliage](Ui.Layout.ViewModel#Foliage) is a list of String-keyed Html
 -}
 foliage : Foliage msg -> Ui msg
 foliage =
@@ -175,15 +186,57 @@ fromItem =
 
 
 
+---- MODIFY ----
+
+
+{-| Shorthand for `singleton |> with ...`
+-}
+setAspect : Aspect -> Ui msg -> Ui msg
+setAspect aspect subUi =
+    with aspect subUi singleton
+
+
+{-| Nest the DOM here.
+If you wrap, and then define the contextual aspect,
+the wrapper will wrap all descendants that constitute this aspect.
+
+    example : Ui msg
+    example =
+        singleton
+            |> with Scene []
+            |> wrap ((++) ( "message", Html.text "I am wrapped" ))
+            |> with Control []
+
+Now, let's see what happens if we define a contextual aspect.
+
+    singleton
+        |> with Info example
+
+This will output:
+`Scene -> []`,
+`Control -> []`,
+`Info -> "I am wrapped" []`
+
+-}
+wrap : (Foliage msg -> Foliage msg) -> Ui msg -> Ui msg
+wrap =
+    Wrap >> (<<) List.singleton
+
+
+
 ---- COMPOSE ----
 
 
 {-| Nest a sub-Ui to each descendant, via a [semantic aspect](Ui.Layout.Aspect):
 
-Note that `[] |> with ...` will always produce `[]`
+Note that an empty list will stay an empty list:
 
     [] |> with Scene (textLabel "I want to be a scene")
         --> []
+
+    singleton ++ singleton
+        |> with Scene (textLabel "I want to be a scene")
+        --> ???
 
 -}
 with : Aspect -> Ui msg -> Ui msg -> Ui msg
@@ -208,7 +261,7 @@ with aspect subUi =
 -}
 addLabel : Ui msg -> Ui msg -> Ui msg
 addLabel l =
-    (++) l >> wrap (node "label" [] >> Tuple.pair "" >> List.singleton)
+    (++) l >> wrap (Html.Keyed.node "label" [] >> Tuple.pair "" >> List.singleton)
 
 
 {-| Combine descendents from two `Ui`s. If one `Ui` is longer, its excessive elements are dropped.
@@ -228,55 +281,25 @@ map2 fu a b =
     List.map2 fu (List.map List.singleton a) (List.map List.singleton b) |> List.concat
 
 
-
----- MODIFY ----
-
-
-{-| Shorthand for `[] |> with ...`
--}
-setAspect : Aspect -> Ui msg -> Ui msg
-setAspect aspect subUi =
-    with aspect subUi []
-
-
-{-| Nest the DOM here.
-If you wrap, and then define the contextual aspect,
-the wrapper will wrap all descendants that constitute this aspect.
-
-    example : Ui msg
-    example =
-        []
-            |> with Scene []
-            |> wrap ((++) ( "message", Html.text "I am wrapped" ))
-            |> with Control []
-
-Now, let's see what happens if we define a contextual aspect.
-
-    []
-        |> with Control example
-
-This will output:
-`Scene -> []`,
-`Control -> "I am wrapped" []`
-
--}
-wrap : (Foliage msg -> Foliage msg) -> Ui msg -> Ui msg
-wrap =
-    Wrap >> (<<) List.singleton
-
-
-{-| convenience function to wrap a Ui into an unordered list
+{-| convenience function to wrap a Ui into an unordered list and give it an id
 -}
 ul : String -> Ui msg -> Ui msg
 ul idString =
     wrap (Html.Keyed.ul [ id idString ] >> Tuple.pair idString >> List.singleton)
 
 
-{-| convenience function to wrap a Ui into an ordered list
+{-| convenience function to wrap a Ui into an ordered list and give it an id
 -}
 ol : String -> Ui msg -> Ui msg
 ol idString =
     wrap (Html.Keyed.ul [ id idString ] >> Tuple.pair idString >> List.singleton)
+
+
+{-| convenience function to wrap a Ui into any Html node and give it an id
+-}
+node : String -> String -> Ui msg -> Ui msg
+node nodeType idString =
+    wrap (Html.Keyed.node nodeType [ id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| prepend a text label to the contextual aspect
@@ -313,7 +336,7 @@ repeat n =
 
 {-|
 
-    List.repeat 10 []
+    List.repeat 10 ()
         |> indexedMap (\i _ -> textLabel (String.fromInt i))
         |> mapList (List.intersperse (textLabel "and"))
 
@@ -321,12 +344,14 @@ You may find it handy to use functions such as `List.Extra.setAt` to replace the
 
     import List.Extra as List
 
-    [ textLabel "A", textLabel "oops", textLabel "C" ]
+    textLabel "A" ++ textLabel "oops" ++ textLabel "C"
         |> mapList (List.setAt 1 (textLabel "the other B"))
 
 or to remove a descendant:
 
-    [ textLabel "A", textLabel "oops", textLabel "C" ]
+    textLabel "A"
+        ++ textLabel "oops"
+        ++ textLabel "C"
         |> mapList (List.remove 1)
 
 -}
@@ -336,6 +361,11 @@ mapList fu =
 
 
 {-| Modify each descendent as a separate Ui and then recombine them.
+
+    textLabel "A" ++ textLabel "B" ++ textLabel "C"
+        |> map ((++) textLabel ", ")
+        ---> something like A, B, C
+
 -}
 map : (Ui msg -> Ui msg2) -> Ui msg -> Ui msg2
 map fu =
@@ -389,10 +419,17 @@ uncons =
 ---- VIEW ----
 
 
-{-| Generate [keyed Html (Foliage)](Ui.Layout.ViewModel#Foliage)
+{-| Generate [keyed Html (Foliage)](Ui.Layout.ViewModel#Foliage) `[(key:String, Html)]` for use with `Html.Keyed`
 -}
 view : Url -> Layout -> Ui msg -> Foliage msg
 view url layout =
+    render url
+        >> Layout.view
+        >> (|>) layout
+
+
+render : Url -> Ui msg -> ViewModel msg
+render url =
     let
         viewUi : ( Aspect, Mask (Ui msg) ) -> Ui msg -> ViewModel msg
         viewUi ( aspect, mask ) =
@@ -433,48 +470,20 @@ view url layout =
                 |> transform
     in
     viewUi ( Scene, Mask.transparent )
-        >> Layout.view
-        >> (|>) layout
 
 
 
 ---- Working with Handles ----
 
 
-{-| **Constant:** Add your own stuff into the Handle aspect
-**Link:** Add a [Link](Ui.Link#Link) into the Handle aspect
-**Inline** Add a [Link](Ui.Link#Link) into the current aspect
-
-  - Popup -> Scene Disclosure in window - volatile - -> TODO
-  - Summarize -> Scene Disclosure inline - volatile - -> summary..details [a href="{currentPath}?summarize={flag}"] <- use austinshenk/elm-w3
-  - Toggle -> Control Disclosure - persistent - -> a role="switch" href="{currentPath}?toggle={flag}"
-  - Static -> Noop
-  - Alternate -> Link to path0 - -> a href="{path0}?rerouteLink=path1"
-
-volatile: `Flag`s are reset when path changes
-persistent: `Flag`s persist across path changes
-unique: A single screen has at most one such `Flag`
-
--}
-type alias Handle msg =
-    ( Aspect, Url ) -> List (Custom msg)
-
-
 {-| Build your own transformation! Useful for links etc.
-
-Example:
-
-    TransformViewModel
-
-    MaskDescendents
-
 -}
 type Custom msg
     = TransformViewModel (ViewModel msg -> ViewModel msg)
     | MaskDescendents (Mask (Ui msg))
 
 
-{-| Here you can add your own link, button, input, or indicator.
+{-| Here you can add your own button, input, or indicator.
 -}
 constant : List (Html msg) -> Ui msg
 constant html_ =
@@ -522,4 +531,16 @@ keyByIndex =
 -}
 toHtml : Foliage msg -> Html msg
 toHtml =
-    node "" []
+    Html.Keyed.node "div" []
+
+
+
+---- Testing ----
+{- Get the length of keyed Html for each Aspect, given the Url "<http://localhost/">
+
+   lengths : Ui msg -> Get Int
+   lengths ui =
+       Url.fromString "http://localhost/"
+           |> Maybe.map (\url -> render url ui |> .get |> Get.map List.length)
+           |> Maybe.withDefault Get.empty
+-}
