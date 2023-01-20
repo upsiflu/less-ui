@@ -424,14 +424,14 @@ uncons =
 
 {-| Generate [keyed Html (Foliage)](Ui.Layout.ViewModel#Foliage) `[(key:String, Html)]` for use with `Html.Keyed`
 -}
-view : { next : State, previous : Maybe State } -> Layout -> Ui msg -> Foliage msg
+view : { current : State, previous : Maybe State } -> Layout -> Ui msg -> Foliage msg
 view transition layout =
     render transition
         >> Layout.view
         >> (|>) layout
 
 
-render : { next : State, previous : Maybe State } -> Ui msg -> ViewModel msg
+render : { current : State, previous : Maybe State } -> Ui msg -> ViewModel msg
 render state =
     let
         viewUi : ( Aspect, Mask (Ui msg) ) -> Ui msg -> ViewModel msg
@@ -453,7 +453,7 @@ render state =
         viewItem ( aspect, mask ) item =
             let
                 ( transform, mask_ ) =
-                    item.dynamic ( aspect, state.next )
+                    item.dynamic ( aspect, state.current )
                         |> List.foldr
                             (\custom_ ( t, m ) ->
                                 case custom_ of
@@ -464,6 +464,31 @@ render state =
                                         ( t, m >> m_ )
                             )
                             ( identity, mask )
+
+                ( previousTransform, previousMask_ ) =
+                    item.dynamic ( aspect, state.previous |> Maybe.withDefault state.current )
+                        |> List.foldr
+                            (\custom_ ( t, m ) ->
+                                case custom_ of
+                                    TransformViewModel t_ ->
+                                        ( t >> t_, m )
+
+                                    MaskDescendents m_ ->
+                                        ( t, m >> m_ )
+                            )
+                            ( identity, mask )
+
+                -- POOF:
+                {-
+
+                   (1) We know the new getMask and viewModelTransform.
+                   (2) Now, what are the elements that need to go poof?
+                   (3) If we can make a ViewModel out of the poof elements, then we can
+                       ViewModel.mergeDeprecated old new
+
+                   (2) We know both lists of transformation and maskDesc.
+
+                -}
             in
             item.get
                 |> mask_
@@ -480,7 +505,8 @@ render state =
 ---- Working with Handles ----
 
 
-{-| Build your own transformation! Useful for links etc.
+{-| `TransformViewModel`: Use to append or map handles or apply transformations to descendents.
+`MaskDescendents`: Transform or occlude nested elements by endomapping `Get`
 -}
 type Custom msg
     = TransformViewModel (ViewModel msg -> ViewModel msg)

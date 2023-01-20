@@ -39,6 +39,7 @@ module Ui.State exposing
 
 import Set exposing (Set)
 import Set.Extra as Set
+import String.Extra as String
 import Url exposing (Url)
 
 
@@ -227,17 +228,7 @@ serializeQuery query =
     Set.toList query.flags
         ++ List.map (\( k, v ) -> k ++ "=" ++ v) query.assignments
         |> String.join "&"
-        |> nothingIfEmpty
-
-
-nothingIfEmpty : String -> Maybe String
-nothingIfEmpty str =
-    case str of
-        "" ->
-            Nothing
-
-        _ ->
-            Just str
+        |> String.nonEmpty
 
 
 parseQueryString : Maybe String -> Query

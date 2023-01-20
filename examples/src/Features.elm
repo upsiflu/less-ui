@@ -77,8 +77,11 @@ paths : Ui.State.Path -> Ui Msg
 paths path =
     Ui.singleton
         |> Ui.with Scene (Ui.textLabel ("Path: " ++ path))
-        |> Ui.with Control (Link.goTo ( "Path-1", Nothing ) |> Link.view (Link.preset.inline [] [ Html.text "Go to Path 1" ]))
-        |> Ui.with Control (Link.goTo ( "Path-2", Nothing ) |> Link.view (Link.preset.inline [] [ Html.text "Go to Path 2" ]))
+        |> Ui.with Control (Link.goTo ( Just "Path-1", Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go to Path 1" ]))
+        |> Ui.with Control (Link.goTo ( Just "Path-2", Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go to Path 2" ]))
+        |> Ui.with Control (Link.goTo ( Just "", Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go home" ]))
+        |> Ui.with Control (Link.goTo ( Nothing, Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go nowhere" ]))
+        |> Ui.with Control (Link.goTo ( Nothing, Just "99" ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go to Fragment #99" ]))
 
 
 {-| [Link](Ui.Link): Manage the Ui State as a URL
@@ -99,8 +102,8 @@ fragments fr =
     Ui.singleton
         |> Ui.with Control
             (Link.bounce
-                { there = ( "", Just "3" ), here = ( "", Just "1" ) }
-                |> Link.view (Link.preset.inline [] [ Html.text "bounce between 1 and 3" ])
+                { there = ( Nothing, Just "3" ), here = ( Nothing, Just "1" ) }
+                |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "bounce between 1 and 3" ])
             )
         |> Ui.with Scene
             (Ui.html (Html.section [] articles))

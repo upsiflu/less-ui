@@ -1,3 +1,16 @@
+.poof {
+    animation          : poof 2s;
+    animation-fill-mode: forwards;
+    pointer-events     : none;
+}
+
+@keyframes poof {
+    to {
+        opacity: 0;
+        display: none;
+    }
+}
+
 .handle,
 .info,
 .control {
@@ -56,7 +69,6 @@ body {
 
 
 a:link[href] {
-    color          : blue;
     text-decoration: underline;
 }
 
@@ -215,7 +227,7 @@ article {
     }
 }
 
-* {
+*:not(:active) {
     transition: all 0.3s
 }
 
@@ -230,13 +242,24 @@ article {
 /*-------------------------------------------*/
 /* Features */
 
-.Features label {
+.Features label,
+.Features a.paths {
     display      : inline-block;
-    box-shadow   : 3px 3px currentColor;
     border-radius: 5px;
     margin       : 2px 4px 2px 1px;
     padding      : 2px 8px;
 }
+
+.Features label,
+.Features a.paths:hover {
+    box-shadow: 3px 3px currentColor;
+}
+
+.Features a.paths:focus {
+    outline       : 2px double currentColor;
+    outline-offset: -1.5px;
+}
+
 
 .Features article:target {
     outline: 10px solid orange;

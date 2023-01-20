@@ -75,7 +75,7 @@ which means, Scene a contains Scene b if Handle h is `on`
 
 -}
 type alias Application model modelMsg =
-    Program () ( Nav.Key, { previous : Maybe State, next : State }, model ) (Msg modelMsg)
+    Program () ( Nav.Key, { current : State, previous : Maybe State }, model ) (Msg modelMsg)
 
 
 {-| -}
@@ -110,7 +110,7 @@ application config =
             \_ url key ->
                 ( config.init, Ui.State.init url )
                     |> (\( ( updatedModel, modelCmd ), initialState ) ->
-                            ( ( key, { next = initialState, previous = Nothing }, updatedModel )
+                            ( ( key, { current = initialState, previous = Nothing }, updatedModel )
                             , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString initialState) ]
                             )
                        )
@@ -120,15 +120,15 @@ application config =
         , update =
             \msg ( key, state, model ) ->
                 let
-                    updateUrl : Ui.Link.Link -> ( ( Nav.Key, { next : State, previous : Maybe State }, model ), Cmd msg )
+                    updateUrl : Ui.Link.Link -> ( ( Nav.Key, { current : State, previous : Maybe State }, model ), Cmd msg )
                     updateUrl link =
-                        Ui.Link.toStateTransition link state.next
+                        Ui.Link.toStateTransition link state.current
                             |> (\canonicalState ->
-                                    ( ( key, { state | previous = Just state.next, next = canonicalState }, model )
-                                    , if state.next == canonicalState then
+                                    ( ( key, { state | previous = Just state.current, current = canonicalState }, model )
+                                    , if state.current == canonicalState then
                                         Cmd.none
 
-                                      else if canonicalState.path == state.next.path && canonicalState.fragment == state.next.fragment then
+                                      else if canonicalState.path == state.current.path && canonicalState.fragment == state.current.fragment then
                                         Nav.replaceUrl key (Ui.State.toUrlString canonicalState)
 
                                       else
@@ -138,18 +138,18 @@ application config =
                 in
                 case msg of
                     UrlChanged url ->
-                        if url == state.next then
+                        if url == state.current then
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            updateUrl (Ui.Link.fromUrl url)
+                            updateUrl (Ui.Link.fromUrl state.current.path url)
 
                     LinkClicked (Browser.Internal url) ->
-                        if url == state.next then
+                        if url == state.current then
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            updateUrl (Ui.Link.fromUrl url |> Ui.Link.relative)
+                            updateUrl (Ui.Link.fromUrl state.current.path url |> Ui.Link.relative)
 
                     LinkClicked (Browser.External href) ->
                         ( ( key, state, model ), Nav.load href )
@@ -161,7 +161,7 @@ application config =
                                )
         , view =
             \( _, state, model ) ->
-                config.view ( Ui.State.getPath state.next, Ui.State.getFragment state.next ) model
+                config.view ( Ui.State.getPath state.current, Ui.State.getFragment state.current ) model
                     |> (\document ->
                             { title = document.title
                             , body = Ui.view state document.layout document.body |> List.map (Tuple.second >> Html.map ModelMsg)

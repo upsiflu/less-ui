@@ -5,6 +5,7 @@ module Ui.Link exposing
     , view, Renderer, preset, Position(..)
     , toUrlString, toStateTransition
     , a
+    , parsePath, queryParseLocation, querySerialiseLocation, stripPrefix, upTo
     )
 
 {-| Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest) on click
@@ -45,6 +46,7 @@ import Bool.Extra as Bool
 import Html exposing (Html)
 import Html.Attributes exposing (..)
 import Maybe.Extra as Maybe
+import String.Extra as String
 import Ui exposing (Ui)
 import Ui.Get as Get
 import Ui.Layout.Aspect as Aspect exposing (Aspect)
@@ -56,10 +58,34 @@ import Url.Codec exposing (Codec, ParseError(..))
 
 
 {-| Encodes a transformation of [the Ui State](Ui.State)
+
+Note concerning `Bounce`:
+
+    url
+    path#fragment        in assignment     Path, Fragment
+
+    /a#b                 a~b               "a", Just "b"
+    /a                   a                 "a", Nothing
+    /#b                  ~b                "",  Just "b"
+    /                                      "",  Nothing
+
+    BUT what we need is a structure that can express
+    - Path and Fragment
+    - Empty Path and Fragment
+    - Path but no Fragment
+    - Empty Path but no Fragment
+    - No Path but Fragment
+
+    ILLEGAL: No Path and No Fragment.
+    The easiest way would be to interpret Nothing in Path as "no path" unless fragment is Nothing,
+    in which case Path==Nothing is interpreted as Just ""
+
+Note that in `Bounce` and `GoTo`, (Nothing, Nothing) is coerced into (Just "", Nothing)
+
 -}
 type Link
-    = GoTo ( Path, Fragment )
-    | Bounce { isAbsolute : Bool } { there : ( Path, Fragment ), here : ( Path, Fragment ) }
+    = GoTo ( Maybe Path, Fragment )
+    | Bounce { isAbsolute : Bool } { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) }
     | Toggle { isAbsolute : Bool } Flag
     | ErrorMessage String
 
@@ -73,8 +99,10 @@ type Link
 a:active, a:link:active, a:visited:active {}
 ```
 
+Note that `(Nothing, Nothing)` is coerced into `(Just "", Nothing)` (is it What happens if not?)
+
 -}
-goTo : ( Path, Fragment ) -> Link
+goTo : ( Maybe Path, Fragment ) -> Link
 goTo =
     GoTo
 
@@ -94,7 +122,7 @@ a.bounce {}
 ```
 
 -}
-bounce : { there : ( Path, Fragment ), here : ( Path, Fragment ) } -> Link
+bounce : { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) } -> Link
 bounce =
     Bounce { isAbsolute = True }
 
@@ -166,7 +194,7 @@ type alias Renderer =
 -}
 a : Link -> List (Html.Attribute Never) -> List (Html Never) -> Html msg
 a link attrs contents =
-    Html.a (Maybe.cons (toHref link) attrs) contents
+    Html.a (toHref link :: attrs) contents
         |> Html.map never
 
 
@@ -241,7 +269,7 @@ codecs =
         buildLink path_ fragment_ reroute_ toggle_ errorMessage_ isAbsolute_ =
             case reroute_ of
                 Just here ->
-                    Bounce { isAbsolute = isAbsolute_ } { there = ( path_, fragment_ ), here = locationFromString here }
+                    Bounce { isAbsolute = isAbsolute_ } { there = ( parsePath path_, fragment_ ), here = queryParseLocation here }
 
                 Nothing ->
                     case toggle_ of
@@ -254,7 +282,7 @@ codecs =
                                     ErrorMessage err
 
                                 Nothing ->
-                                    GoTo ( path_, fragment_ )
+                                    GoTo ( parsePath path_, fragment_ )
 
         getAbsoluteFlag : Url.Codec.CodecInProgress Link (Bool -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
         getAbsoluteFlag =
@@ -282,21 +310,13 @@ codecs =
                             Nothing
                 )
 
-        getFragment : Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Maybe String -> Maybe String -> Bool -> parseResult) -> Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Maybe String -> Bool -> parseResult)
-        getFragment =
-            Url.Codec.fragment (getDestination >> Maybe.andThen Tuple.second)
-
-        getPath : Url.Codec.CodecInProgress Link (String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
-        getPath =
-            Url.Codec.string (getDestination >> Maybe.map Tuple.first)
-
         getReroute : Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Maybe String -> Bool -> parseResult) -> Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Bool -> parseResult)
         getReroute =
             Url.Codec.queryString "reroute"
                 (\l ->
                     case l of
-                        Bounce _ properties ->
-                            Just (locationToString properties.here)
+                        Bounce _ { here } ->
+                            Just (querySerialiseLocation here)
 
                         _ ->
                             Nothing
@@ -313,27 +333,15 @@ codecs =
                         _ ->
                             Nothing
                 )
-
-        getDestination : Link -> Maybe ( Path, Fragment )
-        getDestination l =
-            case l of
-                GoTo location ->
-                    Just location
-
-                Bounce _ { there } ->
-                    Just there
-
-                _ ->
-                    Nothing
     in
     [ Url.Codec.succeed buildLink
         (\_ -> True)
-        |> getPath
+        |> Url.Codec.string destinationPath
     , Url.Codec.succeed (buildLink "")
         (\_ -> True)
     ]
         |> List.map
-            (getFragment
+            (Url.Codec.fragment destinationFragment
                 >> getReroute
                 >> getToggle
                 >> getError
@@ -341,63 +349,114 @@ codecs =
             )
 
 
+unwrapDestination : Link -> Maybe ( Maybe Path, Fragment )
+unwrapDestination link =
+    case link of
+        GoTo location ->
+            Just location
+
+        Bounce _ { there } ->
+            Just there
+
+        _ ->
+            Nothing
+
+
+destinationPath : Link -> Maybe Path
+destinationPath =
+    unwrapDestination
+        >> Maybe.andThen Tuple.first
+        >> serialisePath
+        >> Just
+
+
+destinationFragment : Link -> Fragment
+destinationFragment =
+    unwrapDestination
+        >> Maybe.andThen Tuple.second
+
+
 {-|
+
+    Note that in Elm, an absolute Url path always starts with a slash.
+    To check if the intended path is relative, we compare it with the previous path first.
+
+    In the following tests, we assume a previous path of "/"
 
     import Url
 
-    testUrl : String -> Link
-    testUrl =
-        (++) "http://localhost/"
+    testFromUrl :  String -> Link
+    testFromUrl =
+        (++) "http://localhost"
             >> Url.fromString
-            >> Maybe.map fromUrl
+            >> Maybe.map (fromUrl "/")
             >> Maybe.withDefault (ErrorMessage "Url.fromString failed")
 
 
     --Bounce
 
-    testUrl "there?reroute=here~f2#f1"
-        --> Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("here", Just "f2") }
+    testFromUrl "/there?reroute=here~f2#f1"
+        --> Bounce { isAbsolute = False } { there = (Just "there", Just "f1"), here = (Just "here", Just "f2") }
 
-    testUrl "there?reroute=~f2#f1"
-        --> Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("", Just "f2") }
+    testFromUrl "/there?reroute=/~f2#f1"
+        --> Bounce { isAbsolute = False } { there = (Just "there", Just "f1"), here = (Just "", Just "f2") }
 
-    testUrl "there?reroute=#f1"
-        --> Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("", Nothing) }
+    testFromUrl "/there?reroute=~f2#f1"
+        --> Bounce { isAbsolute = False } { there = (Just "there", Just "f1"), here = (Nothing, Just "f2") }
 
-    testUrl "?reroute=here~f2#f1"
-        --> Bounce { isAbsolute = False } { there = ("", Just "f1"), here = ("here", Just "f2") }
+    testFromUrl "/there?reroute=#f1"
+        --> Bounce { isAbsolute = False } { there = (Just "there", Just "f1"), here = (Nothing, Nothing) }
 
-    testUrl "?reroute=here~f2"
-        --> Bounce { isAbsolute = False } { there = ("", Nothing), here = ("here", Just "f2") }
+    testFromUrl "/?reroute=here~f2#f1"
+        --> Bounce { isAbsolute = False } { there = (Nothing, Just "f1"), here = (Just "here", Just "f2") }
 
+    testFromUrl "/?reroute=here~f2"
+        --> Bounce { isAbsolute = False } { there = (Nothing, Nothing), here = (Just "here", Just "f2") }
+
+    testFromUrl "/?reroute=~"
+        --> Bounce { isAbsolute = False } { there = (Nothing, Nothing), here = (Nothing, Nothing) }
 
     --Toggle
 
-    testUrl "?toggle=flag"
+    testFromUrl "?toggle=flag"
         --> Toggle {isAbsolute = False} "flag"
 
-    testUrl "?toggle=flag&!"
+    testFromUrl "?toggle=flag&!"
         --> Toggle {isAbsolute = True} "flag"
 
 
     --GoTo
 
-    testUrl "path#fragment"
-        --> GoTo ("path", Just "fragment")
+    testFromUrl "/path#fragment"
+        --> GoTo (Just "path", Just "fragment")
 
-    testUrl "path"
-        --> GoTo ("path", Nothing)
+    testFromUrl "/path"
+        --> GoTo (Just "path", Nothing)
 
-    testUrl "path/"
-        --> GoTo ("path", Nothing)
+    testFromUrl "/path/"
+        --> GoTo (Just "path", Nothing)
 
-    testUrl "#fragment"
-        --> GoTo ("", Just "fragment")
+    testFromUrl "/#fragment"
+        --> GoTo (Nothing, Just "fragment")
+
+
+    testFromUrl "/#?fragment"
+        --> GoTo (Nothing, Just "?fragment")
 
 -}
-fromUrl : Url -> Link
-fromUrl url =
-    case Url.Codec.parseUrl codecs url of
+fromUrl : Path -> Url -> Link
+fromUrl currentPath url =
+    case
+        { url
+            | path =
+                if currentPath == url.path then
+                    ""
+
+                else
+                    url.path
+        }
+            |> Url.Codec.parseUrl codecs
+    of
         Ok link ->
             link
 
@@ -445,25 +504,35 @@ fromUrl url =
 -}
 toStateTransition : Link -> State -> State
 toStateTransition link =
+    let
+        getLocation : State -> ( Maybe String, Fragment )
+        getLocation state =
+            ( Ui.State.getPath state |> String.nonEmpty, Ui.State.getFragment state )
+
+        setLocation : ( Maybe Path, Fragment ) -> State -> State
+        setLocation destination =
+            case destination of
+                ( Just path, fragment ) ->
+                    Ui.State.setPath path >> Ui.State.setFragment fragment
+
+                ( Nothing, fragment ) ->
+                    Ui.State.setFragment fragment
+    in
     case link of
-        GoTo ( path, fragment ) ->
-            Ui.State.setPath path >> Ui.State.setFragment fragment
+        GoTo destination ->
+            setLocation destination
 
         Bounce { isAbsolute } { there, here } ->
-            let
-                ( ( here_path, here_fragment ), ( there_path, there_fragment ) ) =
-                    ( here, there )
-            in
             \state ->
-                if ( Ui.State.getPath state, Ui.State.getFragment state ) == there || isAbsolute then
-                    state
-                        |> Ui.State.setPath here_path
-                        |> Ui.State.setFragment here_fragment
+                if
+                    isAbsolute
+                        || (there == getLocation state)
+                        || (Tuple.first there == Nothing && Tuple.second there == Tuple.second (getLocation state))
+                then
+                    setLocation here state
 
                 else
-                    state
-                        |> Ui.State.setPath there_path
-                        |> Ui.State.setFragment there_fragment
+                    setLocation there state
 
         Toggle { isAbsolute } f ->
             Ui.State.removeAssignments [ "toggle", "reroute" ]
@@ -479,33 +548,62 @@ toStateTransition link =
 
 
 {-| -}
-toHref : Link -> Maybe (Html.Attribute Never)
+toHref : Link -> Html.Attribute Never
 toHref =
-    Url.Codec.toString codecs
-        >> Maybe.map Html.Attributes.href
+    toUrlString
+        >> Html.Attributes.href
 
 
 {-| Try to create an UrlString
 
     --Bounce
 
-    Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("here", Just "f2") }
+    Bounce { isAbsolute = False }
+        { there = (Just "there", Just "f1")
+        , here = (Just "here", Just "f2")
+        }
         |> toUrlString
-        --> "there?reroute=here~f2#f1"
+        --> "/there?reroute=here~f2#f1"
 
-    Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("", Just "f2") }
+    Bounce { isAbsolute = False }
+        { there = (Just "there", Just "f1")
+        , here = (Just "", Just "f2")
+        }
         |> toUrlString
-        --> "there?reroute=~f2#f1"
+        --> "/there?reroute=/~f2#f1"
 
-    Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("", Nothing) }
+    Bounce { isAbsolute = False }
+        { there = (Just "there", Just "f1")
+        , here = (Just "", Nothing)
+        }
         |> toUrlString
-        --> "there?reroute=#f1"
+        --> "/there?reroute=/#f1"
 
-    Bounce { isAbsolute = False } { there = ("", Just "f1"), here = ("here", Just "f2") }
+    Bounce { isAbsolute = False }
+        { there = (Just "", Just "f1")
+        , here = (Just "here", Just "f2")
+        }
+        |> toUrlString
+        --> "/?reroute=here~f2#f1"
+
+    Bounce { isAbsolute = False }
+        { there = (Just "", Nothing)
+        , here = (Just "here", Just "f2")
+        }
+        |> toUrlString
+        --> "/?reroute=here~f2"
+
+    Bounce { isAbsolute = False }
+        { there = (Nothing, Just "f1")
+        , here = (Just "here", Just "f2")
+        }
         |> toUrlString
         --> "?reroute=here~f2#f1"
 
-    Bounce { isAbsolute = False } { there = ("", Nothing), here = ("here", Just "f2") }
+    Bounce { isAbsolute = False }
+        { there = (Nothing, Nothing)
+        , here = (Just "here", Just "f2")
+        }
         |> toUrlString
         --> "?reroute=here~f2"
 
@@ -523,23 +621,31 @@ toHref =
 
     --GoTo
 
-    GoTo ("path", Just "fragment")
+    GoTo (Just "path", Just "fragment")
         |> toUrlString
-        --> "path#fragment"
+        --> "/path#fragment"
 
-    GoTo ("path", Nothing)
+    GoTo (Just "path", Nothing)
         |> toUrlString
-        --> "path"
+        --> "/path"
 
-
-    GoTo ("", Just "fragment")
+    GoTo (Nothing, Just "fragment")
         |> toUrlString
         --> "#fragment"
+
+    GoTo (Nothing, Nothing)
+        |> toUrlString
+        --> ""
+
+    GoTo (Nothing, Just "")
+        |> toUrlString
+        --> "#"
 
 -}
 toUrlString : Link -> String
 toUrlString =
     Url.Codec.toString codecs
+        >> Maybe.andThen Url.percentDecode
         >> Maybe.withDefault "?errorMessage=Error converting link to string"
 
 
@@ -571,10 +677,10 @@ toId link =
     in
     case link of
         GoTo location ->
-            locationToString location
+            querySerialiseLocation location
 
         Bounce { isAbsolute } { there, here } ->
-            locationToString there ++ "<>" ++ locationToString here ++ encodeState isAbsolute
+            querySerialiseLocation there ++ "<>" ++ querySerialiseLocation here ++ encodeState isAbsolute
 
         Toggle { isAbsolute } flag ->
             flag ++ encodeState isAbsolute
@@ -583,27 +689,135 @@ toId link =
             e
 
 
-{-| -}
-locationToString : ( Path, Fragment ) -> String
-locationToString ( path, fragment ) =
-    path ++ (Maybe.map (String.cons '~') fragment |> Maybe.withDefault "")
+{-| Use in encoding a query assignment for contextual linking
+
+    querySerialiseLocation (Just "", Nothing)
+        --> "/"
+
+    querySerialiseLocation (Nothing, Nothing)        -- Perhaps we need to prevent this case
+        --> ""
+
+    querySerialiseLocation (Nothing, Just "f")
+        --> "~f"
+
+    querySerialiseLocation (Nothing, Just "~")
+        --> "~~"
+
+    querySerialiseLocation (Just "~", Nothing)
+        --> "%7E"
+
+    querySerialiseLocation (Just "p", Nothing)
+        --> "p"
+
+    querySerialiseLocation (Just "p", Just "f")
+        --> "p~f"
+
+-}
+querySerialiseLocation : ( Maybe Path, Fragment ) -> String
+querySerialiseLocation ( maybePath, fragment ) =
+    querySerialisePath maybePath ++ (Maybe.map (String.cons '~') fragment |> Maybe.withDefault "")
 
 
-{-| -}
-locationFromString : String -> ( Path, Fragment )
-locationFromString str =
+serialisePath : Maybe Path -> String
+serialisePath maybePath_ =
+    case maybePath_ of
+        Just nonEmpty ->
+            "/" ++ String.replace "~" "%7E" nonEmpty
+
+        Nothing ->
+            ""
+
+
+querySerialisePath : Maybe Path -> String
+querySerialisePath maybePath_ =
+    case maybePath_ of
+        Just "" ->
+            "/"
+
+        Just nonEmpty ->
+            String.replace "~" "%7E" nonEmpty
+
+        Nothing ->
+            ""
+
+
+{-|
+
+    queryParseLocation ""
+        --> (Nothing, Nothing)
+
+    queryParseLocation "/"
+        --> (Just "", Nothing)
+
+    queryParseLocation "~"
+        --> (Nothing, Nothing)    -- Path may need to be coerced to ""
+
+    queryParseLocation "~f"
+        --> (Nothing, Just "f")
+
+    queryParseLocation "/~f"
+        --> (Just "", Just "f")
+
+    queryParseLocation "~~"
+        --> (Nothing, Just "~")
+
+    queryParseLocation "p"
+        --> (Just "p", Nothing)
+
+    queryParseLocation "p~"       -- Will be sanitised to "p"
+        --> (Just "p", Nothing)
+
+    queryParseLocation "p~f"
+        --> (Just "p", Just "f")
+
+-}
+queryParseLocation : String -> ( Maybe Path, Fragment )
+queryParseLocation str =
     case String.split "~" str of
         [] ->
-            ( "", Nothing )
+            ( Nothing, Nothing )
 
         [ path ] ->
-            ( upTo "#" path |> Maybe.withDefault "", Nothing )
+            ( Maybe.andThen parsePath (upTo "#" path), Nothing )
 
         path :: fragment ->
-            ( path, upTo "#" <| String.join "~" fragment )
+            ( parsePath path, upTo "#" <| String.join "~" fragment )
 
 
+parsePath : String -> Maybe Path
+parsePath str =
+    case String.replace "%7E" "~" str of
+        "" ->
+            Nothing
+
+        nonEmpty ->
+            Just (stripPrefix "/" nonEmpty)
+
+
+stripPrefix : String -> String -> String
+stripPrefix prefix str =
+    case String.split prefix str of
+        _ :: r :: est ->
+            String.join prefix (r :: est)
+
+        _ ->
+            str
+
+
+{-|
+
+    upTo "?" ""
+        --> Nothing
+
+    upTo "?" "!"
+        --> Just "!"
+
+    upTo "?" "!?1234"
+        --> Just "!"
+
+-}
 upTo : String -> String -> Maybe String
 upTo searchString =
     String.split searchString
         >> List.head
+        >> Maybe.andThen String.nonEmpty
