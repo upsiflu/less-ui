@@ -125,7 +125,7 @@ application config =
                         Ui.Link.toStateTransition link state.next
                             |> (\canonicalState ->
                                     ( ( key, { state | previous = Just state.next, next = canonicalState }, model )
-                                    , if canonicalState == state.next then
+                                    , if state.next == canonicalState then
                                         Cmd.none
 
                                       else if canonicalState.path == state.next.path && canonicalState.fragment == state.next.fragment then

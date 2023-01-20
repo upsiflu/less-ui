@@ -219,22 +219,31 @@ removeAssignments keys =
 
 mapQuery : (Query -> Query) -> State -> State
 mapQuery fu state =
-    { state
-        | query =
-            Maybe.map (toQuery >> fu >> fromQuery) state.query
-    }
+    { state | query = state.query |> (parseQueryString >> fu >> serializeQuery) }
 
 
-fromQuery : Query -> String
-fromQuery query =
+serializeQuery : Query -> Maybe String
+serializeQuery query =
     Set.toList query.flags
         ++ List.map (\( k, v ) -> k ++ "=" ++ v) query.assignments
         |> String.join "&"
+        |> nothingIfEmpty
 
 
-toQuery : String -> Query
-toQuery =
-    String.split "&"
+nothingIfEmpty : String -> Maybe String
+nothingIfEmpty str =
+    case str of
+        "" ->
+            Nothing
+
+        _ ->
+            Just str
+
+
+parseQueryString : Maybe String -> Query
+parseQueryString =
+    Maybe.withDefault ""
+        >> String.split "&"
         >> List.foldr
             (\entry query ->
                 case String.split "=" entry of
@@ -292,6 +301,4 @@ type alias Query =
 
 getFlags : Url -> List Flag
 getFlags =
-    .query
-        >> Maybe.map (toQuery >> .flags >> Set.toList)
-        >> Maybe.withDefault []
+    .query >> parseQueryString >> .flags >> Set.toList
