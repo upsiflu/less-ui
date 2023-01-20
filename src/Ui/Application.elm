@@ -43,8 +43,8 @@ import Browser.Navigation as Nav
 import Html
 import Ui exposing (Ui)
 import Ui.Layout exposing (Layout)
-import Ui.Link exposing (Fragment, Path)
-import Ui.State
+import Ui.Link
+import Ui.State exposing (Fragment, Path, State)
 import Url exposing (Url)
 
 
@@ -75,7 +75,7 @@ which means, Scene a contains Scene b if Handle h is `on`
 
 -}
 type alias Application model modelMsg =
-    Program () ( Nav.Key, Url, model ) (Msg modelMsg)
+    Program () ( Nav.Key, { previous : Maybe State, next : State }, model ) (Msg modelMsg)
 
 
 {-| -}
@@ -107,11 +107,11 @@ application :
 application config =
     Browser.application
         { init =
-            \_ state key ->
-                config.init
-                    |> (\( updatedModel, modelCmd ) ->
-                            ( ( key, Ui.State.init state, updatedModel )
-                            , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString state) ]
+            \_ url key ->
+                ( config.init, Ui.State.init url )
+                    |> (\( ( updatedModel, modelCmd ), initialState ) ->
+                            ( ( key, { next = initialState, previous = Nothing }, updatedModel )
+                            , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString initialState) ]
                             )
                        )
         , onUrlChange = UrlChanged
@@ -119,31 +119,37 @@ application config =
         , subscriptions = \_ -> Sub.none
         , update =
             \msg ( key, state, model ) ->
+                let
+                    updateUrl : Ui.Link.Link -> ( ( Nav.Key, { next : State, previous : Maybe State }, model ), Cmd msg )
+                    updateUrl link =
+                        Ui.Link.toStateTransition link state.next
+                            |> (\canonicalState ->
+                                    ( ( key, { state | previous = Just state.next, next = canonicalState }, model )
+                                    , if canonicalState == state.next then
+                                        Cmd.none
+
+                                      else if canonicalState.path == state.next.path && canonicalState.fragment == state.next.fragment then
+                                        Nav.replaceUrl key (Ui.State.toUrlString canonicalState)
+
+                                      else
+                                        Nav.pushUrl key (Ui.State.toUrlString canonicalState)
+                                    )
+                               )
+                in
                 case msg of
-                    UrlChanged receivedUrl ->
-                        if receivedUrl == state then
+                    UrlChanged url ->
+                        if url == state.next then
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            Ui.State.update (Ui.Link.fromUrl (Debug.log "Application.update received Url" receivedUrl) |> Debug.log "     ") (Debug.log "   * " state)
-                                |> (\canonicalState ->
-                                        ( ( key, Debug.log "   = " canonicalState, model )
-                                        , if canonicalState == state then
-                                            Cmd.none
-
-                                          else
-                                            Nav.replaceUrl key (Ui.State.toUrlString canonicalState)
-                                        )
-                                   )
+                            updateUrl (Ui.Link.fromUrl url)
 
                     LinkClicked (Browser.Internal url) ->
-                        ( ( key, state, model )
-                        , url
-                            |> Ui.Link.fromUrl
-                            |> Ui.Link.relative
-                            |> Ui.Link.toUrlString
-                            |> Nav.pushUrl key
-                        )
+                        if url == state.next then
+                            ( ( key, state, model ), Cmd.none )
+
+                        else
+                            updateUrl (Ui.Link.fromUrl url |> Ui.Link.relative)
 
                     LinkClicked (Browser.External href) ->
                         ( ( key, state, model ), Nav.load href )
@@ -154,11 +160,11 @@ application config =
                                     ( ( key, state, updatedModel ), Cmd.map ModelMsg modelCmd )
                                )
         , view =
-            \( _, url, model ) ->
-                config.view ( url.path, url.fragment ) model
+            \( _, state, model ) ->
+                config.view ( Ui.State.getPath state.next, Ui.State.getFragment state.next ) model
                     |> (\document ->
                             { title = document.title
-                            , body = Ui.view url document.layout document.body |> List.map (Tuple.second >> Html.map ModelMsg)
+                            , body = Ui.view state document.layout document.body |> List.map (Tuple.second >> Html.map ModelMsg)
                             }
                        )
         }

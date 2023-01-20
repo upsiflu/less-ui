@@ -60,26 +60,77 @@ a:link[href] {
     text-decoration: underline;
 }
 
-a[role="switch"],
 button {
     background: #bbb;
     padding   : 2px 10px;
+    border    : 4px #ddd outset;
 }
 
-a[aria-checked="false"],
-button {
-    border: 4px #ddd outset;
-}
-
-a[aria-checked="true"],
-a[role="switch"]:active,
 button:active {
     border: 4px #ccc inset;
 }
 
 button:focus {
-    outline       : 2px solid black;
-    outline-offset: 0.5px;
+    outline: 2px double black;
+}
+
+
+a[href][role="switch"] {
+    position       : relative;
+    margin         : 4px 12px;
+    outline-offset : 0.5rem;
+    border-radius  : 1rem;
+    text-decoration: none;
+}
+
+a[href][role="switch"]:focus {
+    outline        : 2px double currentColor;
+    text-decoration: underline;
+}
+
+a[role="switch"]:before {
+    display: inline-block;
+    content: "​";
+    margin : 4px 0;
+
+}
+
+
+a[aria-checked="false"] {}
+
+body {
+    background: silver
+}
+
+a[role="switch"]:after {
+    transition   : all 0.3s;
+    border-radius: 1.1rem;
+    width        : calc(100% + 1rem);
+    height       : calc(100% + 1rem);
+    position     : absolute;
+    top          : -0.5rem;
+    left         : -0.5rem;
+    display      : block;
+    content      : "​";
+    outline      : 0.5px solid currentColor;
+}
+
+
+
+a[aria-checked="true"]:after,
+a[role="switch"]:active:after {
+    box-shadow: inset 3px 3px currentColor;
+    outline   : 0.5px solid transparent;
+}
+
+
+a[role="switch"]:hover:after {
+    box-shadow: inset -1.5px -1.5px currentColor;
+}
+
+a[aria-checked="true"]:hover:after,
+a[role="switch"]:active:hover:after {
+    box-shadow: inset 1.5px 1.5px currentColor;
 }
 
 .scene a {
@@ -183,6 +234,10 @@ article {
     display      : inline-block;
     box-shadow   : 3px 3px currentColor;
     border-radius: 5px;
-    margin       : 0.5px;
+    margin       : 2px 4px 2px 1px;
     padding      : 2px 8px;
+}
+
+.Features article:target {
+    outline: 10px solid orange;
 }

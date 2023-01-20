@@ -1,13 +1,16 @@
 module Ui.State exposing
-    ( State
+    ( State, Path, Flag, Fragment, Query
     , init
-    , update
+    , setPath, setFragment
+    , addAssignment, removeAssignments, toggleFlag, turnOnFlag
+    , hasFlag
     , toUrlString
+    , getFragment, getPath
     )
 
 {-| We use the Url query to keep track of the Ui state. This makes sharing a Ui state as easy as copying the Url.
 
-@docs State
+@docs State, Path, Flag, Fragment, Query
 
 
 # Create
@@ -15,25 +18,253 @@ module Ui.State exposing
 @docs init
 
 
-# Update
+# Map
 
-@docs update
+@docs setPath, setFragment
+
+@docs addAssignment, removeAssignments, toggleFlag, turnOnFlag
 
 
-# Decompose
+# Query
+
+@docs hasFlag
+
+
+# Deconstruct
 
 @docs toUrlString
+@docs getFragment, getPath
 
 -}
 
-import List.Extra as List
-import Ui.Link as Link exposing (Link(..))
+import Set exposing (Set)
+import Set.Extra as Set
 import Url exposing (Url)
 
 
 {-| -}
 type alias State =
     Url
+
+
+{-| Turning off a `Flag` renders invisible the corresponding [`Control`](Ui.Layout.Aspect) with its descendants, as well as
+one-layer deep nested [`Control`s](Ui.Layout.Aspect) with their descendants.
+
+The pattern is **progressive disclosure**.
+
+-}
+type alias Flag =
+    String
+
+
+{-| Paths may represent an **editing-cursor position** or **viewport**. This is up to the app to define for now.
+-}
+type alias Path =
+    String
+
+
+{-| "Graphical Web browsers typically scroll to position pages so that the top of the element
+identified by the fragment id is aligned with the top of the viewport;
+thus fragment identifiers are often used in tables of content and in permalinks.
+The appearance of the identified element can be changed through
+the `:target` CSS pseudoclass; Wikipedia uses this to highlight the selected reference.
+(from Wikipedia)"
+-}
+type alias Fragment =
+    Maybe String
+
+
+
+---- Create ----
+
+
+{-| -}
+init : State -> State
+init state =
+    state
+
+
+
+---- Map ----
+
+
+{-| -}
+setPath : Path -> State -> State
+setPath path state =
+    { state | path = "/" ++ path }
+
+
+{-| -}
+setFragment : Fragment -> State -> State
+setFragment fragment state =
+    { state | fragment = fragment }
+
+
+{-|
+
+    import Url
+
+    testQuery : (State -> State) -> String -> String
+    testQuery fu =
+        (++) "http://localhost/?"
+            >> Url.fromString
+            >> Maybe.andThen (fu >> .query)
+            >> Maybe.withDefault "Url.fromString or .query failed"
+
+    "f&g&h&a=b&c=d=e"
+        |> testQuery (turnOnFlag "g")
+        --> "f&g&h&a=b&c=d=e"
+
+    "a=b&c=d=e&f&g"
+        |> testQuery (turnOnFlag "h")
+        --> "f&g&h&a=b&c=d=e"
+
+    "f"
+        |> testQuery (turnOnFlag "")
+        --> "f"
+
+
+    ""
+        |> testQuery (turnOnFlag "h")
+        --> "h"
+
+    ""
+        |> testQuery (turnOnFlag "")
+        --> ""
+
+-}
+turnOnFlag : Flag -> State -> State
+turnOnFlag flag =
+    if flag == "" then
+        identity
+
+    else
+        mapQuery <| \q -> { q | flags = Set.insert flag q.flags }
+
+
+{-|
+
+    import Url
+
+    testQuery : (State -> State) -> String -> String
+    testQuery fu =
+        (++) "http://localhost/?"
+            >> Url.fromString
+            >> Maybe.andThen (fu >> .query)
+            >> Maybe.withDefault "Url.fromString or .query failed"
+
+    "f&g&h&a=b&c=d=e"
+        |> testQuery (toggleFlag "g")
+        --> "f&h&a=b&c=d=e"
+
+    "f&h&a=b&c=d=e"
+        |> testQuery (toggleFlag "g")
+        --> "f&g&h&a=b&c=d=e"
+
+-}
+toggleFlag : Flag -> State -> State
+toggleFlag flag =
+    if flag == "" then
+        identity
+
+    else
+        mapQuery <| \q -> { q | flags = Set.toggle flag q.flags }
+
+
+{-|
+
+    import Url
+
+    testQuery : (State -> State) -> String -> String
+    testQuery fu =
+        (++) "http://localhost/?"
+            >> Url.fromString
+            >> Maybe.andThen (fu >> .query)
+            >> Maybe.withDefault "Url.fromString or .query failed"
+
+    "f&g&h&a=b&c=d=e"
+        |> testQuery (addAssignment "c" "x")
+        --> "f&g&h&c=x&a=b&c=d=e"
+
+    ""
+        |> testQuery (addAssignment "" "x")
+        --> "=x"
+
+    "=x"
+        |> testQuery (addAssignment "" "y")
+        --> "=y&=x"
+
+    "=y&=x"
+        |> testQuery (addAssignment "" "")
+        --> "=&=y&=x"
+
+-}
+addAssignment : String -> String -> State -> State
+addAssignment key value =
+    mapQuery <| \q -> { q | assignments = ( key, value ) :: q.assignments }
+
+
+{-| -}
+removeAssignments : List String -> State -> State
+removeAssignments keys =
+    mapQuery <|
+        \q ->
+            { q
+                | assignments =
+                    List.filter
+                        (Tuple.first >> (\key -> List.member key keys |> not))
+                        q.assignments
+            }
+
+
+mapQuery : (Query -> Query) -> State -> State
+mapQuery fu state =
+    { state
+        | query =
+            Maybe.map (toQuery >> fu >> fromQuery) state.query
+    }
+
+
+fromQuery : Query -> String
+fromQuery query =
+    Set.toList query.flags
+        ++ List.map (\( k, v ) -> k ++ "=" ++ v) query.assignments
+        |> String.join "&"
+
+
+toQuery : String -> Query
+toQuery =
+    String.split "&"
+        >> List.foldr
+            (\entry query ->
+                case String.split "=" entry of
+                    [] ->
+                        query
+
+                    [ "" ] ->
+                        query
+
+                    [ flag ] ->
+                        { query | flags = Set.insert flag query.flags }
+
+                    ass :: ignment ->
+                        { query | assignments = ( ass, String.join "=" ignment ) :: query.assignments }
+            )
+            { flags = Set.empty, assignments = [] }
+
+
+
+---- Query ----
+
+
+{-| -}
+hasFlag : Flag -> Url -> Bool
+hasFlag flag =
+    getFlags >> List.member flag
+
+
+
+---- Deconstruct ----
 
 
 {-| -}
@@ -43,129 +274,24 @@ toUrlString =
 
 
 {-| -}
-withError : String -> State -> State
-withError str state =
-    { state | query = Just (Maybe.withDefault "" state.query ++ "?error=" ++ str) }
+getFragment : State -> Fragment
+getFragment =
+    .fragment
 
 
-{-|
+{-| -}
+getPath : State -> Path
+getPath { path } =
+    String.dropLeft 1 path
 
 
-## Motivation
-
-The user toggles a Ui handle, for example the avatar, to open or close a menu.
-
-(a)
-They decide to share the link of the handle, so they right-click on the toggle and choose
-'copy link'. Their friend opens the link and the handle is activated.
-
-(b)
-They copy the Url and paste it in another tab or browser or device.
-The app loads and restores exactly the same Ui state.
-
-In the case of (a), we share a href, which is a string.
-The friend opens the link, and Elm turns it into the initial Url.
-Now, `canonical.init` canonicalises the initial Url
-
-**Lifecycle of a Link**
-
-1.  Link
-
-2.  Dom `a` node with `href`
-
-3a. Shared this `href`
--> Received new UrlString
--> 3aa. Init the app with that
--> 3ab. Update the app with that
-
-3b. Clicked `Internal` (`href` -> `Url`) UrlRequest
--> Received new UrlString
--> Update the app with that
-
--}
-update : Link -> (State -> State)
-update link state =
-    case link of
-        GoTo ( path, fragment ) ->
-            { state | path = "/" ++ path, fragment = fragment }
-
-        Bounce { isAbsolute } { there, here } ->
-            let
-                ( ( here_path, here_fragment ), ( there_path, there_fragment ) ) =
-                    ( here, there )
-            in
-            if state.path == there_path || isAbsolute then
-                { state
-                    | path = here_path
-                    , fragment = here_fragment
-                }
-
-            else
-                { state
-                    | path = there_path
-                    , fragment = there_fragment
-                }
-
-        Toggle { isAbsolute } f ->
-            { state
-                | query =
-                    state
-                        |> .query
-                        |> Maybe.withDefault ""
-                        |> String.split "&"
-                        |> List.map (String.split "=")
-                        |> List.foldr
-                            (\param ( fAcc, aAcc ) ->
-                                case param of
-                                    [] ->
-                                        ( fAcc, aAcc )
-
-                                    [ "" ] ->
-                                        ( fAcc, aAcc )
-
-                                    [ flag ] ->
-                                        ( flag :: fAcc, aAcc )
-
-                                    ass :: signment ->
-                                        if ass == "toggle" || ass == "reroute" then
-                                            ( fAcc, aAcc )
-
-                                        else
-                                            ( fAcc, ( ass, String.join "=" signment ) :: aAcc )
-                            )
-                            ( [], [] )
-                        |> Tuple.mapFirst
-                            (\flags_ ->
-                                if not (List.member f flags_) then
-                                    f :: flags_
-
-                                else if isAbsolute then
-                                    flags_
-
-                                else
-                                    List.remove f flags_
-                            )
-                        |> Tuple.mapFirst (List.filter ((/=) ""))
-                        |> Tuple.mapSecond
-                            (List.map (\( k, v ) -> k ++ "=" ++ v))
-                        |> (\( flags_, assignments_ ) ->
-                                String.join "&" (flags_ ++ assignments_)
-                           )
-                        |> (\str ->
-                                if str == "" then
-                                    Nothing
-
-                                else
-                                    Just str
-                           )
-            }
-
-        ErrorMessage _ ->
-            Link.toUrlString link
-                |> Url.fromString
-                |> Maybe.withDefault (withError "UrlToStringFailed" state)
+{-| -}
+type alias Query =
+    { flags : Set Flag, assignments : List ( String, String ) }
 
 
-init : State -> State
-init state =
-    { state | query = Nothing }
+getFlags : Url -> List Flag
+getFlags =
+    .query
+        >> Maybe.map (toQuery >> .flags >> Set.toList)
+        >> Maybe.withDefault []

@@ -13,7 +13,8 @@ import Ui exposing (Ui)
 import Ui.Application exposing (Application, application)
 import Ui.Layout as Layout exposing (Layout)
 import Ui.Layout.Aspect exposing (Aspect(..))
-import Ui.Link as Link
+import Ui.Link
+import Ui.State
 
 
 {-| -}
@@ -39,15 +40,15 @@ update msg garden =
             )
 
 
-view : ( Link.Path, Link.Fragment ) -> Garden -> { body : Ui Msg, layout : Layout, title : String }
+view : ( Ui.State.Path, Ui.State.Fragment ) -> Garden -> { body : Ui Msg, layout : Layout, title : String }
 view ( path, fragment ) garden =
     { title = "Welcome to the Garden!"
     , layout = Layout.Default
     , body =
         page
             |> Ui.with Scene
-                (Link.toggle "rhododendron"
-                    |> Link.view (Link.preset.global [] [ Html.text "rhododendron" ])
+                (Ui.Link.toggle "rhododendron"
+                    |> Ui.Link.view (Ui.Link.preset.global [] [ Html.text "rhododendron" ])
                     |> Ui.with Control
                         (Rhododendron.view RhododendronMsg garden.rhododendron)
                 )

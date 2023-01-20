@@ -106,6 +106,7 @@ import Ui.Layout as Layout exposing (Layout)
 import Ui.Layout.Aspect exposing (Aspect(..))
 import Ui.Layout.ViewModel as ViewModel exposing (Foliage, ViewModel)
 import Ui.Mask as Mask exposing (Mask)
+import Ui.State exposing (State)
 import Url exposing (Url)
 
 
@@ -423,15 +424,15 @@ uncons =
 
 {-| Generate [keyed Html (Foliage)](Ui.Layout.ViewModel#Foliage) `[(key:String, Html)]` for use with `Html.Keyed`
 -}
-view : Url -> Layout -> Ui msg -> Foliage msg
-view url layout =
-    render url
+view : { next : State, previous : Maybe State } -> Layout -> Ui msg -> Foliage msg
+view transition layout =
+    render transition
         >> Layout.view
         >> (|>) layout
 
 
-render : Url -> Ui msg -> ViewModel msg
-render url =
+render : { next : State, previous : Maybe State } -> Ui msg -> ViewModel msg
+render state =
     let
         viewUi : ( Aspect, Mask (Ui msg) ) -> Ui msg -> ViewModel msg
         viewUi ( aspect, mask ) =
@@ -452,7 +453,7 @@ render url =
         viewItem ( aspect, mask ) item =
             let
                 ( transform, mask_ ) =
-                    item.dynamic ( aspect, url )
+                    item.dynamic ( aspect, state.next )
                         |> List.foldr
                             (\custom_ ( t, m ) ->
                                 case custom_ of

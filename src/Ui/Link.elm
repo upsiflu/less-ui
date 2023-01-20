@@ -1,9 +1,9 @@
 module Ui.Link exposing
     ( goTo, bounce, toggle
-    , Link(..), fromUrl, Flag, Path, Fragment
+    , Link(..), fromUrl
     , relative
     , view, Renderer, preset, Position(..)
-    , toUrlString, getFlags
+    , toUrlString, toStateTransition
     , a
     )
 
@@ -17,7 +17,7 @@ module Ui.Link exposing
 
 @docs goTo, bounce, toggle
 
-@docs Link, fromUrl, Flag, Path, Fragment
+@docs Link, fromUrl
 
 
 # Map
@@ -32,7 +32,7 @@ module Ui.Link exposing
 
 # Deconstruct
 
-@docs toUrlString, getFlags
+@docs toUrlString, toStateTransition
 
 
 # Convenience
@@ -45,12 +45,12 @@ import Bool.Extra as Bool
 import Html exposing (Html)
 import Html.Attributes exposing (..)
 import Maybe.Extra as Maybe
-import String.Extra as String
 import Ui exposing (Ui)
 import Ui.Get as Get
 import Ui.Layout.Aspect as Aspect exposing (Aspect)
 import Ui.Layout.ViewModel as ViewModel
 import Ui.Mask as Mask
+import Ui.State exposing (Flag, Fragment, Path, State)
 import Url exposing (Url)
 import Url.Codec exposing (Codec, ParseError(..))
 
@@ -111,43 +111,6 @@ a[role="switch"]:aria-checked {}
 toggle : Flag -> Link
 toggle =
     Toggle { isAbsolute = True }
-
-
-{-| Turning off a `Flag` renders invisible the corresponding [`Control`](Ui.Layout.Aspect) with its descendants, as well as
-one-layer deep nested [`Control`s](Ui.Layout.Aspect) with their descendants.
-
-The pattern is **progressive disclosure**.
-
--}
-type alias Flag =
-    String
-
-
-{-| Paths may represent an **editing-cursor position** or **viewport**. This is up to the app to define for now.
--}
-type alias Path =
-    String
-
-
-{-| "Graphical Web browsers typically scroll to position pages so that the top of the element
-identified by the fragment id is aligned with the top of the viewport;
-thus fragment identifiers are often used in tables of content and in permalinks.
-The appearance of the identified element can be changed through
-the `:target` CSS pseudoclass; Wikipedia uses this to highlight the selected reference.
-(from Wikipedia)"
--}
-type alias Fragment =
-    Maybe String
-
-
-
----- Query ----
-
-
-{-| -}
-hasFlag : Flag -> Url -> Bool
-hasFlag flag =
-    getFlags >> List.member flag
 
 
 
@@ -250,7 +213,7 @@ view config link =
                             Bool.ifElse
                                 ( "true", [] )
                                 ( "false", [ Mask.occludeList config.occlusions |> Ui.MaskDescendents ] )
-                                (hasFlag flag url)
+                                (Ui.State.hasFlag flag url)
                     in
                     transformViewModel
                         [ attribute "role" "switch"
@@ -278,7 +241,7 @@ codecs =
         buildLink path_ fragment_ reroute_ toggle_ errorMessage_ isAbsolute_ =
             case reroute_ of
                 Just here ->
-                    Bounce { isAbsolute = isAbsolute_ } { there = ( path_, Maybe.map (String.leftOf "?") fragment_ ), here = locationFromString here }
+                    Bounce { isAbsolute = isAbsolute_ } { there = ( path_, fragment_ ), here = locationFromString here }
 
                 Nothing ->
                     case toggle_ of
@@ -392,12 +355,20 @@ codecs =
 
     --Bounce
 
-    testUrl "there#f1?reroute=here~f2"
+    testUrl "there?reroute=here~f2#f1"
         --> Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("here", Just "f2") }
 
-    testUrl "#f1?reroute=here~f2"
+    testUrl "there?reroute=~f2#f1"
+        --> Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("", Just "f2") }
+
+    testUrl "there?reroute=#f1"
+        --> Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("", Nothing) }
+
+    testUrl "?reroute=here~f2#f1"
         --> Bounce { isAbsolute = False } { there = ("", Just "f1"), here = ("here", Just "f2") }
 
+    testUrl "?reroute=here~f2"
+        --> Bounce { isAbsolute = False } { there = ("", Nothing), here = ("here", Just "f2") }
 
 
     --Toggle
@@ -425,78 +396,86 @@ codecs =
 
 -}
 fromUrl : Url -> Link
-fromUrl =
-    Url.Codec.parseUrl codecs
-        >> (\result ->
-                case result of
-                    Ok link ->
-                        link
+fromUrl url =
+    case Url.Codec.parseUrl codecs url of
+        Ok link ->
+            link
 
-                    Err e ->
-                        ErrorMessage <|
-                            String.join ", " <|
-                                case e of
-                                    SegmentMismatch { expected, available } ->
-                                        [ "SegmentMismatch: expected", expected, "available", available ]
+        Err e ->
+            ErrorMessage <|
+                String.join ", " <|
+                    case e of
+                        SegmentMismatch { expected, available } ->
+                            [ "SegmentMismatch: expected", expected, "available", available ]
 
-                                    SegmentNotAvailable ->
-                                        [ "SegmentNotAvailable" ]
+                        SegmentNotAvailable ->
+                            [ "SegmentNotAvailable" ]
 
-                                    DidNotConsumeEverything strList ->
-                                        "DidNotConsumeEverything" :: strList
+                        DidNotConsumeEverything strList ->
+                            "DidNotConsumeEverything" :: strList
 
-                                    NeededSingleQueryParameterValueGotMultiple { key, got } ->
-                                        [ "NeededSingleQueryParameterValueGotMultiple", key ] ++ got
+                        NeededSingleQueryParameterValueGotMultiple { key, got } ->
+                            [ "NeededSingleQueryParameterValueGotMultiple", key ] ++ got
 
-                                    _ ->
-                                        [ "other link parse error" ]
-           )
+                        _ ->
+                            [ "other link parse error" ]
 
 
-flags : List (Codec (List String))
-flags =
-    [ Url.Codec.succeed identity (\_ -> True)
-        |> Url.Codec.allQueryFlags identity
-    , Url.Codec.succeed (\_ -> identity) (\_ -> True)
-        |> Url.Codec.string (\_ -> Nothing)
-        |> Url.Codec.allQueryFlags identity
-    ]
+
+---- Deconstruct ----
 
 
-{-| Attention: Fails silently!
+{-| **Lifecycle of a Link**
 
-    import Url
+1.  Link
 
-    testUrl : String -> List String
-    testUrl =
-        (++) "http://localhost/"
-            >> Url.fromString
-            >> Maybe.map getFlags
-            >> Maybe.withDefault ["Url.fromString failed"]
+2.  Dom `a` node with `href`
 
-    testUrl
-        "" --> []
+3a. Shared this `href`
+-> Received new UrlString
 
-    testUrl
-        "?a" --> ["a"]
+-> 3aa. Init the app with that
+-> 3ab. Update the app with that
 
-    testUrl
-        "?a&b" --> ["a", "b"]
+3b. Clicked `Internal` (`href` -> `Url`) UrlRequest
+-> Received new UrlString
 
-    testUrl
-        "path" --> []
-
-    testUrl
-        "path?a" --> ["a"]
-
-    testUrl
-        "path?a&b" --> ["a", "b"]
+-> Update the app with that
 
 -}
-getFlags : Url -> List Flag
-getFlags =
-    Url.Codec.parseUrl flags
-        >> Result.withDefault [ "Error_in_GetFlags" ]
+toStateTransition : Link -> State -> State
+toStateTransition link =
+    case link of
+        GoTo ( path, fragment ) ->
+            Ui.State.setPath path >> Ui.State.setFragment fragment
+
+        Bounce { isAbsolute } { there, here } ->
+            let
+                ( ( here_path, here_fragment ), ( there_path, there_fragment ) ) =
+                    ( here, there )
+            in
+            \state ->
+                if ( Ui.State.getPath state, Ui.State.getFragment state ) == there || isAbsolute then
+                    state
+                        |> Ui.State.setPath here_path
+                        |> Ui.State.setFragment here_fragment
+
+                else
+                    state
+                        |> Ui.State.setPath there_path
+                        |> Ui.State.setFragment there_fragment
+
+        Toggle { isAbsolute } f ->
+            Ui.State.removeAssignments [ "toggle", "reroute" ]
+                >> (if isAbsolute then
+                        Ui.State.turnOnFlag f
+
+                    else
+                        Ui.State.toggleFlag f
+                   )
+
+        ErrorMessage err ->
+            Ui.State.addAssignment "errorMessage" err
 
 
 {-| -}
@@ -507,11 +486,61 @@ toHref =
 
 
 {-| Try to create an UrlString
+
+    --Bounce
+
+    Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("here", Just "f2") }
+        |> toUrlString
+        --> "there?reroute=here~f2#f1"
+
+    Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("", Just "f2") }
+        |> toUrlString
+        --> "there?reroute=~f2#f1"
+
+    Bounce { isAbsolute = False } { there = ("there", Just "f1"), here = ("", Nothing) }
+        |> toUrlString
+        --> "there?reroute=#f1"
+
+    Bounce { isAbsolute = False } { there = ("", Just "f1"), here = ("here", Just "f2") }
+        |> toUrlString
+        --> "?reroute=here~f2#f1"
+
+    Bounce { isAbsolute = False } { there = ("", Nothing), here = ("here", Just "f2") }
+        |> toUrlString
+        --> "?reroute=here~f2"
+
+
+    --Toggle
+
+    Toggle {isAbsolute = False} "flag"
+        |> toUrlString
+        --> "?toggle=flag"
+
+    Toggle {isAbsolute = True} "flag"
+        |> toUrlString
+        --> "?toggle=flag&!"
+
+
+    --GoTo
+
+    GoTo ("path", Just "fragment")
+        |> toUrlString
+        --> "path#fragment"
+
+    GoTo ("path", Nothing)
+        |> toUrlString
+        --> "path"
+
+
+    GoTo ("", Just "fragment")
+        |> toUrlString
+        --> "#fragment"
+
 -}
 toUrlString : Link -> String
 toUrlString =
     Url.Codec.toString codecs
-        >> Maybe.withDefault "?error=Error converting link to string"
+        >> Maybe.withDefault "?errorMessage=Error converting link to string"
 
 
 {-| -}
@@ -557,7 +586,7 @@ toId link =
 {-| -}
 locationToString : ( Path, Fragment ) -> String
 locationToString ( path, fragment ) =
-    path ++ (fragment |> Maybe.map (String.cons '~') |> Maybe.withDefault "")
+    path ++ (Maybe.map (String.cons '~') fragment |> Maybe.withDefault "")
 
 
 {-| -}
@@ -568,7 +597,13 @@ locationFromString str =
             ( "", Nothing )
 
         [ path ] ->
-            ( path, Nothing )
+            ( upTo "#" path |> Maybe.withDefault "", Nothing )
 
         path :: fragment ->
-            ( path, Just <| String.join "~" fragment )
+            ( path, upTo "#" <| String.join "~" fragment )
+
+
+upTo : String -> String -> Maybe String
+upTo searchString =
+    String.split searchString
+        >> List.head

@@ -18,6 +18,7 @@ import Ui.Application exposing (Application, application)
 import Ui.Layout exposing (Layout)
 import Ui.Layout.Aspect exposing (Aspect(..))
 import Ui.Link as Link
+import Ui.State
 
 
 {-| -}
@@ -39,7 +40,7 @@ update () features =
     ( features, Cmd.none )
 
 
-view : ( Link.Path, Link.Fragment ) -> Features -> { body : Ui Msg, layout : Layout, title : String }
+view : ( Ui.State.Path, Ui.State.Fragment ) -> Features -> { body : Ui Msg, layout : Layout, title : String }
 view ( path, fragment ) features =
     let
         showTab : String -> Ui Msg -> Ui Msg
@@ -72,7 +73,7 @@ ui =
 
 {-| [Application](Ui.Application): Sever Route from Model
 -}
-paths : Link.Path -> Ui Msg
+paths : Ui.State.Path -> Ui Msg
 paths path =
     Ui.singleton
         |> Ui.with Scene (Ui.textLabel ("Path: " ++ path))
@@ -82,16 +83,16 @@ paths path =
 
 {-| [Link](Ui.Link): Manage the Ui State as a URL
 -}
-fragments : Link.Fragment -> Ui Msg
+fragments : Ui.State.Fragment -> Ui Msg
 fragments fr =
     let
         articles : List (Html msg)
         articles =
-            [ Html.article [ Attr.id "1" ]
+            [ Html.article [ Attr.id "1", Attr.tabindex 1 ]
                 [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
-            , Html.article [ Attr.id "2" ]
+            , Html.article [ Attr.id "2", Attr.tabindex 1 ]
                 [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
-            , Html.article [ Attr.id "3" ]
+            , Html.article [ Attr.id "3", Attr.tabindex 1 ]
                 [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
             ]
     in

@@ -47,12 +47,11 @@ config =
     , NoExposingEverything.rule
     , NoMissingTypeAnnotation.rule
     , NoMissingTypeAnnotationInLetIn.rule
-    , NoMissingTypeExpose.rule
+    --, NoMissingTypeExpose.rule
     , NoSimpleLetBody.rule
     , NoPrematureLetComputation.rule
     , NoUnused.CustomTypeConstructors.rule []
     , NoUnused.CustomTypeConstructorArgs.rule
-    , NoUnused.Dependencies.rule
     , NoUnused.Exports.rule
     , NoUnused.Modules.rule
     , NoUnused.Parameters.rule

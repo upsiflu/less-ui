@@ -14,6 +14,7 @@ import Ui.Application exposing (Application, application)
 import Ui.Layout as Layout
 import Ui.Layout.Aspect exposing (Aspect(..))
 import Ui.Link as Link
+import Ui.State
 
 
 {-| -}
@@ -36,7 +37,7 @@ init =
     ( 0, Cmd.none )
 
 
-pageFromPath : Link.Path -> Path
+pageFromPath : Ui.State.Path -> Path
 pageFromPath path =
     case path of
         "/" ->
@@ -52,7 +53,7 @@ pageFromPath path =
             NotFound
 
 
-pathFromPage : Page -> Link.Path
+pathFromPage : Page -> Ui.State.Path
 pathFromPage page =
     case page of
         Home ->
@@ -71,7 +72,7 @@ update () model =
 --view : Path -> model -> Document modelMsg
 
 
-view : ( Link.Path, Link.Fragment ) -> Model -> Ui.Application.Document ()
+view : ( Ui.State.Path, Ui.State.Fragment ) -> Model -> Ui.Application.Document ()
 view ( rawPath, _ ) model =
     let
         appendCounter : Ui () -> Ui ()

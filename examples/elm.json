@@ -15,7 +15,8 @@
             "elm/url": "1.0.0",
             "elm-community/list-extra": "8.7.0",
             "elm-community/maybe-extra": "5.3.0",
-            "elm-community/string-extra": "4.0.1"
+            "elm-community/string-extra": "4.0.1",
+            "stoeffel/set-extra": "1.2.3"
         },
         "indirect": {
             "elm/json": "1.1.3",
