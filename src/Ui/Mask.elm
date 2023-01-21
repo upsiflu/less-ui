@@ -75,6 +75,20 @@ superimpose =
 
 
 {-| Occlude a list of aspects
+
+    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Ui.Get as Get exposing (get)
+
+    Get.full ()
+        |> occludeList [Control]
+        |> get Control
+        --> Nothing
+
+    Get.full ()
+        |> occludeList [Control, Scene]
+        |> get Info
+        --> Just ()
+
 -}
 occludeList : List Aspect -> Mask a
 occludeList =

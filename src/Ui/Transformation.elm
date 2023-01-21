@@ -45,26 +45,26 @@ mapContent fu t =
     current =
         { occlude = [ Scene ]
         , appendWhere = Just Scene
-        , appendWhat = [1]
+        , appendWhat = [("current", 1)]
         }
 
     previous : Transformation Int
     previous =
         { occlude = [ Scene ]
         , appendWhere = Just Control
-        , appendWhat = [2]
+        , appendWhat = [("previous", 2)]
         }
 
     difference current previous
     -->     { addition =
     -->         { occlude = []
     -->         , appendWhere = Just Scene
-    -->         , appendWhat = [1]
+    -->         , appendWhat = [("current", 1)]
     -->         }
     -->     , removal =
     -->         { occlude = []
     -->         , appendWhere = Just Control
-    -->         , appendWhat = [2]
+    -->         , appendWhat = [("previous", 2)]
     -->         }
     -->     , unchanged =
     -->         { occlude = [ Scene ]
@@ -80,26 +80,35 @@ difference :
     -> { addition : Transformation a, removal : Transformation a, unchanged : Transformation a }
 difference current previous =
     let
-        ( unchangedContent, removedContent ) =
+        ( addedContent, removedContent, unchangedContent ) =
             if current.appendWhere == previous.appendWhere then
-                ( current.appendWhat, [] )
+                ( [], [], current.appendWhat )
 
             else
-                ( [], previous.appendWhat )
+                ( current.appendWhat, previous.appendWhat, [] )
     in
     { addition =
-        { occlude = current.occlude |> Aspect.subtract previous.occlude
-        , appendWhere = current.appendWhere
-        , appendWhat = current.appendWhat
+        { occlude =
+            current.occlude |> Aspect.subtract previous.occlude
+        , appendWhere =
+            current.appendWhere
+        , appendWhat =
+            addedContent
         }
     , removal =
-        { occlude = previous.occlude |> Aspect.subtract current.occlude
-        , appendWhere = previous.appendWhere
-        , appendWhat = removedContent
+        { occlude =
+            previous.occlude |> Aspect.subtract current.occlude
+        , appendWhere =
+            previous.appendWhere
+        , appendWhat =
+            removedContent
         }
     , unchanged =
-        { occlude = Aspect.intersect current.occlude previous.occlude
-        , appendWhere = current.appendWhere
-        , appendWhat = unchangedContent
+        { occlude =
+            Aspect.intersect current.occlude previous.occlude
+        , appendWhere =
+            current.appendWhere
+        , appendWhat =
+            unchangedContent
         }
     }

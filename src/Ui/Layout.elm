@@ -1,13 +1,13 @@
 module Ui.Layout exposing
     ( Layout
-    , default, sceneOnly, withClass
+    , default, sceneOnly, withClass, list
     )
 
 {-| Lay out the [`ViewModel`](Ui.Layout.ViewModel)
 
 @docs Layout
 
-@docs default, sceneOnly, withClass
+@docs default, sceneOnly, withClass, list
 
 -}
 
@@ -49,7 +49,17 @@ sceneOnly =
     { view =
         \{ get } ->
             get Scene |> Maybe.withDefault []
-    , markRemovals = identity
+    , markRemovals = \_ -> []
+    }
+
+
+{-| -}
+list : Layout html
+list =
+    { view =
+        \{ handle, get } ->
+            handle :: Get.values Ui.Layout.Aspect.all get |> List.concat
+    , markRemovals = \_ -> []
     }
 
 

@@ -1,5 +1,6 @@
 module Ui.Layout.Aspect exposing
     ( Aspect(..)
+    , all
     , intersect, inverse, subtract, isMember
     )
 
@@ -8,6 +9,8 @@ module Ui.Layout.Aspect exposing
 This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#toggle)
 
 @docs Aspect
+
+@docs all
 
 @docs intersect, inverse, subtract, isMember
 
@@ -23,8 +26,14 @@ This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#togg
 -}
 type Aspect
     = Scene
-    | Control
     | Info
+    | Control
+
+
+{-| -}
+all : List Aspect
+all =
+    [ Scene, Info, Control ]
 
 
 {-|
@@ -36,8 +45,7 @@ type Aspect
 -}
 inverse : List Aspect -> List Aspect
 inverse comparison =
-    [ Scene, Control, Info ]
-        |> subtract comparison
+    subtract comparison all
 
 
 {-|

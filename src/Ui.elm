@@ -420,11 +420,33 @@ uncons =
 
 {-| Generate [keyed Html (Foliage)](Ui.Layout.ViewModel#Foliage) `[(key:String, Html)]` for use with `Html.Keyed`
 
-As the following example shows, you can substitute Html by any othe type:
+As the following example shows, you can substitute Html by any other type:
+
+    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Url exposing (Url)
+    import Ui.Layout
+
+    dummyUrl : Maybe Url
+    dummyUrl =
+        Url.fromString "http://localhost/abc"
 
     myUi : Ui Int
     myUi =
         singleton
+            |> with Scene ( keyed "Scene" 1 )
+            |> with Info ( keyed "Info" 200 )
+            |> with Control ( keyed "Control" 3 )
+            |> with Info ( keyed "Info" 201 )
+
+    Maybe.map
+        (\url -> view
+                    { current = url, previous = Nothing }
+                    Ui.Layout.list
+                    myUi
+        )
+        dummyUrl
+
+        --> Just [ ("Scene", 1), ("Info", 200), ("Info", 201), ("Control", 3) ]
 
 -}
 view : { current : State, previous : Maybe State } -> Layout html -> Ui html -> Foliage html
@@ -466,9 +488,11 @@ render state { markRemovals } =
                                             , removal.occlude
                                             , ViewModel.appendAt removal.appendWhere
                                                 (markRemovals removal.appendWhat)
-                                                >> ViewModel.appendAt unchanged.appendWhere
+                                                >> ViewModel.appendAt
+                                                    unchanged.appendWhere
                                                     unchanged.appendWhat
-                                                >> ViewModel.appendAt addition.appendWhere
+                                                >> ViewModel.appendAt
+                                                    addition.appendWhere
                                                     addition.appendWhat
                                             )
                                        )
@@ -508,6 +532,99 @@ constant html_ =
 
 
 {-| This interface is mostly interesting for library authors.
+
+    import Ui.Layout.Aspect as Aspect exposing (Aspect(..))
+    import Url exposing (Url)
+    import Ui.Layout
+    import Ui.Transformation exposing (Transformation)
+    import Ui.State exposing (State)
+
+
+    noControl : Ui ()
+    noControl =
+      custom
+        (\(aspect, url) ->
+            { occlude = [Control]
+            , appendWhere = Nothing
+            , appendWhat = [("Handle", ())]
+            }
+        )
+
+    page : String -> Ui ()
+    page route =
+      custom
+        (\(aspect, { path }) ->
+            { occlude = if path == route then [] else Aspect.all
+            , appendWhere = Nothing
+            , appendWhat = [(route, ())]
+            }
+        )
+
+    viewWithState : {current : String, previous : String } -> Ui html -> List String
+    viewWithState state ui =
+        case Url.fromString state.current of
+            Nothing -> ["Invalid `current` Url"]
+            Just justCurrent ->
+                ui
+                    |> view {current = justCurrent, previous = Url.fromString state.previous} Ui.Layout.list
+                    |> List.map Tuple.first
+
+
+    noControl
+        |> with Scene ( keyed "Scene" () )
+        |> with Info ( keyed "Info" () )
+        |> with Control ( keyed "Control" () )
+        |> viewWithState { current = "http://a/", previous = "http://a/" }
+        -->  [ "Handle" ,"Scene", "Info" ]
+
+    singleton
+        |> with Scene ( noControl )
+        |> with Info ( keyed "Info" () )
+        |> with Control ( keyed "Control" () )
+        |> viewWithState { current = "http://a/", previous = "http://a/" }
+        -->  [ "Handle" ,"Info", "Control" ]
+
+    singleton
+        |> with Scene
+            ( noControl
+                |> with Control (keyed "Control" ())
+            )
+        |> viewWithState { current = "http://a/", previous = "http://a/" }
+        -->  [ "Handle" ]
+
+    singleton
+        |> with Scene
+            ( noControl
+                |> with Control
+                ( keyed "Control" ()
+                    |> with Info ( keyed "Info" () )
+                )
+            )
+        |> viewWithState { current = "http://a/", previous = "http://a/" }
+        -->  [ "Handle" ]
+
+    noControl
+        |> with Scene
+            ( page "/Cool"
+                |> with Info (keyed "Cool page is open" ())
+            )
+        |> viewWithState { current = "http://a/", previous = "http://a/" }
+        -->  [ "Handle", "/Cool" ]
+
+    [ page "/Cool" |> with Info (keyed "Cool page is open" ())
+    , page "/Hot" |> with Info (keyed "Hot page is open" ())
+    ]
+        |> List.concat
+        |> viewWithState { current = "http://a/", previous = "http://a/" }
+        -->  [ "/Cool", "/Hot" ]
+
+    [ page "/Cool" |> with Info (keyed "Cool page is open" ())
+    , page "/Hot" |> with Info (keyed "Hot page is open" ())
+    ]
+        |> List.concat
+        |> viewWithState { current = "http://a.a/Cool", previous = "http://a/" }
+        -->  [ "/Cool", "/Hot", "Cool page is open" ]
+
 -}
 custom : (( Aspect, Url ) -> Transformation html) -> Ui html
 custom h =
