@@ -36,6 +36,15 @@ update () features =
     ( features, Cmd.none )
 
 
+
+-- what happens is that when the state transitions to toggle off a feature,
+-- then only the direct `Control` properly deprecates (poof) its elements
+-- whereas all the others continue to be drawn.
+--
+-- The reason is that we implement hiding as `wrap`, which only
+-- affects the `current Aspect`!
+
+
 view : ( Ui.State.Path, Ui.State.Fragment ) -> Features -> { body : Ui (Html Msg), layout : Layout (Html Msg), title : String }
 view ( path, fragment ) _ =
     let
@@ -43,11 +52,12 @@ view ( path, fragment ) _ =
         showTab str contents =
             Link.toggle (String.replace " " "-" str)
                 |> Link.view (Link.preset.global [] [ Html.text str ])
-                |> Ui.with Control contents
+                |> Ui.with Scene contents
     in
     { body =
         Ui.with Info (Ui.textLabel "Toggle the features on top of the page! ") Ui.singleton
-            ++ showTab "Flat Ui Layout" ui
+            ++ showTab "Flat Ui Layout"
+                ui
             ++ showTab "Path in View"
                 (paths path)
             ++ showTab "Bounce between fragments"

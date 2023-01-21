@@ -179,7 +179,7 @@ empty : Renderer
 empty =
     { attributes = []
     , contents = []
-    , occlusions = [ Aspect.Control, Aspect.Scene, Aspect.Info ]
+    , occlusions = Aspect.all
     , position = Global
     }
 
@@ -240,10 +240,11 @@ view config link =
                 Toggle _ flag ->
                     let
                         ( isChecked, mask ) =
-                            Bool.ifElse
+                            if Ui.State.hasFlag flag url then
                                 ( "true", [] )
+
+                            else
                                 ( "false", config.occlusions )
-                                (Ui.State.hasFlag flag url)
                     in
                     { occlude = mask
                     , appendWhere = where_

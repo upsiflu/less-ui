@@ -103,7 +103,7 @@ import List.Extra as List
 import Maybe.Extra as Maybe
 import Ui.Get as Get exposing (Get)
 import Ui.Layout exposing (Layout)
-import Ui.Layout.Aspect exposing (Aspect(..))
+import Ui.Layout.Aspect as Aspect exposing (Aspect(..))
 import Ui.Layout.ViewModel as ViewModel exposing (Foliage, ViewModel)
 import Ui.Mask as Mask exposing (Mask)
 import Ui.State exposing (State)
@@ -450,73 +450,67 @@ As the following example shows, you can substitute Html by any other type:
 
 -}
 view : { current : State, previous : Maybe State } -> Layout html -> Ui html -> Foliage html
-view transition layout =
-    render transition { markRemovals = layout.markRemovals }
-        >> layout.view
-
-
-render : { current : State, previous : Maybe State } -> { markRemovals : Foliage html -> Foliage html } -> Ui html -> ViewModel html
-render state { markRemovals } =
+view state layout =
     let
-        viewUi : ( Aspect, Mask (Ui html) ) -> Ui html -> ViewModel html
-        viewUi ( aspect, mask ) =
+        viewUi : Aspect -> Ui html -> ViewModel html
+        viewUi aspect =
             ViewModel.concatMap <|
                 \descendant ->
                     case descendant of
                         Twig foliage_ maybeItem ->
                             maybeItem
-                                |> Maybe.unwrap ViewModel.empty (viewItem ( aspect, mask ))
+                                |> Maybe.unwrap ViewModel.empty (viewItem aspect)
                                 |> ViewModel.appendGet (Get.singleton aspect foliage_)
 
                         Wrap wrapper descList ->
                             descList
-                                |> viewUi ( aspect, mask )
+                                |> viewUi aspect
                                 |> ViewModel.mapGet (Get.update aspect wrapper)
 
-        viewItem : ( Aspect, Mask (Ui html) ) -> Item html -> ViewModel html
-        viewItem ( aspect, mask ) item =
+        viewItem : Aspect -> Item html -> ViewModel html
+        viewItem aspect item =
             let
-                ( invisibleAspects, outgoingAspects, transformViewModel_ ) =
+                ( unchangedOccludes, removedAspects, transformViewModel_ ) =
                     item.dynamic
-                        |> Maybe.map
-                            (\getTransformation ->
-                                Transformation.difference
-                                    (getTransformation ( aspect, state.current ))
-                                    (getTransformation ( aspect, Maybe.withDefault state.current state.previous ))
-                                    |> (\{ addition, removal, unchanged } ->
-                                            ( unchanged.occlude
-                                            , removal.occlude
-                                            , ViewModel.appendAt removal.appendWhere
-                                                (markRemovals removal.appendWhat)
-                                                >> ViewModel.appendAt
-                                                    unchanged.appendWhere
-                                                    unchanged.appendWhat
-                                                >> ViewModel.appendAt
-                                                    addition.appendWhere
-                                                    addition.appendWhat
-                                            )
-                                       )
-                            )
+                        |> Maybe.map getProperties
                         |> Maybe.withDefault ( [], [], identity )
+
+                getProperties : (( Aspect, State ) -> Transformation html) -> ( List Aspect, List Aspect, ViewModel html -> ViewModel html )
+                getProperties getTransformation =
+                    Transformation.difference
+                        (getTransformation ( aspect, state.current ))
+                        (getTransformation ( aspect, Maybe.withDefault state.current state.previous ))
+                        |> (\{ addition, removal, unchanged } ->
+                                ( unchanged.occlude
+                                , addition.occlude
+                                , ViewModel.appendAt removal.appendWhere
+                                    (layout.markRemovals removal.appendWhat)
+                                    >> ViewModel.appendAt
+                                        unchanged.appendWhere
+                                        unchanged.appendWhat
+                                    >> ViewModel.appendAt
+                                        addition.appendWhere
+                                        addition.appendWhat
+                                )
+                           )
             in
             item.get
-                |> mask
                 -------------- contextual transformation: --------------
-                -- occlude aspects invisible to both
-                |> Mask.occludeList
-                    invisibleAspects
-                -- make outgoing aspects vanish
-                |> Get.updateWhere (\aspect_ -> List.member aspect_ outgoingAspects)
-                    (wrap markRemovals)
+                -- apply continuous occlusions to item aspects
+                |> Mask.occludeList unchangedOccludes
                 --------------------------------------------------------
                 |> Get.mapByKey
-                    (\aspect_ -> viewUi ( aspect_, mask ))
-                |> Get.values [ Scene, Control, Info ]
+                    (\aspect_ -> viewUi aspect_)
+                -- mark removed aspects
+                |> Get.updateWhere (\aspect_ -> List.member aspect_ removedAspects)
+                    (ViewModel.mapGet (Get.map layout.markRemovals))
+                --------------------------------------------------------
+                |> Get.values Aspect.all
                 |> ViewModel.concat
                 -------------- contextual transformation: --------------
                 |> transformViewModel_
     in
-    viewUi ( Scene, Mask.transparent )
+    viewUi Scene >> layout.view
 
 
 
@@ -539,6 +533,7 @@ constant html_ =
     import Ui.Transformation exposing (Transformation)
     import Ui.State exposing (State)
 
+    -- Custom handles --
 
     noControl : Ui ()
     noControl =
@@ -560,6 +555,20 @@ constant html_ =
             }
         )
 
+    toggle : String -> Ui ()
+    toggle flag =
+      custom
+        (\(aspect, { query }) ->
+            { occlude = if Maybe.map (String.contains flag) query |> Maybe.withDefault False
+                            then []
+                            else Aspect.all
+            , appendWhere = Nothing
+            , appendWhat = [(flag, ())]
+            }
+        )
+
+    -- Test --
+
     viewWithState : {current : String, previous : String } -> Ui html -> List String
     viewWithState state ui =
         case Url.fromString state.current of
@@ -569,6 +578,7 @@ constant html_ =
                     |> view {current = justCurrent, previous = Url.fromString state.previous} Ui.Layout.list
                     |> List.map Tuple.first
 
+    -- Scenarios --
 
     noControl
         |> with Scene ( keyed "Scene" () )
@@ -624,6 +634,13 @@ constant html_ =
         |> List.concat
         |> viewWithState { current = "http://a.a/Cool", previous = "http://a/" }
         -->  [ "/Cool", "/Hot", "Cool page is open" ]
+
+    [ page "/Cool" |> with Info (keyed "Cool page is open" ())
+    , page "/Hot" |> with Info (keyed "Hot page is open" ())
+    ]
+        |> List.concat
+        |> viewWithState { current = "http://a.a/Cool", previous = "http://a/Hot" }
+        -->  [ "/Cool", "/Hot", "Cool page is open", "-" ]
 
 -}
 custom : (( Aspect, Url ) -> Transformation html) -> Ui html

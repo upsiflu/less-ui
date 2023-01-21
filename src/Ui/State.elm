@@ -257,7 +257,22 @@ parseQueryString =
 ---- Query ----
 
 
-{-| -}
+{-|
+
+    import Set
+    import Url
+
+    "http://a/?y"
+        |> Url.fromString
+        |> Maybe.map (hasFlag "z")
+        --> Just False
+
+    "http://a/?y&z"
+        |> Url.fromString
+        |> Maybe.map (hasFlag "z")
+        --> Just True
+
+-}
 hasFlag : Flag -> Url -> Bool
 hasFlag flag =
     getFlags >> List.member flag

@@ -15,7 +15,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Keyed exposing (node)
 import Ui.Get as Get exposing (Get)
-import Ui.Layout.Aspect exposing (Aspect(..))
+import Ui.Layout.Aspect as Aspect exposing (Aspect(..))
 import Ui.Layout.ViewModel exposing (Foliage, ViewModel)
 
 
@@ -32,15 +32,9 @@ default =
     { view =
         \{ handle, get } ->
             ( "handle", node "nav" [ Attr.class "handle" ] handle )
-                :: Get.toListBy (niceLayout "") [ Scene, Info, Control ] get
+                :: Get.toListBy (niceLayout "") Aspect.all get
     , markRemovals = poof
     }
-
-
-poof : Foliage (Html html) -> Foliage (Html html)
-poof =
-    List.intersperse ( "poof", Html.span [ Attr.class "poof" ] [ Html.text "" ] )
-        >> (::) ( "poof", Html.span [ Attr.class "poof" ] [ Html.text "" ] )
 
 
 {-| -}
@@ -58,9 +52,19 @@ list : Layout html
 list =
     { view =
         \{ handle, get } ->
-            handle :: Get.values Ui.Layout.Aspect.all get |> List.concat
-    , markRemovals = \_ -> []
+            handle :: Get.values Aspect.all get |> List.concat
+    , markRemovals = List.map (\( _, v ) -> ( "-", v ))
     }
+
+
+
+---- Html ----
+
+
+poof : Foliage (Html html) -> Foliage (Html html)
+poof =
+    List.indexedMap (\i a -> [ ( "poof" ++ String.fromInt i, Html.span [ Attr.class "poof" ] [ Html.text (String.fromInt i) ] ), a ])
+        >> List.concat
 
 
 {-| -}
@@ -69,7 +73,7 @@ withClass prefix =
     { view =
         \{ handle, get } ->
             ( "handle", node "nav" [ Attr.class prefix, Attr.class "handle" ] handle )
-                :: Get.toListBy (niceLayout prefix) [ Scene, Info, Control ] get
+                :: Get.toListBy (niceLayout prefix) Aspect.all get
     , markRemovals = poof
     }
 

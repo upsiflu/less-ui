@@ -14,7 +14,7 @@ module Ui.Transformation exposing
 
 -}
 
-import Ui.Layout.Aspect as Aspect exposing (Aspect)
+import Ui.Layout.Aspect as Aspect exposing (Aspect, intersect, subtract)
 import Ui.Layout.ViewModel exposing (Keyed)
 
 
@@ -89,7 +89,8 @@ difference current previous =
     in
     { addition =
         { occlude =
-            current.occlude |> Aspect.subtract previous.occlude
+            current.occlude
+                |> subtract previous.occlude
         , appendWhere =
             current.appendWhere
         , appendWhat =
@@ -97,7 +98,8 @@ difference current previous =
         }
     , removal =
         { occlude =
-            previous.occlude |> Aspect.subtract current.occlude
+            previous.occlude
+                |> subtract current.occlude
         , appendWhere =
             previous.appendWhere
         , appendWhat =
@@ -105,7 +107,7 @@ difference current previous =
         }
     , unchanged =
         { occlude =
-            Aspect.intersect current.occlude previous.occlude
+            intersect current.occlude previous.occlude
         , appendWhere =
             current.appendWhere
         , appendWhat =
