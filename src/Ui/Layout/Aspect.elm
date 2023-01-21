@@ -1,4 +1,7 @@
-module Ui.Layout.Aspect exposing (Aspect(..))
+module Ui.Layout.Aspect exposing
+    ( Aspect(..)
+    , inverse, subtract
+    )
 
 {-| Categorise the parts of your [Ui item](Ui)
 
@@ -20,3 +23,17 @@ type Aspect
     = Scene
     | Control
     | Info
+
+
+{-| -}
+inverse : List Aspect -> List Aspect
+inverse comparison =
+    [ Scene, Control, Info ]
+        |> subtract comparison
+
+
+{-| -}
+subtract : List Aspect -> List Aspect -> List Aspect
+subtract comparison =
+    List.filter
+        (\a -> not <| List.member a comparison)

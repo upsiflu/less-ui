@@ -10,7 +10,7 @@ module Ui exposing
     , ol, ul, node
     , uncons
     , constant
-    , custom, Custom(..)
+    , custom
     , map, indexedMap, mapList
     , map2
     , ifJust, notIf, none
@@ -123,14 +123,9 @@ type Descendant msg
 
 {-| -}
 type alias Item msg =
-    { dynamic : Handle msg
+    { dynamic : Maybe (( Aspect, Url ) -> ViewModel.Transformation msg)
     , get : Get (Ui msg)
     }
-
-
-{-| -}
-type alias Handle msg =
-    ( Aspect, Url ) -> List (Custom msg)
 
 
 
@@ -250,7 +245,7 @@ with aspect subUi =
                 Twig foliage_ maybeItem ->
                     maybeItem
                         |> Maybe.unpack
-                            (\() -> { dynamic = \_ -> [], get = Get.singleton aspect subUi })
+                            (\() -> { dynamic = Nothing, get = Get.singleton aspect subUi })
                             (\it -> { it | get = Get.addList aspect subUi it.get })
                         |> Just
                         |> Twig foliage_
@@ -434,8 +429,8 @@ view transition layout =
 render : { current : State, previous : Maybe State } -> Ui msg -> ViewModel msg
 render state =
     let
-        viewUi : ( Aspect, Mask (Ui msg) ) -> Ui msg -> ViewModel msg
-        viewUi ( aspect, mask ) =
+        viewUi : ( Aspect, Mask (Ui msg) ) -> Bool -> Ui msg -> ViewModel msg
+        viewUi ( aspect, mask ) isOutgoing =
             ViewModel.concatMap <|
                 \descendant ->
                     case descendant of
@@ -445,72 +440,52 @@ render state =
                                 |> ViewModel.appendGet (Get.singleton aspect foliage_)
 
                         Wrap wrapper descList ->
+                            -- if this ui is outgoing then add the `poof` class to it
+                            -- Need to check on paper (with drawing) what exactly happens with all the nasty nestings...
                             descList
-                                |> viewUi ( aspect, mask )
+                                |> viewUi ( aspect, mask ) False
                                 |> ViewModel.mapGet (Get.update aspect wrapper)
 
         viewItem : ( Aspect, Mask (Ui msg) ) -> Item msg -> ViewModel msg
         viewItem ( aspect, mask ) item =
             let
-                ( transform, mask_ ) =
-                    item.dynamic ( aspect, state.current )
-                        |> List.foldr
-                            (\custom_ ( t, m ) ->
-                                case custom_ of
-                                    TransformViewModel t_ ->
-                                        ( t >> t_, m )
+                previousTransformation =
+                    item.dynamic
+                        |> Maybe.map ((|>) ( aspect, state.previous |> Maybe.withDefault state.current ))
 
-                                    MaskDescendents m_ ->
-                                        ( t, m >> m_ )
-                            )
-                            ( identity, mask )
+                currentTransformation =
+                    item.dynamic
+                        |> Maybe.map ((|>) ( aspect, state.current ))
 
-                ( previousTransform, previousMask_ ) =
-                    item.dynamic ( aspect, state.previous |> Maybe.withDefault state.current )
-                        |> List.foldr
-                            (\custom_ ( t, m ) ->
-                                case custom_ of
-                                    TransformViewModel t_ ->
-                                        ( t >> t_, m )
+                transform =
+                    if previousTransformation == Nothing && currentTransformation == Nothing then
+                        identity
 
-                                    MaskDescendents m_ ->
-                                        ( t, m >> m_ )
-                            )
-                            ( identity, mask )
+                    else
+                        ViewModel.applyTransformations
+                            { maybeCurrent = currentTransformation, maybePrevious = previousTransformation }
 
-                -- POOF:
-                {-
-
-                   (1) We know the new getMask and viewModelTransform.
-                   (2) Now, what are the elements that need to go poof?
-                   (3) If we can make a ViewModel out of the poof elements, then we can
-                       ViewModel.mergeDeprecated old new
-
-                   (2) We know both lists of transformation and maskDesc.
-
-                -}
+                outgoingAspects : List Aspect
+                outgoingAspects =
+                    Maybe.map2 (\current previous -> current.occlude |> Ui.Layout.Aspect.subtract previous.occlude)
+                        currentTransformation
+                        previousTransformation
+                        |> Maybe.withDefault []
             in
             item.get
-                |> mask_
+                |> mask
                 |> Get.mapByKey
-                    (\aspect_ -> viewUi ( aspect_, mask ))
+                    -- Here we can add a flip 'outgoing' which will only apply to direct 'wrap' descendant
+                    (\aspect_ -> viewUi ( aspect_, mask ) (List.member aspect outgoingAspects))
                 |> Get.values [ Scene, Control, Info ]
                 |> ViewModel.concat
                 |> transform
     in
-    viewUi ( Scene, Mask.transparent )
+    viewUi ( Scene, Mask.transparent ) False
 
 
 
 ---- Working with Handles ----
-
-
-{-| `TransformViewModel`: Use to append or map handles or apply transformations to descendents.
-`MaskDescendents`: Transform or occlude nested elements by endomapping `Get`
--}
-type Custom msg
-    = TransformViewModel (ViewModel msg -> ViewModel msg)
-    | MaskDescendents (Mask (Ui msg))
 
 
 {-| Here you can add your own button, input, or indicator.
@@ -518,14 +493,14 @@ type Custom msg
 constant : List (Html msg) -> Ui msg
 constant html_ =
     (always >> custom)
-        [ TransformViewModel (ViewModel.appendHandle (keyByIndex html_)) ]
+        { occlude = [], append = ( Nothing, keyByIndex html_ ) }
 
 
 {-| This interface is mostly interesting for library authors.
 -}
-custom : (( Aspect, Url ) -> List (Custom msg)) -> Ui msg
+custom : (( Aspect, Url ) -> ViewModel.Transformation msg) -> Ui msg
 custom h =
-    fromItem { dynamic = h, get = \_ -> Nothing }
+    fromItem { dynamic = Just h, get = \_ -> Nothing }
 
 
 

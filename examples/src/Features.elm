@@ -49,15 +49,18 @@ view ( path, fragment ) features =
                 |> Link.view (Link.preset.global [] [ Html.text str ])
                 |> Ui.with Control contents
     in
-    { title = "Restrictive Ui feature test"
-    , layout = Ui.Layout.WithClass "Features"
-    , body =
+    { body =
         Ui.with Info (Ui.textLabel "Toggle the features on top of the page! ") Ui.singleton
             ++ showTab "Flat Ui Layout" ui
             ++ showTab "Path in View"
                 (paths path)
             ++ showTab "Bounce between fragments"
                 (fragments fragment)
+            ++ (Ui.constant [ Html.label [] [ Html.text "ConStAnt" ] ]
+                    |> Ui.with Scene (Ui.textLabel "ConsScene")
+               )
+    , layout = Ui.Layout.WithClass "Features"
+    , title = "Restrictive Ui feature test"
     }
 
 

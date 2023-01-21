@@ -48,10 +48,8 @@ import Html.Attributes exposing (..)
 import Maybe.Extra as Maybe
 import String.Extra as String
 import Ui exposing (Ui)
-import Ui.Get as Get
 import Ui.Layout.Aspect as Aspect exposing (Aspect)
 import Ui.Layout.ViewModel as ViewModel
-import Ui.Mask as Mask
 import Ui.State exposing (Flag, Fragment, Path, State)
 import Url exposing (Url)
 import Url.Codec exposing (Codec, ParseError(..))
@@ -219,20 +217,22 @@ view config link =
     Ui.custom <|
         \( aspect, url ) ->
             let
-                transformViewModel : List (Html.Attribute Never) -> Ui.Custom msg
-                transformViewModel additionalAttributes =
+                transformViewModel : List Aspect -> List (Html.Attribute Never) -> ViewModel.Transformation msg
+                transformViewModel mask additionalAttributes =
                     let
                         foliage : ViewModel.Foliage msg
                         foliage =
                             [ ( toId link, a link (config.attributes ++ additionalAttributes) config.contents ) ]
                     in
-                    Ui.TransformViewModel <|
+                    { occlude = mask
+                    , append =
                         case config.position of
                             Inline ->
-                                ViewModel.appendGet (Get.singleton aspect foliage)
+                                ( Just aspect, foliage )
 
                             Global ->
-                                ViewModel.appendHandle foliage
+                                ( Nothing, foliage )
+                    }
             in
             case link of
                 Toggle _ flag ->
@@ -240,17 +240,16 @@ view config link =
                         ( isChecked, mask ) =
                             Bool.ifElse
                                 ( "true", [] )
-                                ( "false", [ Mask.occludeList config.occlusions |> Ui.MaskDescendents ] )
+                                ( "false", config.occlusions )
                                 (Ui.State.hasFlag flag url)
                     in
-                    transformViewModel
+                    transformViewModel mask
                         [ attribute "role" "switch"
                         , attribute "aria-checked" isChecked
                         ]
-                        :: mask
 
                 _ ->
-                    [ transformViewModel [] ]
+                    transformViewModel [] []
 
 
 {-| Define whether the link anchor
