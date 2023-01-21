@@ -1,12 +1,12 @@
 module Ui.Transformation exposing
-    ( Transformation
+    ( Transformation, neutral
     , mapContent
     , difference
     )
 
 {-|
 
-@docs Transformation
+@docs Transformation, neutral
 
 @docs mapContent
 
@@ -14,7 +14,7 @@ module Ui.Transformation exposing
 
 -}
 
-import Ui.Layout.Aspect as Aspect exposing (Aspect, intersect, subtract)
+import Ui.Layout.Aspect exposing (Aspect, intersect, subtract)
 import Ui.Layout.ViewModel exposing (Keyed)
 
 
@@ -24,6 +24,26 @@ type alias Transformation content =
     { occlude : List Aspect
     , appendWhere : Maybe Aspect
     , appendWhat : List (Keyed content)
+    }
+
+
+
+---- Create ----
+
+
+{-|
+
+    { occlude = []
+    , appendWhere = Nothing
+    , appendWhat = []
+    }
+
+-}
+neutral : Transformation content
+neutral =
+    { occlude = []
+    , appendWhere = Nothing
+    , appendWhat = []
     }
 
 

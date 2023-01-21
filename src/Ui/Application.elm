@@ -124,7 +124,7 @@ application config =
                     updateUrl link =
                         Ui.Link.toStateTransition link state.current
                             |> (\canonicalState ->
-                                    ( ( key, { state | previous = Just state.current, current = canonicalState }, model )
+                                    ( ( key, { state | current = canonicalState, previous = Just state.current }, model )
                                     , if state.current == canonicalState then
                                         Cmd.none
 

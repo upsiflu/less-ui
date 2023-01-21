@@ -49,7 +49,6 @@ The following functions are mostly here for testing
 
 -}
 
-import Bool.Extra as Bool
 import Html exposing (Html)
 import Html.Attributes exposing (..)
 import String.Extra as String

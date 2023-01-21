@@ -105,7 +105,7 @@ import Ui.Get as Get exposing (Get)
 import Ui.Layout exposing (Layout)
 import Ui.Layout.Aspect as Aspect exposing (Aspect(..))
 import Ui.Layout.ViewModel as ViewModel exposing (Foliage, ViewModel)
-import Ui.Mask as Mask exposing (Mask)
+import Ui.Mask as Mask
 import Ui.State exposing (State)
 import Ui.Transformation as Transformation exposing (Transformation)
 import Url exposing (Url)
@@ -124,7 +124,7 @@ type Descendant html
 
 {-| -}
 type alias Item html =
-    { dynamic : Maybe (( Aspect, State ) -> Transformation html)
+    { contingentTransformation : Maybe (( Aspect, State ) -> Transformation html)
     , get : Get (Ui html)
     }
 
@@ -246,7 +246,7 @@ with aspect subUi =
                 Twig foliage_ maybeItem ->
                     maybeItem
                         |> Maybe.unpack
-                            (\() -> { dynamic = Nothing, get = Get.singleton aspect subUi })
+                            (\() -> { contingentTransformation = Nothing, get = Get.singleton aspect subUi })
                             (\it -> { it | get = Get.addList aspect subUi it.get })
                         |> Just
                         |> Twig foliage_
@@ -450,7 +450,7 @@ As the following example shows, you can substitute Html by any other type:
 
 -}
 view : { current : State, previous : Maybe State } -> Layout html -> Ui html -> Foliage html
-view state layout =
+view { current, previous } layout =
     let
         viewUi : Aspect -> Ui html -> ViewModel html
         viewUi aspect =
@@ -470,45 +470,29 @@ view state layout =
         viewItem : Aspect -> Item html -> ViewModel html
         viewItem aspect item =
             let
-                ( unchangedOccludes, removedAspects, transformViewModel_ ) =
-                    item.dynamic
-                        |> Maybe.map getProperties
-                        |> Maybe.withDefault ( [], [], identity )
-
-                getProperties : (( Aspect, State ) -> Transformation html) -> ( List Aspect, List Aspect, ViewModel html -> ViewModel html )
-                getProperties getTransformation =
-                    Transformation.difference
-                        (getTransformation ( aspect, state.current ))
-                        (getTransformation ( aspect, Maybe.withDefault state.current state.previous ))
-                        |> (\{ addition, removal, unchanged } ->
-                                ( unchanged.occlude
-                                , addition.occlude
-                                , ViewModel.appendAt removal.appendWhere
-                                    (layout.markRemovals removal.appendWhat)
-                                    >> ViewModel.appendAt
-                                        unchanged.appendWhere
-                                        unchanged.appendWhat
-                                    >> ViewModel.appendAt
-                                        addition.appendWhere
-                                        addition.appendWhat
-                                )
+                { addition, removal, unchanged } =
+                    item.contingentTransformation
+                        |> Maybe.withDefault (\_ -> Transformation.neutral)
+                        |> (\apply ->
+                                apply ( aspect, Maybe.withDefault current previous )
+                                    |> Transformation.difference (apply ( aspect, current ))
                            )
             in
             item.get
-                -------------- contextual transformation: --------------
-                -- apply continuous occlusions to item aspects
-                |> Mask.occludeList unchangedOccludes
-                --------------------------------------------------------
+                |> Mask.occludeList unchanged.occlude
                 |> Get.mapByKey
                     (\aspect_ -> viewUi aspect_)
-                -- mark removed aspects
-                |> Get.updateWhere (\aspect_ -> List.member aspect_ removedAspects)
+                |> Get.updateWhere (\aspect_ -> List.member aspect_ addition.occlude)
                     (ViewModel.mapGet (Get.map layout.markRemovals))
-                --------------------------------------------------------
                 |> Get.values Aspect.all
                 |> ViewModel.concat
-                -------------- contextual transformation: --------------
-                |> transformViewModel_
+                |> ViewModel.append
+                    { removal
+                        | appendWhat =
+                            layout.markRemovals removal.appendWhat
+                    }
+                |> ViewModel.append unchanged
+                |> ViewModel.append addition
     in
     viewUi Scene >> layout.view
 
@@ -645,7 +629,7 @@ constant html_ =
 -}
 custom : (( Aspect, Url ) -> Transformation html) -> Ui html
 custom h =
-    fromItem { dynamic = Just h, get = Get.empty }
+    fromItem { contingentTransformation = Just h, get = Get.empty }
 
 
 

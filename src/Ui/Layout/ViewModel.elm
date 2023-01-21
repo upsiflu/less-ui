@@ -1,7 +1,7 @@
 module Ui.Layout.ViewModel exposing
     ( ViewModel, Foliage, Keyed
     , empty
-    , appendGet, mapGet, appendHandle, mapHandle, appendAt
+    , appendGet, mapGet, appendHandle, mapHandle, append
     , merge
     , concat, concatMap
     )
@@ -20,7 +20,7 @@ You can probably ignore this module.
 
 # Map
 
-@docs appendGet, mapGet, appendHandle, mapHandle, appendAt
+@docs appendGet, mapGet, appendHandle, mapHandle, append
 
 
 # Compose
@@ -116,11 +116,11 @@ appendHandle foliage =
 
 {-| Note that `Nothing` means the handle is appended.
 -}
-appendAt : Maybe Aspect -> Foliage html -> ViewModel html -> ViewModel html
-appendAt place =
-    case place of
-        Nothing ->
-            appendHandle
-
+append : { a | appendWhat : Foliage html, appendWhere : Maybe Aspect } -> ViewModel html -> ViewModel html
+append { appendWhat, appendWhere } =
+    case appendWhere of
         Just aspect ->
-            Get.singleton aspect >> appendGet
+            Get.singleton aspect appendWhat |> appendGet
+
+        Nothing ->
+            appendHandle appendWhat
