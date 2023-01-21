@@ -1,4 +1,4 @@
-.poof~* {
+.poof+* {
     animation          : poof .3s;
     animation-fill-mode: forwards;
     pointer-events     : none;

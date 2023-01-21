@@ -1,6 +1,6 @@
 module Ui.Layout.Aspect exposing
     ( Aspect(..)
-    , inverse, subtract
+    , intersect, inverse, subtract
     )
 
 {-| Categorise the parts of your [Ui item](Ui)
@@ -37,3 +37,10 @@ subtract : List Aspect -> List Aspect -> List Aspect
 subtract comparison =
     List.filter
         (\a -> not <| List.member a comparison)
+
+
+{-| -}
+intersect : List Aspect -> List Aspect -> List Aspect
+intersect comparison =
+    List.filter
+        (\a -> List.member a comparison)

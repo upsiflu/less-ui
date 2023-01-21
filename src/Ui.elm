@@ -429,8 +429,8 @@ view transition layout =
 render : { current : State, previous : Maybe State } -> Ui msg -> ViewModel msg
 render state =
     let
-        viewUi : ( Aspect, Mask (Ui msg) ) -> Bool -> Ui msg -> ViewModel msg
-        viewUi ( aspect, mask ) isOutgoing =
+        viewUi : ( Aspect, Mask (Ui msg) ) -> Ui msg -> ViewModel msg
+        viewUi ( aspect, mask ) =
             ViewModel.concatMap <|
                 \descendant ->
                     case descendant of
@@ -443,7 +443,7 @@ render state =
                             -- if this ui is outgoing then add the `poof` class to it
                             -- Need to check on paper (with drawing) what exactly happens with all the nasty nestings...
                             descList
-                                |> viewUi ( aspect, mask ) False
+                                |> viewUi ( aspect, mask )
                                 |> ViewModel.mapGet (Get.update aspect wrapper)
 
         viewItem : ( Aspect, Mask (Ui msg) ) -> Item msg -> ViewModel msg
@@ -457,13 +457,9 @@ render state =
                     item.dynamic
                         |> Maybe.map ((|>) ( aspect, state.current ))
 
-                transform =
-                    if previousTransformation == Nothing && currentTransformation == Nothing then
-                        identity
-
-                    else
-                        ViewModel.applyTransformations
-                            { maybeCurrent = currentTransformation, maybePrevious = previousTransformation }
+                simpleTransform =
+                    Maybe.map ViewModel.applySimpleTransformation currentTransformation
+                        |> Maybe.withDefault identity
 
                 outgoingAspects : List Aspect
                 outgoingAspects =
@@ -471,17 +467,34 @@ render state =
                         currentTransformation
                         previousTransformation
                         |> Maybe.withDefault []
+
+                vanishIfOutgoing : Aspect -> ViewModel msg -> ViewModel msg
+                vanishIfOutgoing aspect_ =
+                    if List.member aspect_ outgoingAspects then
+                        ViewModel.vanish
+
+                    else
+                        identity
+
+                maskInvisibles : Mask (Ui msg)
+                maskInvisibles =
+                    Maybe.map2 (\current previous -> current.occlude |> Ui.Layout.Aspect.intersect previous.occlude)
+                        currentTransformation
+                        previousTransformation
+                        |> Maybe.withDefault []
+                        |> Mask.occludeList
             in
             item.get
                 |> mask
+                |> maskInvisibles
                 |> Get.mapByKey
                     -- Here we can add a flip 'outgoing' which will only apply to direct 'wrap' descendant
-                    (\aspect_ -> viewUi ( aspect_, mask ) (List.member aspect outgoingAspects))
+                    (\aspect_ -> viewUi ( aspect_, mask ) >> vanishIfOutgoing aspect)
                 |> Get.values [ Scene, Control, Info ]
                 |> ViewModel.concat
-                |> transform
+                |> simpleTransform
     in
-    viewUi ( Scene, Mask.transparent ) False
+    viewUi ( Scene, Mask.transparent )
 
 
 

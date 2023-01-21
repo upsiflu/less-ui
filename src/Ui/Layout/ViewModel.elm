@@ -4,7 +4,7 @@ module Ui.Layout.ViewModel exposing
     , appendGet, mapGet, appendHandle, mapHandle
     , merge
     , concat, concatMap
-    , Transformation, applyTransformations, maskFromTransformation, mergeDeprecated
+    , Transformation, applySimpleTransformation, vanish
     )
 
 {-| Intermediate model calculated before applying a [Layout](Ui.Layout)
@@ -113,14 +113,6 @@ appendHandle foliage =
     mapHandle ((++) foliage)
 
 
-{-| -}
-mergeDeprecated : ViewModel msg -> ViewModel msg -> ViewModel msg
-mergeDeprecated old new =
-    mapHandle poof old
-        |> mapGet (Get.map poof)
-        |> merge new
-
-
 {-| Note that an `Aspect` of `Nothing` implies a global position.
 -}
 type alias Transformation msg =
@@ -129,80 +121,29 @@ type alias Transformation msg =
     }
 
 
+{-| -}
+vanish : ViewModel msg -> ViewModel msg
+vanish =
+    mapHandle poof
+        >> mapGet (Get.map poof)
+
+
 poof : Foliage msg -> Foliage msg
 poof =
-    (++) [ ( "poof", Html.span [ Attr.class "poof" ] [ Html.text "" ] ) ]
-
-
-{-| As of now, we do detect:
-
-  - Occlusion increases
-  - Changes in the position (`Maybe Aspect`) of appended Foliage
-
-We do not detect if Foliage changes in the very same place.
-
-ERROR (WIP)
-
-Ideas:
-
-- Instead of injecting the `poof`, we want to
-  declare, in Ui, a `wrapWithAnimation` or the like.
-
--}
-applyTransformations :
-    { maybeCurrent : Maybe (Transformation msg), maybePrevious : Maybe (Transformation msg) }
-    -> ViewModel msg
-    -> ViewModel msg
-applyTransformations { maybeCurrent, maybePrevious } viewModel =
-    let
-        noTransformation =
-            { occlude = [], append = ( Nothing, [] ) }
-
-        ( current, previous ) =
-            ( Maybe.withDefault noTransformation maybeCurrent, Maybe.withDefault noTransformation maybePrevious )
-
-        --1. We want a ViewModel that only contains newly-occluded items.
-        --1.a Apply the previous occlusion plus the inverse of the current occlusion
-        deprecationMask =
-            Ui.Mask.occludeList (previous.occlude ++ Ui.Layout.Aspect.inverse current.occlude)
-
-        ( ( currentPosition, currentFoliage ), ( previousPosition, previousFoliage ) ) =
-            ( current.append, previous.append )
-
-        deprecationAppend =
-            if currentPosition /= previousPosition then
-                case Debug.log "ViewModel -> previous.append position" previousPosition of
-                    Just aspect ->
-                        appendGet (Get.singleton aspect (poof previousFoliage))
-
-                    Nothing ->
-                        appendHandle (poof previousFoliage)
-
-            else
-                identity
-
-        currentAppend =
-            case Debug.log "ViewModel -> current.append position" currentPosition of
-                Nothing ->
-                    appendHandle currentFoliage
-
-                Just aspect ->
-                    appendGet (Get.singleton aspect currentFoliage)
-
-        deprecationModel =
-            viewModel
-                |> mapGet (deprecationMask >> Get.map poof)
-                |> deprecationAppend
-
-        currentModel =
-            viewModel
-                |> mapGet (Ui.Mask.occludeList current.occlude)
-                |> currentAppend
-    in
-    merge currentModel deprecationModel
+    List.intersperse ( "poof", Html.span [ Attr.class "poof" ] [ Html.text "" ] )
+        >> (::) ( "poof", Html.span [ Attr.class "poof" ] [ Html.text "" ] )
 
 
 {-| -}
-maskFromTransformation : { a | occlude : List Aspect } -> Mask b
-maskFromTransformation { occlude } =
-    Ui.Mask.occludeList occlude
+applySimpleTransformation : Transformation msg -> ViewModel msg -> ViewModel msg
+applySimpleTransformation { append } =
+    let
+        ( position, foliage ) =
+            append
+    in
+    case position of
+        Just aspect ->
+            appendGet (Get.singleton aspect foliage)
+
+        Nothing ->
+            appendHandle foliage
