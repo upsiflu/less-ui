@@ -74,7 +74,7 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 For convenient functions, check out the [Link](Ui.Link) module.
 
 @docs constant
-@docs custom, Custom
+@docs custom
 
 
 ## Map
@@ -97,34 +97,35 @@ It is usually easier to build exactly the `Ui` you need instead of altering and 
 
 import Bool.Extra as Bool
 import Html exposing (Html)
-import Html.Attributes exposing (..)
+import Html.Attributes as Attr
 import Html.Keyed
 import List.Extra as List
 import Maybe.Extra as Maybe
 import Ui.Get as Get exposing (Get)
-import Ui.Layout as Layout exposing (Layout)
+import Ui.Layout exposing (Layout)
 import Ui.Layout.Aspect exposing (Aspect(..))
 import Ui.Layout.ViewModel as ViewModel exposing (Foliage, ViewModel)
 import Ui.Mask as Mask exposing (Mask)
 import Ui.State exposing (State)
+import Ui.Transformation as Transformation exposing (Transformation)
 import Url exposing (Url)
 
 
 {-| -}
-type alias Ui msg =
-    List (Descendant msg)
+type alias Ui html =
+    List (Descendant html)
 
 
 {-| -}
-type Descendant msg
-    = Twig (Foliage msg) (Maybe (Item msg))
-    | Wrap (Foliage msg -> Foliage msg) (Ui msg)
+type Descendant html
+    = Twig (Foliage html) (Maybe (Item html))
+    | Wrap (Foliage html -> Foliage html) (Ui html)
 
 
 {-| -}
-type alias Item msg =
-    { dynamic : Maybe (( Aspect, Url ) -> ViewModel.Transformation msg)
-    , get : Get (Ui msg)
+type alias Item html =
+    { dynamic : Maybe (( Aspect, State ) -> Transformation html)
+    , get : Get (Ui html)
     }
 
 
@@ -133,50 +134,50 @@ type alias Item msg =
 
 
 {-| -}
-singleton : Ui msg
+singleton : Ui html
 singleton =
     [ Twig [] Nothing ]
 
 
 {-| -}
-textLabel : String -> Ui msg
+textLabel : String -> Ui (Html msg)
 textLabel =
     addTextLabel >> (|>) []
 
 
 {-| -}
-html : Html msg -> Ui msg
+html : html -> Ui html
 html =
     Tuple.pair "" >> List.singleton >> foliage
 
 
 {-| Preserve data in controls or [custom elements](https://guide.elm-lang.org/interop/custom_elements.html) even [when nodes before this are removed or added](https://guide.elm-lang.org/optimization/keyed.html).
 -}
-keyed : String -> Html msg -> Ui msg
+keyed : String -> html -> Ui html
 keyed key =
     Tuple.pair key >> List.singleton >> foliage
 
 
 {-| [Foliage](Ui.Layout.ViewModel#Foliage) is a list of String-keyed Html
 -}
-foliage : Foliage msg -> Ui msg
+foliage : Foliage html -> Ui html
 foliage =
     Twig >> (|>) Nothing >> List.singleton
 
 
-labelFromString : String -> Ui msg
+labelFromString : String -> Ui (Html msg)
 labelFromString t =
-    foliage [ ( t, Html.span [ class "text label" ] [ Html.text t ] ) ]
+    foliage [ ( t, Html.span [ Attr.class "text label" ] [ Html.text t ] ) ]
 
 
 {-| `fromList = List.concatMap`
 -}
-fromList : (a -> Ui msg) -> List a -> Ui msg
+fromList : (a -> Ui html) -> List a -> Ui html
 fromList =
     List.concatMap
 
 
-fromItem : Item msg -> Ui msg
+fromItem : Item html -> Ui html
 fromItem =
     Just >> Twig [] >> List.singleton
 
@@ -187,7 +188,7 @@ fromItem =
 
 {-| Shorthand for `singleton |> with ...`
 -}
-setAspect : Aspect -> Ui msg -> Ui msg
+setAspect : Aspect -> Ui html -> Ui html
 setAspect aspect subUi =
     with aspect subUi singleton
 
@@ -214,7 +215,7 @@ This will output:
 `Info -> "I am wrapped" []`
 
 -}
-wrap : (Foliage msg -> Foliage msg) -> Ui msg -> Ui msg
+wrap : (Foliage html -> Foliage html) -> Ui html -> Ui html
 wrap =
     Wrap >> (<<) List.singleton
 
@@ -237,7 +238,7 @@ Note that an empty list will stay an empty list:
         -> ???
 
 -}
-with : Aspect -> Ui msg -> Ui msg -> Ui msg
+with : Aspect -> Ui html -> Ui html -> Ui html
 with aspect subUi =
     List.map
         (\original ->
@@ -257,7 +258,7 @@ with aspect subUi =
 
 {-| prepend a freeform label to the contextual aspect
 -}
-addLabel : Ui msg -> Ui msg -> Ui msg
+addLabel : Ui (Html msg) -> Ui (Html msg) -> Ui (Html msg)
 addLabel l =
     (++) l >> wrap (Html.Keyed.node "label" [] >> Tuple.pair "" >> List.singleton)
 
@@ -274,35 +275,35 @@ You can easily implement higher order `mapN`s:
             |> List.concat
 
 -}
-map2 : (Ui msg -> Ui msg2 -> Ui msg3) -> Ui msg -> Ui msg2 -> Ui msg3
+map2 : (Ui html -> Ui html2 -> Ui html3) -> Ui html -> Ui html2 -> Ui html3
 map2 fu a b =
     List.map2 fu (List.map List.singleton a) (List.map List.singleton b) |> List.concat
 
 
 {-| convenience function to wrap a Ui into an unordered list and give it an id
 -}
-ul : String -> Ui msg -> Ui msg
+ul : String -> Ui (Html msg) -> Ui (Html msg)
 ul idString =
-    wrap (Html.Keyed.ul [ id idString ] >> Tuple.pair idString >> List.singleton)
+    wrap (Html.Keyed.ul [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| convenience function to wrap a Ui into an ordered list and give it an id
 -}
-ol : String -> Ui msg -> Ui msg
+ol : String -> Ui (Html msg) -> Ui (Html msg)
 ol idString =
-    wrap (Html.Keyed.ul [ id idString ] >> Tuple.pair idString >> List.singleton)
+    wrap (Html.Keyed.ul [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| convenience function to wrap a Ui into any Html node and give it an id
 -}
-node : String -> String -> Ui msg -> Ui msg
+node : String -> String -> Ui (Html msg) -> Ui (Html msg)
 node nodeType idString =
-    wrap (Html.Keyed.node nodeType [ id idString ] >> Tuple.pair idString >> List.singleton)
+    wrap (Html.Keyed.node nodeType [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| prepend a text label to the contextual aspect
 -}
-addTextLabel : String -> Ui msg -> Ui msg
+addTextLabel : String -> Ui (Html msg) -> Ui (Html msg)
 addTextLabel =
     labelFromString >> addLabel
 
@@ -418,18 +419,24 @@ uncons =
 
 
 {-| Generate [keyed Html (Foliage)](Ui.Layout.ViewModel#Foliage) `[(key:String, Html)]` for use with `Html.Keyed`
+
+As the following example shows, you can substitute Html by any othe type:
+
+    myUi : Ui Int
+    myUi =
+        singleton
+
 -}
-view : { current : State, previous : Maybe State } -> Layout -> Ui msg -> Foliage msg
+view : { current : State, previous : Maybe State } -> Layout html -> Ui html -> Foliage html
 view transition layout =
-    render transition
-        >> Layout.view
-        >> (|>) layout
+    render transition { markRemovals = layout.markRemovals }
+        >> layout.view
 
 
-render : { current : State, previous : Maybe State } -> Ui msg -> ViewModel msg
-render state =
+render : { current : State, previous : Maybe State } -> { markRemovals : Foliage html -> Foliage html } -> Ui html -> ViewModel html
+render state { markRemovals } =
     let
-        viewUi : ( Aspect, Mask (Ui msg) ) -> Ui msg -> ViewModel msg
+        viewUi : ( Aspect, Mask (Ui html) ) -> Ui html -> ViewModel html
         viewUi ( aspect, mask ) =
             ViewModel.concatMap <|
                 \descendant ->
@@ -440,59 +447,50 @@ render state =
                                 |> ViewModel.appendGet (Get.singleton aspect foliage_)
 
                         Wrap wrapper descList ->
-                            -- if this ui is outgoing then add the `poof` class to it
-                            -- Need to check on paper (with drawing) what exactly happens with all the nasty nestings...
                             descList
                                 |> viewUi ( aspect, mask )
                                 |> ViewModel.mapGet (Get.update aspect wrapper)
 
-        viewItem : ( Aspect, Mask (Ui msg) ) -> Item msg -> ViewModel msg
+        viewItem : ( Aspect, Mask (Ui html) ) -> Item html -> ViewModel html
         viewItem ( aspect, mask ) item =
             let
-                previousTransformation =
+                ( invisibleAspects, outgoingAspects, transformViewModel_ ) =
                     item.dynamic
-                        |> Maybe.map ((|>) ( aspect, state.previous |> Maybe.withDefault state.current ))
-
-                currentTransformation =
-                    item.dynamic
-                        |> Maybe.map ((|>) ( aspect, state.current ))
-
-                simpleTransform =
-                    Maybe.map ViewModel.applySimpleTransformation currentTransformation
-                        |> Maybe.withDefault identity
-
-                outgoingAspects : List Aspect
-                outgoingAspects =
-                    Maybe.map2 (\current previous -> current.occlude |> Ui.Layout.Aspect.subtract previous.occlude)
-                        currentTransformation
-                        previousTransformation
-                        |> Maybe.withDefault []
-
-                vanishIfOutgoing : Aspect -> ViewModel msg -> ViewModel msg
-                vanishIfOutgoing aspect_ =
-                    if List.member aspect_ outgoingAspects then
-                        ViewModel.vanish
-
-                    else
-                        identity
-
-                maskInvisibles : Mask (Ui msg)
-                maskInvisibles =
-                    Maybe.map2 (\current previous -> current.occlude |> Ui.Layout.Aspect.intersect previous.occlude)
-                        currentTransformation
-                        previousTransformation
-                        |> Maybe.withDefault []
-                        |> Mask.occludeList
+                        |> Maybe.map
+                            (\getTransformation ->
+                                Transformation.difference
+                                    (getTransformation ( aspect, state.current ))
+                                    (getTransformation ( aspect, Maybe.withDefault state.current state.previous ))
+                                    |> (\{ addition, removal, unchanged } ->
+                                            ( unchanged.occlude
+                                            , removal.occlude
+                                            , ViewModel.appendAt removal.appendWhere
+                                                (markRemovals removal.appendWhat)
+                                                >> ViewModel.appendAt unchanged.appendWhere
+                                                    unchanged.appendWhat
+                                                >> ViewModel.appendAt addition.appendWhere
+                                                    addition.appendWhat
+                                            )
+                                       )
+                            )
+                        |> Maybe.withDefault ( [], [], identity )
             in
             item.get
                 |> mask
-                |> maskInvisibles
+                -------------- contextual transformation: --------------
+                -- occlude aspects invisible to both
+                |> Mask.occludeList
+                    invisibleAspects
+                -- make outgoing aspects vanish
+                |> Get.updateWhere (\aspect_ -> List.member aspect_ outgoingAspects)
+                    (wrap markRemovals)
+                --------------------------------------------------------
                 |> Get.mapByKey
-                    -- Here we can add a flip 'outgoing' which will only apply to direct 'wrap' descendant
-                    (\aspect_ -> viewUi ( aspect_, mask ) >> vanishIfOutgoing aspect)
+                    (\aspect_ -> viewUi ( aspect_, mask ))
                 |> Get.values [ Scene, Control, Info ]
                 |> ViewModel.concat
-                |> simpleTransform
+                -------------- contextual transformation: --------------
+                |> transformViewModel_
     in
     viewUi ( Scene, Mask.transparent )
 
@@ -503,17 +501,17 @@ render state =
 
 {-| Here you can add your own button, input, or indicator.
 -}
-constant : List (Html msg) -> Ui msg
+constant : List html -> Ui html
 constant html_ =
     (always >> custom)
-        { occlude = [], append = ( Nothing, keyByIndex html_ ) }
+        { occlude = [], appendWhere = Nothing, appendWhat = keyByIndex html_ }
 
 
 {-| This interface is mostly interesting for library authors.
 -}
-custom : (( Aspect, Url ) -> ViewModel.Transformation msg) -> Ui msg
+custom : (( Aspect, Url ) -> Transformation html) -> Ui html
 custom h =
-    fromItem { dynamic = Just h, get = \_ -> Nothing }
+    fromItem { dynamic = Just h, get = Get.empty }
 
 
 
@@ -540,14 +538,14 @@ none =
     Html.text ""
 
 
-keyByIndex : List (Html msg) -> Foliage msg
+keyByIndex : List html -> Foliage html
 keyByIndex =
     List.indexedMap (String.fromInt >> Tuple.pair)
 
 
 {-| If you use the default Elm Html library, this is for you
 -}
-toHtml : Foliage msg -> Html msg
+toHtml : Foliage (Html msg) -> Html msg
 toHtml =
     Html.Keyed.node "div" []
 

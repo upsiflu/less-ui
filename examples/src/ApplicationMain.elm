@@ -18,7 +18,6 @@ import Ui exposing (Ui)
 import Ui.Application exposing (Application, application)
 import Ui.Layout as Layout
 import Ui.Layout.Aspect exposing (Aspect(..))
-import Ui.Link as Link
 import Ui.State
 
 
@@ -86,7 +85,7 @@ update () model =
     ( model + 1, Cmd.none )
 
 
-view : ( Ui.State.Path, Ui.State.Fragment ) -> Model -> Ui.Application.Document ()
+view : ( Ui.State.Path, Ui.State.Fragment ) -> Model -> Ui.Application.Document (Html ())
 view ( rawPath, rawFragment ) model =
     let
         page : Page
@@ -107,7 +106,7 @@ view ( rawPath, rawFragment ) model =
 
             DomState ->
                 let
-                    counter : Ui ()
+                    counter : Ui (Html ())
                     counter =
                         List.repeat model ()
                             |> List.indexedMap
@@ -122,12 +121,12 @@ view ( rawPath, rawFragment ) model =
                             |> List.reverse
                             |> Ui.ul "counter"
 
-                    editable : Int -> String -> Ui ()
+                    editable : Int -> String -> Ui (Html ())
                     editable key str =
                         Html.p [ Attr.contenteditable True, Attr.title ("Keyed with: " ++ String.fromInt key) ] [ Html.text str ]
                             |> Ui.keyed (String.fromInt key)
 
-                    updater : Ui ()
+                    updater : Ui (Html ())
                     updater =
                         Html.button [ Events.onClick () ]
                             [ Html.text ("Add item #" ++ String.fromInt model) ]
@@ -142,7 +141,7 @@ view ( rawPath, rawFragment ) model =
 
             Lorem ->
                 let
-                    viewArticle : String -> List (Html ()) -> Ui ()
+                    viewArticle : String -> List (Html ()) -> Ui (Html ())
                     viewArticle title content =
                         Ui.html (Html.h1 [] [ Html.text ("About " ++ title) ])
                             :: (if title == fragment then
@@ -192,7 +191,7 @@ view ( rawPath, rawFragment ) model =
                     (Ui.textLabel ("404 Not found: " ++ rawPath))
 
 
-myTest : Ui ()
+myTest : Ui (Html ())
 myTest =
     Ui.textLabel "The right order: "
         ++ Ui.textLabel "1"
@@ -201,12 +200,12 @@ myTest =
         |> Ui.with Info (Ui.textLabel "a" ++ Ui.textLabel "b")
 
 
-viewPage : Ui () -> Page -> Ui.Application.Document ()
+viewPage : Ui (Html ()) -> Page -> Ui.Application.Document (Html ())
 viewPage content page =
     { body =
         Ui.constant [ viewNav ]
             |> Ui.with Scene content
-    , layout = Layout.Default
+    , layout = Layout.default
     , title = pathFromPage page ++ " – SPA"
     }
 

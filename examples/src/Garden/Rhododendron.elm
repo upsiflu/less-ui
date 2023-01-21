@@ -6,7 +6,7 @@ module Garden.Rhododendron exposing (Rhododendron, singleton, update, Msg, view)
 
 -}
 
-import Html exposing (button, input, text)
+import Html exposing (Html, button, input, text)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed
@@ -81,16 +81,16 @@ map toPath ((Rhododendron label descendants) as rhodo) =
 
 
 {-| -}
-view : (Msg -> msg) -> Rhododendron -> Ui msg
+view : (Msg -> msg) -> Rhododendron -> Ui (Html msg)
 view howToMessage ((Rhododendron label _) as rhododendron) =
     let
-        controls : Ui msg
+        controls : Ui (Html msg)
         controls =
             button [ onClick (Grow |> howToMessage) ] [ text "append" ]
                 |> Ui.html
                 |> (++) (input [ onInput (Edit label >> howToMessage) ] [ Html.text label ] |> Ui.html |> Ui.addTextLabel "Edit")
 
-        scene : Rhododendron -> Ui msg
+        scene : Rhododendron -> Ui (Html msg)
         scene (Rhododendron s descendants) =
             Ui.singleton
                 |> Ui.with Scene (Ui.textLabel s)

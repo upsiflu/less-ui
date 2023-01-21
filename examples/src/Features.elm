@@ -1,13 +1,8 @@
-module Features exposing
-    ( main, Msg
-    , ui, paths, fragments
-    )
+module Features exposing (Features, main, Msg)
 
 {-|
 
-@docs main, Msg
-
-@docs ui, paths, fragments
+@docs Features, main, Msg
 
 -}
 
@@ -26,6 +21,7 @@ type alias Msg =
     ()
 
 
+{-| -}
 type alias Features =
     {}
 
@@ -40,10 +36,10 @@ update () features =
     ( features, Cmd.none )
 
 
-view : ( Ui.State.Path, Ui.State.Fragment ) -> Features -> { body : Ui Msg, layout : Layout, title : String }
-view ( path, fragment ) features =
+view : ( Ui.State.Path, Ui.State.Fragment ) -> Features -> { body : Ui (Html Msg), layout : Layout (Html Msg), title : String }
+view ( path, fragment ) _ =
     let
-        showTab : String -> Ui Msg -> Ui Msg
+        showTab : String -> Ui (Html Msg) -> Ui (Html Msg)
         showTab str contents =
             Link.toggle (String.replace " " "-" str)
                 |> Link.view (Link.preset.global [] [ Html.text str ])
@@ -59,14 +55,14 @@ view ( path, fragment ) features =
             ++ (Ui.constant [ Html.label [] [ Html.text "ConStAnt" ] ]
                     |> Ui.with Scene (Ui.textLabel "ConsScene")
                )
-    , layout = Ui.Layout.WithClass "Features"
+    , layout = Ui.Layout.withClass "Features"
     , title = "Restrictive Ui feature test"
     }
 
 
 {-| [Ui](Ui): Flat layout instead of nested components
 -}
-ui : Ui Msg
+ui : Ui (Html Msg)
 ui =
     Ui.constant [ Html.label [] [ Html.text "Handle" ] ]
         |> Ui.with Scene (Ui.textLabel "Scene")
@@ -76,7 +72,7 @@ ui =
 
 {-| [Application](Ui.Application): Sever Route from Model
 -}
-paths : Ui.State.Path -> Ui Msg
+paths : Ui.State.Path -> Ui (Html Msg)
 paths path =
     Ui.singleton
         |> Ui.with Scene (Ui.textLabel ("Path: " ++ path))
@@ -89,7 +85,7 @@ paths path =
 
 {-| [Link](Ui.Link): Manage the Ui State as a URL
 -}
-fragments : Ui.State.Fragment -> Ui Msg
+fragments : Ui.State.Fragment -> Ui (Html Msg)
 fragments fr =
     let
         articles : List (Html msg)
@@ -105,7 +101,7 @@ fragments fr =
     Ui.singleton
         |> Ui.with Control
             (Link.bounce
-                { there = ( Nothing, Just "3" ), here = ( Nothing, Just "1" ) }
+                { here = ( Nothing, Just "1" ), there = ( Nothing, Just "3" ) }
                 |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "bounce between 1 and 3" ])
             )
         |> Ui.with Scene

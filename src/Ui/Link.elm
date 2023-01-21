@@ -5,7 +5,7 @@ module Ui.Link exposing
     , view, Renderer, preset, Position(..)
     , toUrlString, toStateTransition
     , a
-    , parsePath, queryParseLocation, querySerialiseLocation, stripPrefix, upTo
+    , queryParseLocation, querySerialiseLocation, upTo
     )
 
 {-| Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest) on click
@@ -40,16 +40,22 @@ module Ui.Link exposing
 
 @docs a
 
+
+# Advanced
+
+The following functions are mostly here for testing
+
+@docs queryParseLocation, querySerialiseLocation, upTo
+
 -}
 
 import Bool.Extra as Bool
 import Html exposing (Html)
 import Html.Attributes exposing (..)
-import Maybe.Extra as Maybe
 import String.Extra as String
 import Ui exposing (Ui)
 import Ui.Layout.Aspect as Aspect exposing (Aspect)
-import Ui.Layout.ViewModel as ViewModel
+import Ui.Layout.ViewModel exposing (Foliage)
 import Ui.State exposing (Flag, Fragment, Path, State)
 import Url exposing (Url)
 import Url.Codec exposing (Codec, ParseError(..))
@@ -212,27 +218,23 @@ a link attrs contents =
 view :
     Renderer
     -> Link
-    -> Ui msg
+    -> Ui (Html msg)
 view config link =
     Ui.custom <|
         \( aspect, url ) ->
             let
-                transformViewModel : List Aspect -> List (Html.Attribute Never) -> ViewModel.Transformation msg
-                transformViewModel mask additionalAttributes =
-                    let
-                        foliage : ViewModel.Foliage msg
-                        foliage =
-                            [ ( toId link, a link (config.attributes ++ additionalAttributes) config.contents ) ]
-                    in
-                    { occlude = mask
-                    , append =
-                        case config.position of
-                            Inline ->
-                                ( Just aspect, foliage )
+                linkWithAttributes : List (Html.Attribute Never) -> Foliage (Html msg)
+                linkWithAttributes additionalAttributes =
+                    [ ( toId link, a link (config.attributes ++ additionalAttributes) config.contents ) ]
 
-                            Global ->
-                                ( Nothing, foliage )
-                    }
+                where_ : Maybe Aspect
+                where_ =
+                    case config.position of
+                        Inline ->
+                            Just aspect
+
+                        Global ->
+                            Nothing
             in
             case link of
                 Toggle _ flag ->
@@ -243,13 +245,20 @@ view config link =
                                 ( "false", config.occlusions )
                                 (Ui.State.hasFlag flag url)
                     in
-                    transformViewModel mask
-                        [ attribute "role" "switch"
-                        , attribute "aria-checked" isChecked
-                        ]
+                    { occlude = mask
+                    , appendWhere = where_
+                    , appendWhat =
+                        linkWithAttributes
+                            [ attribute "role" "switch"
+                            , attribute "aria-checked" isChecked
+                            ]
+                    }
 
                 _ ->
-                    transformViewModel [] []
+                    { occlude = []
+                    , appendWhere = where_
+                    , appendWhat = linkWithAttributes []
+                    }
 
 
 {-| Define whether the link anchor

@@ -40,7 +40,7 @@ This opens two possible pitfalls:
 
 import Browser
 import Browser.Navigation as Nav
-import Html
+import Html exposing (Html)
 import Ui exposing (Ui)
 import Ui.Layout exposing (Layout)
 import Ui.Link
@@ -79,8 +79,8 @@ type alias Application model modelMsg =
 
 
 {-| -}
-type alias Document modelMsg =
-    { body : Ui modelMsg, layout : Layout, title : String }
+type alias Document html =
+    { body : Ui html, layout : Layout html, title : String }
 
 
 {-| Separate Url update from Model update
@@ -101,7 +101,7 @@ type alias Document modelMsg =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : ( Path, Fragment ) -> model -> { body : Ui modelMsg, layout : Layout, title : String }
+    , view : ( Path, Fragment ) -> model -> Document (Html modelMsg)
     }
     -> Application model modelMsg
 application config =

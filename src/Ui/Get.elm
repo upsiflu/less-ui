@@ -1,7 +1,7 @@
 module Ui.Get exposing
     ( Get
     , empty, full, singleton
-    , orAdd, insert, update, updateValue
+    , orAdd, insert, update, updateValue, updateWhere
     , addValue, addWithDefault, maybeAdd
     , remove
     , consList, addList
@@ -29,7 +29,7 @@ module Ui.Get exposing
 
 # Associate values
 
-@docs orAdd, insert, update, updateValue
+@docs orAdd, insert, update, updateValue, updateWhere
 @docs addValue, addWithDefault, maybeAdd
 @docs remove
 
@@ -322,6 +322,35 @@ updateValue key fu =
 
     import Ui.Layout.Aspect exposing (Aspect(..))
 
+    fromList [ (Scene, 1), (Control, 1)]
+        |> updateWhere  ( (==) Control )
+            negate
+        |> get Control
+        --> Just (-1)
+
+    singleton Control 1
+        |> updateWhere ( (==) Scene )
+            negate
+        |> get Control
+        --> Just (1)
+
+-}
+updateWhere : (Aspect -> Bool) -> (a -> a) -> Get a -> Get a
+updateWhere condition fu getA key =
+    Maybe.map
+        (if condition key then
+            fu
+
+         else
+            identity
+        )
+        (getA key)
+
+
+{-|
+
+    import Ui.Layout.Aspect exposing (Aspect(..))
+
     consList Scene 1 (full [2, 3])
         |> get Scene
         --> Just [1, 2, 3]
@@ -421,11 +450,21 @@ filter =
 
 {-| compose a function behind the result, preserving the 'Maybe' value.
 
-    mapValue =
-        (<<)
+`mapValue = (<<)`
 
 You can use this function to leverage mapping functions from the `Maybe` and `Maybe.Extra` library.
-For example, `filter` can be expressed as `Maybe.filter >> mapValue`.
+
+    import Maybe
+    import Ui.Layout.Aspect exposing (Aspect(..))
+
+    withDefault : a -> Maybe a -> Maybe a
+    withDefault a =
+        Maybe.withDefault a >> Just
+
+    fromList [ (Scene, 1), (Control, 2)]
+        |> mapValue (withDefault 4)
+        |> toList [Scene, Control, Info]
+        --> [ (Scene, 1), (Control, 2), (Info, 4) ]
 
 -}
 mapValue : (Maybe a -> Maybe b) -> Get a -> Get b

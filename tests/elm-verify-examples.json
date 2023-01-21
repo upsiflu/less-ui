@@ -9,6 +9,7 @@
     "Ui.Layout.ViewModel",
     "Ui.Link",
     "Ui.State",
-    "Ui.Mask"
+    "Ui.Mask",
+    "Ui.Transformation"
   ]
 }

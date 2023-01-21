@@ -4,6 +4,11 @@
     pointer-events     : none;
 }
 
+.poof {
+    display: inline-block;
+    outline: 2px solid red;
+}
+
 @keyframes poof {
 
     to {
@@ -123,8 +128,6 @@ a[role="switch"]:before {
 
 }
 
-
-a[aria-checked="false"] {}
 
 body {
     background: silver

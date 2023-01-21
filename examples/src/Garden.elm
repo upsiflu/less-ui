@@ -1,8 +1,8 @@
-module Garden exposing (main, Msg)
+module Garden exposing (Garden, main, Msg)
 
 {-|
 
-@docs main, Msg
+@docs Garden, main, Msg
 
 -}
 
@@ -22,6 +22,7 @@ type Msg
     = RhododendronMsg Rhododendron.Msg
 
 
+{-| -}
 type alias Garden =
     { rhododendron : Rhododendron }
 
@@ -40,11 +41,9 @@ update msg garden =
             )
 
 
-view : ( Ui.State.Path, Ui.State.Fragment ) -> Garden -> { body : Ui Msg, layout : Layout, title : String }
-view ( path, fragment ) garden =
-    { title = "Welcome to the Garden!"
-    , layout = Layout.Default
-    , body =
+view : ( Ui.State.Path, Ui.State.Fragment ) -> Garden -> { body : Ui (Html Msg), layout : Layout (Html Msg), title : String }
+view _ garden =
+    { body =
         page
             |> Ui.with Scene
                 (Ui.Link.toggle "rhododendron"
@@ -52,10 +51,12 @@ view ( path, fragment ) garden =
                     |> Ui.with Control
                         (Rhododendron.view RhododendronMsg garden.rhododendron)
                 )
+    , layout = Layout.default
+    , title = "Welcome to the Garden!"
     }
 
 
-page : Ui Msg
+page : Ui (Html Msg)
 page =
     Ui.constant [ Html.text "Handle" ]
         |> Ui.with Scene (myScene "Scene 1")
@@ -74,7 +75,7 @@ square color =
         []
 
 
-myScene : String -> Ui msg
+myScene : String -> Ui (Html msg)
 myScene sId =
     Ui.html (square "red")
         ++ Ui.html (square "blue")
@@ -82,14 +83,19 @@ myScene sId =
         |> Ui.node "section" sId
 
 
-myControl : Ui msg
+myControl : Ui (Html msg)
 myControl =
     Ui.textLabel "Control"
 
 
-myInfo : Ui msg
+myInfo : Ui (Html msg)
 myInfo =
     Ui.textLabel "Info"
+
+
+
+-- Field `view` expected `(Path, Fragment) -> Garden -> { body : Ui Msg, layout : Layout, title : String }`
+--, found                `(Path, Fragment) -> Garden -> { body : Ui (Html Msg), layout : Layout, title : String }`Elm
 
 
 {-| -}

@@ -1,4 +1,4 @@
-module Writing exposing (main)
+module Writing exposing (Model, main)
 
 {-|
 
@@ -13,7 +13,6 @@ import Ui exposing (Ui)
 import Ui.Application exposing (Application, application)
 import Ui.Layout as Layout
 import Ui.Layout.Aspect exposing (Aspect(..))
-import Ui.Link as Link
 import Ui.State
 
 
@@ -72,10 +71,10 @@ update () model =
 --view : Path -> model -> Document modelMsg
 
 
-view : ( Ui.State.Path, Ui.State.Fragment ) -> Model -> Ui.Application.Document ()
+view : ( Ui.State.Path, Ui.State.Fragment ) -> Model -> Ui.Application.Document (Html ())
 view ( rawPath, _ ) model =
     let
-        appendCounter : Ui () -> Ui ()
+        appendCounter : Ui (Html ()) -> Ui (Html ())
         appendCounter =
             List.repeat model ()
                 |> List.indexedMap
@@ -92,7 +91,7 @@ view ( rawPath, _ ) model =
                     )
                 |> List.foldl (<<) identity
 
-        editable : String -> Ui ()
+        editable : String -> Ui (Html ())
         editable str =
             Html.p [ Attr.contenteditable True ]
                 [ Html.text ("Edit me " ++ str)
@@ -103,7 +102,7 @@ view ( rawPath, _ ) model =
         path =
             pageFromPath rawPath
 
-        updater : Ui ()
+        updater : Ui (Html ())
         updater =
             Html.button [ Events.onClick () ]
                 [ Html.text ("Update number " ++ String.fromInt model)
@@ -136,19 +135,20 @@ view ( rawPath, _ ) model =
                     (Ui.textLabel ("404 Not found: " ++ rawPath))
 
 
-viewPage : String -> Path -> Ui () -> Ui.Application.Document ()
+viewPage : String -> Path -> Ui (Html ()) -> Ui.Application.Document (Html ())
 viewPage title route content =
-    { title = title ++ " – SPA"
-    , body =
+    { body =
         Ui.constant [ viewNav route ]
             |> Ui.with Scene content
-    , layout = Layout.Default
+    , layout = Layout.default
+    , title = title ++ " – SPA"
     }
 
 
 viewNav : Path -> Html ()
 viewNav maybePage =
     let
+        items : List ( Page, String )
         items =
             [ ( Home, "Home" )
             , ( About, "About" )
