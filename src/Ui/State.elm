@@ -50,7 +50,7 @@ type alias State =
 
 {-| Turning off a `Flag` renders invisible the corresponding [Aspects](Ui.Layout.Aspect) in the corresponding [toggle Link](Ui.Link#toggle).
 
-Assignments such as `?a=b` may represent currently active Tabs or a search string. 
+Assignments such as `?a=b` may represent currently active Tabs or a search string.
 
 The patterns are **progressive disclosure** and **fulltext search**.
 
@@ -74,6 +74,7 @@ the `:target` CSS pseudoclass; Wikipedia uses this to highlight the selected ref
 
 The **target** is somewhat tied to the **focus**, but when updating the fragment (hash) via Elm,
 the Browser may not update the focus, so it's safer to add a `focus-me` custom element to the DOM.
+
 -}
 type alias Fragment =
     Maybe String
@@ -116,26 +117,26 @@ setFragment fragment state =
             >> Maybe.andThen (fu >> .query)
             >> Maybe.withDefault "Url.fromString or .query failed"
 
-    "f&g&h&a=b&c=d=e"
-        |> testQuery (turnOnFlag "g")
-        --> "f&g&h&a=b&c=d=e"
+    testQuery (turnOnFlag "g")
+        "f&g&h&a=b&c=d=e"
+    --> "f&g&h&a=b&c=d=e"
 
-    "a=b&c=d=e&f&g"
-        |> testQuery (turnOnFlag "h")
-        --> "f&g&h&a=b&c=d=e"
+    testQuery (turnOnFlag "h")
+        "a=b&c=d=e&f&g"
+    --> "f&g&h&a=b&c=d=e"
 
-    "f"
-        |> testQuery (turnOnFlag "")
-        --> "f"
+    testQuery (turnOnFlag "")
+        "f"
+    --> "f"
 
 
-    ""
-        |> testQuery (turnOnFlag "h")
-        --> "h"
+    testQuery (turnOnFlag "h")
+        ""
+    --> "h"
 
-    ""
-        |> testQuery (turnOnFlag "")
-        --> ""
+    testQuery (turnOnFlag "")
+        ""
+    --> ""
 
 -}
 turnOnFlag : Flag -> State -> State
@@ -158,13 +159,15 @@ turnOnFlag flag =
             >> Maybe.andThen (fu >> .query)
             >> Maybe.withDefault "Url.fromString or .query failed"
 
-    "f&g&h&a=b&c=d=e"
-        |> testQuery (toggleFlag "g")
-        --> "f&h&a=b&c=d=e"
 
-    "f&h&a=b&c=d=e"
-        |> testQuery (toggleFlag "g")
-        --> "f&g&h&a=b&c=d=e"
+    testQuery (toggleFlag "g")
+        "f&g&h&a=b&c=d=e"
+    --> "f&h&a=b&c=d=e"
+
+
+    testQuery (toggleFlag "g")
+        "f&h&a=b&c=d=e"
+    --> "f&g&h&a=b&c=d=e"
 
 -}
 toggleFlag : Flag -> State -> State
@@ -182,26 +185,27 @@ toggleFlag flag =
 
     testQuery : (State -> State) -> String -> String
     testQuery fu =
-        (++) "http://localhost/?"
+        (++) "http://./?"
             >> Url.fromString
             >> Maybe.andThen (fu >> .query)
             >> Maybe.withDefault "Url.fromString or .query failed"
 
-    "f&g&h&a=b&c=d=e"
-        |> testQuery (addAssignment "c" "x")
-        --> "f&g&h&c=x&a=b&c=d=e"
+    testQuery (addAssignment "c" "x")
+        "f&g&h&a=b&c=d=e"
+    --> "f&g&h&c=x&a=b&c=d=e"
 
-    ""
-        |> testQuery (addAssignment "" "x")
-        --> "=x"
 
-    "=x"
-        |> testQuery (addAssignment "" "y")
-        --> "=y&=x"
+    testQuery (addAssignment "" "x")
+        ""
+    --> "=x"
 
-    "=y&=x"
-        |> testQuery (addAssignment "" "")
-        --> "=&=y&=x"
+    testQuery (addAssignment "" "y")
+        "=x"
+    --> "=y&=x"
+
+    testQuery (addAssignment "" "")
+        "=y&=x"
+    --> "=&=y&=x"
 
 -}
 addAssignment : String -> String -> State -> State

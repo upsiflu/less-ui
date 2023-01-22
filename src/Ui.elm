@@ -355,7 +355,7 @@ or to remove a descendant:
         |> mapList (List.remove 1)
 
 -}
-mapList : (List (Ui msg) -> List (Ui msg2)) -> Ui msg -> Ui msg2
+mapList : (List (Ui html) -> List (Ui html2)) -> Ui html -> Ui html2
 mapList fu =
     List.map List.singleton >> fu >> List.concat
 
@@ -367,50 +367,47 @@ mapList fu =
         ---> something like A, B, C
 
 -}
-map : (Ui msg -> Ui msg2) -> Ui msg -> Ui msg2
+map : (Ui html -> Ui html2) -> Ui html -> Ui html2
 map fu =
     List.concatMap (List.singleton >> fu)
 
 
 
-{-
-   mapMsg : (msg -> msg2) -> Ui msg -> Ui msg2
-   mapMsg fu =
-       let
-           mapHandleMsg : Handle msg -> Handle msg2
-           mapHandleMsg handle =
-               case handle of
-                   Constant (List (Html msg))
-                   Toggle Flag (List (Html Never))
-                   Summarize Flag (Bool -> List (Html Never))
-                   Alternate ( Path, Path ) (List (Html Never))
-
-
-
-           mapItemMsg : Item msg -> Item msg2
-           mapItemMsg ({ handle, get }) =
-               { handle = mapHandleMsg handle
-               , get = get>>mapMsg fu
-               }
-
-           mapDescMsg : Descendant msg -> Descendant msg2
-           mapDescMsg desc =
-               case desc of
-                   Leaf (foliage) (maybeItem) ->
-                       Leaf
-                           (List.map (Tuple.mapSecond (Html.map fu)) foliage)
-                           (Maybe.map (mapItemMsg))
-                   Wrap (foliageFu) (ui) ->
-                       Wrap identity (mapMsg fu ui)
-       in
-       List.map mapDescMsg
--}
 ---- DECOMPOSE ----
 
 
 {-| Attempt to separate the first descendant in the Ui
+
+    import Ui.Layout.ViewModel exposing (Foliage)
+    import Ui.Layout
+    import Url
+
+    view_ :  (Ui html, Ui html) -> Foliage html
+    view_ =
+        Url.fromString "http://a/"
+            |> Maybe.map
+                (\url ->
+                    Tuple.first >> view { current = url, previous = Nothing } Ui.Layout.list
+                )
+            |> Maybe.withDefault (\_-> [])
+
+    keyed "1" () ++ keyed "2" () ++ keyed "3" ()
+        |> uncons
+        |> Maybe.map view_
+        --> Just [ ("1", ())]
+
+    singleton
+        |> uncons
+        |> Maybe.map view_
+        --> Just []
+
+    []
+        |> uncons
+        |> Maybe.map view_
+        --> Nothing
+
 -}
-uncons : Ui msg -> Maybe ( Ui msg, Ui msg )
+uncons : Ui html -> Maybe ( Ui html, Ui html )
 uncons =
     List.uncons >> Maybe.map (Tuple.mapFirst List.singleton)
 
@@ -424,12 +421,16 @@ uncons =
 As the following example shows, you can substitute Html by any other type:
 
     import Ui.Layout.Aspect exposing (Aspect(..))
+    import Ui.Layout.ViewModel exposing (Foliage)
     import Url exposing (Url)
     import Ui.Layout
 
-    dummyUrl : Maybe Url
-    dummyUrl =
-        Url.fromString "http://localhost/abc"
+    view_ : String -> Ui html -> Maybe (Foliage html)
+    view_ urlString ui_=
+        Url.fromString urlString
+            |> Maybe.map
+                (\url -> view { current = url, previous = Nothing } Ui.Layout.list ui_)
+
 
     myUi : Ui Int
     myUi =
@@ -439,14 +440,7 @@ As the following example shows, you can substitute Html by any other type:
             |> with Control ( keyed "Control" 3 )
             |> with Info ( keyed "Info" 201 )
 
-    Maybe.map
-        (\url -> view
-                    { current = url, previous = Nothing }
-                    Ui.Layout.list
-                    myUi
-        )
-        dummyUrl
-
+    view_ "http://a/" myUi
         --> Just [ ("Scene", 1), ("Info", 200), ("Info", 201), ("Control", 3) ]
 
 -}
@@ -557,7 +551,8 @@ handle html_ =
     viewWithState : {current : String, previous : String } -> Ui html -> List String
     viewWithState state ui =
         case Url.fromString state.current of
-            Nothing -> ["Invalid `current` Url"]
+            Nothing ->
+                ["Invalid `current` Url: "++state.current]
             Just justCurrent ->
                 ui
                     |> view {current = justCurrent, previous = Url.fromString state.previous} Ui.Layout.list

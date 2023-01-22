@@ -60,31 +60,7 @@ import Url exposing (Url)
 import Url.Codec exposing (Codec, ParseError(..))
 
 
-{-| Encodes a transformation of [the Ui State](Ui.State)
-
-Note concerning `Bounce`:
-
-    url
-    path#fragment        in assignment     Path, Fragment
-
-    /a#b                 a~b               "a", Just "b"
-    /a                   a                 "a", Nothing
-    /#b                  ~b                "",  Just "b"
-    /                                      "",  Nothing
-
-    BUT what we need is a structure that can express
-    - Path and Fragment
-    - Empty Path and Fragment
-    - Path but no Fragment
-    - Empty Path but no Fragment
-    - No Path but Fragment
-
-    ILLEGAL: No Path and No Fragment.
-    The easiest way would be to interpret Nothing in Path as "no path" unless fragment is Nothing,
-    in which case Path==Nothing is interpreted as Just ""
-
-Note that in `Bounce` and `GoTo`, (Nothing, Nothing) is coerced into (Just "", Nothing)
-
+{-| Encodes an intended transition of [the Ui State](Ui.State).
 -}
 type Link
     = GoTo ( Maybe Path, Fragment )
@@ -193,7 +169,7 @@ type alias Renderer =
     }
 
 
-{-| a bit like `Html.a`
+{-| A bit like `Html.a`
 -}
 a : Link -> List (Html.Attribute Never) -> List (Html Never) -> Html msg
 a link attrs contents =
@@ -384,12 +360,10 @@ destinationFragment =
         >> Maybe.andThen Tuple.second
 
 
-{-|
+{-| Note that in Elm, an absolute Url path always starts with a slash.
+To check if the intended path is relative, we compare it with the previous path first.
 
-    Note that in Elm, an absolute Url path always starts with a slash.
-    To check if the intended path is relative, we compare it with the previous path first.
-
-    In the following tests, we assume a previous path of "/"
+In the following tests, we assume a previous path of "/"
 
     import Url
 
@@ -423,6 +397,7 @@ destinationFragment =
 
     testFromUrl "/?reroute=~"
         --> Bounce { isAbsolute = False } { there = (Nothing, Nothing), here = (Nothing, Nothing) }
+
 
     --Toggle
 
@@ -562,7 +537,7 @@ toHref =
         >> Html.Attributes.href
 
 
-{-| Try to create an UrlString
+{-| Try to create an UrlString.
 
     --Bounce
 
@@ -657,7 +632,17 @@ toUrlString =
         >> Maybe.withDefault "?errorMessage=Error converting link to string"
 
 
-{-| -}
+{-| By default, links render absolute, which means they don't respect
+the current state. This is the desired behavior when sharing links.
+
+For example, if you share a toggle, you want the receiver to
+experience the "on" state; for a bounce, you want the "there" location,
+regardless of the current state of their application.
+
+When clicking a link in an application, a transition relative to the
+current state is desired, so `Application.update` makes internal links relative.
+
+-}
 relative : Link -> Link
 relative link =
     case link of
@@ -697,7 +682,7 @@ toId link =
             e
 
 
-{-| Use in encoding a query assignment for contextual linking
+{-| Use in encoding a query assignment for contextual linking.
 
     querySerialiseLocation (Just "", Nothing)
         --> "/"
