@@ -9,7 +9,7 @@ module Ui exposing
     , repeat
     , ol, ul, node
     , uncons
-    , constant
+    , handle
     , custom
     , map, indexedMap, mapList
     , map2
@@ -69,11 +69,12 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 # Advanced Usage
 
 
-## Add Handles
+## Add handles and other contingent transformations
 
-For convenient functions, check out the [Link](Ui.Link) module.
+For convenient functions and inspiration, check out the [Link](Ui.Link) module which uses [`Ui.custom`](#custom) to
+interface with the Ui context.
 
-@docs constant
+@docs handle
 @docs custom
 
 
@@ -498,13 +499,13 @@ view { current, previous } layout =
 
 
 
----- Working with Handles ----
+---- Working with contingent transformations ----
 
 
 {-| Here you can add your own button, input, or indicator.
 -}
-constant : List html -> Ui html
-constant html_ =
+handle : List html -> Ui html
+handle html_ =
     (always >> custom)
         { occlude = [], appendWhere = Nothing, appendWhat = keyByIndex html_ }
 

@@ -42,19 +42,19 @@ init =
 pageFromPath : Ui.State.Path -> Page
 pageFromPath path =
     case path of
-        "/" ->
+        "" ->
             Home
 
-        "/About" ->
+        "About" ->
             About
 
-        "/DomState" ->
+        "DomState" ->
             DomState
 
-        "/Home" ->
+        "Home" ->
             Home
 
-        "/Lorem" ->
+        "Lorem" ->
             Lorem
 
         _ ->
@@ -203,7 +203,7 @@ myTest =
 viewPage : Ui (Html ()) -> Page -> Ui.Application.Document (Html ())
 viewPage content page =
     { body =
-        Ui.constant [ viewNav ]
+        Ui.hande [ viewNav ]
             |> Ui.with Scene content
     , layout = Layout.default
     , title = pathFromPage page ++ " – SPA"

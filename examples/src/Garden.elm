@@ -58,7 +58,7 @@ view _ garden =
 
 page : Ui (Html Msg)
 page =
-    Ui.constant [ Html.text "Handle" ]
+    Ui.handle [ Html.text "Handle" ]
         |> Ui.with Scene (myScene "Scene 1")
         |> Ui.with Scene (myScene "Scene 2")
         |> Ui.with Control myControl

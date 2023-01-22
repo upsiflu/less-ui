@@ -138,7 +138,7 @@ view ( rawPath, _ ) model =
 viewPage : String -> Path -> Ui (Html ()) -> Ui.Application.Document (Html ())
 viewPage title route content =
     { body =
-        Ui.constant [ viewNav route ]
+        Ui.handle [ viewNav route ]
             |> Ui.with Scene content
     , layout = Layout.default
     , title = title ++ " – SPA"

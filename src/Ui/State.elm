@@ -48,10 +48,11 @@ type alias State =
     Url
 
 
-{-| Turning off a `Flag` renders invisible the corresponding [`Control`](Ui.Layout.Aspect) with its descendants, as well as
-one-layer deep nested [`Control`s](Ui.Layout.Aspect) with their descendants.
+{-| Turning off a `Flag` renders invisible the corresponding [Aspects](Ui.Layout.Aspect) in the corresponding [toggle Link](Ui.Link#toggle).
 
-The pattern is **progressive disclosure**.
+Assignments such as `?a=b` may represent currently active Tabs or a search string. 
+
+The patterns are **progressive disclosure** and **fulltext search**.
 
 -}
 type alias Flag =
@@ -68,8 +69,11 @@ type alias Path =
 identified by the fragment id is aligned with the top of the viewport;
 thus fragment identifiers are often used in tables of content and in permalinks.
 The appearance of the identified element can be changed through
-the `:target` CSS pseudoclass; Wikipedia uses this to highlight the selected reference.
-(from Wikipedia)"
+the `:target` CSS pseudoclass; Wikipedia uses this to highlight the selected reference."
+(from Wikipedia)
+
+The **target** is somewhat tied to the **focus**, but when updating the fragment (hash) via Elm,
+the Browser may not update the focus, so it's safer to add a `focus-me` custom element to the DOM.
 -}
 type alias Fragment =
     Maybe String

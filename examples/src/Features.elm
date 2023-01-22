@@ -62,7 +62,7 @@ view ( path, fragment ) _ =
                 (paths path)
             ++ showTab "Bounce between fragments"
                 (fragments fragment)
-            ++ (Ui.constant [ Html.label [] [ Html.text "ConStAnt" ] ]
+            ++ (Ui.handle [ Html.label [] [ Html.text "ConStAnt" ] ]
                     |> Ui.with Scene (Ui.textLabel "ConsScene")
                )
     , layout = Ui.Layout.withClass "Features"
@@ -74,7 +74,7 @@ view ( path, fragment ) _ =
 -}
 ui : Ui (Html Msg)
 ui =
-    Ui.constant [ Html.label [] [ Html.text "Handle" ] ]
+    Ui.handle [ Html.label [] [ Html.text "Handle" ] ]
         |> Ui.with Scene (Ui.textLabel "Scene")
         |> Ui.with Control (Ui.textLabel "Control")
         |> Ui.with Info (Ui.textLabel "Info")
