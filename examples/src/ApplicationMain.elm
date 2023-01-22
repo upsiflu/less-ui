@@ -203,7 +203,7 @@ myTest =
 viewPage : Ui (Html ()) -> Page -> Ui.Application.Document (Html ())
 viewPage content page =
     { body =
-        Ui.hande [ viewNav ]
+        Ui.handle [ viewNav ]
             |> Ui.with Scene content
     , layout = Layout.default
     , title = pathFromPage page ++ " – SPA"

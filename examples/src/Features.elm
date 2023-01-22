@@ -58,6 +58,8 @@ view ( path, fragment ) _ =
         Ui.with Info (Ui.textLabel "Toggle the features on top of the page! ") Ui.singleton
             ++ showTab "Flat Ui Layout"
                 ui
+            ++ showTab "Global Navbar"
+                globalNav
             ++ showTab "Path in View"
                 (paths path)
             ++ showTab "Bounce between fragments"
@@ -91,6 +93,12 @@ paths path =
         |> Ui.with Control (Link.goTo ( Just "", Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go home" ]))
         |> Ui.with Control (Link.goTo ( Nothing, Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go nowhere" ]))
         |> Ui.with Control (Link.goTo ( Nothing, Just "99" ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go to Fragment #99" ]))
+
+
+globalNav : Ui (Html Msg)
+globalNav =
+    [ "Introduction", "First Steps", "Last Steps" ]
+        |> List.concatMap (\title -> Link.goTo ( Just title, Nothing ) |> Link.view (Link.preset.nav [] []))
 
 
 {-| [Link](Ui.Link): Manage the Ui State as a URL

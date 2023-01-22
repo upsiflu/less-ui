@@ -50,7 +50,7 @@ The following functions are mostly here for testing
 -}
 
 import Html exposing (Html)
-import Html.Attributes exposing (..)
+import Html.Attributes as Attr
 import String.Extra as String
 import Ui exposing (Ui)
 import Ui.Layout.Aspect as Aspect exposing (Aspect)
@@ -143,10 +143,14 @@ toggle =
 preset :
     { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer
     , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer
+    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer
+    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer
     }
 preset =
     { global = \att con -> { empty | attributes = att, contents = con, position = Global }
     , inline = \att con -> { empty | attributes = att, contents = con, position = Inline }
+    , nav = \att con -> { empty | attributes = Attr.type_ "radio" :: att, contents = con, element = Html.input, position = Global }
+    , tab = \att con -> { empty | attributes = Attr.type_ "radio" :: att, contents = con, element = Html.input, position = Inline }
     }
 
 
@@ -154,6 +158,7 @@ empty : Renderer
 empty =
     { attributes = []
     , contents = []
+    , element = Html.a
     , occlusions = Aspect.all
     , position = Global
     }
@@ -164,6 +169,7 @@ empty =
 type alias Renderer =
     { attributes : List (Html.Attribute Never)
     , contents : List (Html Never)
+    , element : List (Html.Attribute Never) -> List (Html Never) -> Html Never
     , occlusions : List Aspect
     , position : Position
     }
@@ -225,8 +231,8 @@ view config link =
                     , appendWhere = where_
                     , appendWhat =
                         linkWithAttributes
-                            [ attribute "role" "switch"
-                            , attribute "aria-checked" isChecked
+                            [ Attr.attribute "role" "switch"
+                            , Attr.attribute "aria-checked" isChecked
                             ]
                     }
 
@@ -534,7 +540,7 @@ toStateTransition link =
 toHref : Link -> Html.Attribute Never
 toHref =
     toUrlString
-        >> Html.Attributes.href
+        >> Attr.href
 
 
 {-| Try to create an UrlString.
