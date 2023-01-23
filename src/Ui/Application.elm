@@ -108,12 +108,13 @@ application config =
     Browser.application
         { init =
             \_ url key ->
-                ( config.init, Ui.State.init url )
-                    |> (\( ( updatedModel, modelCmd ), initialState ) ->
-                            ( ( key, { current = initialState, previous = Nothing }, updatedModel )
-                            , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString initialState) ]
-                            )
-                       )
+                let
+                    ( ( updatedModel, modelCmd ), initialState ) =
+                        ( config.init, Ui.State.init url )
+                in
+                ( ( key, { current = initialState, previous = Nothing }, updatedModel )
+                , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString initialState) ]
+                )
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         , subscriptions = \_ -> Sub.none
@@ -149,7 +150,10 @@ application config =
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            updateUrl (Ui.Link.fromUrl state.current.path url |> Ui.Link.relative)
+                            updateUrl
+                                (Ui.Link.fromUrl state.current.path url
+                                    |> Ui.Link.relative
+                                )
 
                     LinkClicked (Browser.External href) ->
                         ( ( key, state, model ), Nav.load href )
@@ -164,7 +168,9 @@ application config =
                 config.view ( Ui.State.getPath state.current, Ui.State.getFragment state.current ) model
                     |> (\document ->
                             { title = document.title
-                            , body = Ui.view state document.layout document.body |> List.map (Tuple.second >> Html.map ModelMsg)
+                            , body =
+                                Ui.view state document.layout document.body
+                                    |> List.map (Tuple.second >> Html.map ModelMsg)
                             }
                        )
         }

@@ -63,9 +63,9 @@ inverse comparison =
 
 -}
 subtract : List Aspect -> List Aspect -> List Aspect
-subtract comparison =
+subtract whatToSubstract =
     List.filter
-        (\a -> not <| List.member a comparison)
+        (\a -> not <| List.member a whatToSubstract)
 
 
 {-|

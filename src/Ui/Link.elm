@@ -51,6 +51,7 @@ The following functions are mostly here for testing
 
 import Html exposing (Html)
 import Html.Attributes as Attr
+import Maybe.Extra as Maybe
 import String.Extra as String
 import Ui exposing (Ui)
 import Ui.Layout.Aspect as Aspect exposing (Aspect)
@@ -496,7 +497,7 @@ toStateTransition link =
     let
         getLocation : State -> ( Maybe String, Fragment )
         getLocation state =
-            ( Ui.State.getPath state |> String.nonEmpty, Ui.State.getFragment state )
+            ( String.nonEmpty (Ui.State.getPath state), Ui.State.getFragment state )
 
         setLocation : ( Maybe Path, Fragment ) -> State -> State
         setLocation destination =
@@ -714,7 +715,7 @@ toId link =
 -}
 querySerialiseLocation : ( Maybe Path, Fragment ) -> String
 querySerialiseLocation ( maybePath, fragment ) =
-    querySerialisePath maybePath ++ (Maybe.map (String.cons '~') fragment |> Maybe.withDefault "")
+    querySerialisePath maybePath ++ Maybe.unwrap "" (String.cons '~') fragment
 
 
 serialisePath : Maybe Path -> String
@@ -777,7 +778,10 @@ queryParseLocation str =
             ( Nothing, Nothing )
 
         [ path ] ->
-            ( Maybe.andThen parsePath (upTo "#" path), Nothing )
+            ( upTo "#" path
+                |> Maybe.andThen parsePath
+            , Nothing
+            )
 
         path :: fragment ->
             ( parsePath path, upTo "#" <| String.join "~" fragment )

@@ -12,6 +12,7 @@ when inside the directory containing this file.
 -}
 
 
+import Review.Rule as Rule exposing (Rule)
 import Docs.ReviewAtDocs
 import NoDebug.Log
 import NoDebug.TodoOrToString
@@ -34,8 +35,17 @@ import NoUnsortedCases
 import NoUnsortedLetDeclarations
 import NoUnsortedRecords
 import NoUnsortedTopLevelDeclarations
-import Review.Rule as Rule exposing (Rule)
 import Simplify
+import ReviewPipelineStyles
+import ReviewPipelineStyles.Premade
+    exposing
+        ( noMultilineLeftPizza
+        , noPipelinesWithConfusingNonCommutativeFunctions
+        , noPipelinesWithSimpleInputs
+        , noRepeatedParentheticalApplication
+        , noSemanticallyInfixFunctionsInLeftPipelines
+        , noSingleLineRightPizza
+        )
 
 
 config : List Rule
@@ -76,8 +86,15 @@ config =
     , NoUnsortedRecords.rule
         (NoUnsortedRecords.defaults
             |> NoUnsortedRecords.treatAllSubrecordsAsCanonical
-            -- This is only on to help me find bugs
             |> NoUnsortedRecords.typecheckAllRecords
             |> NoUnsortedRecords.reportAmbiguousRecordsWithoutFix
         )
+    , ReviewPipelineStyles.rule <|
+        List.concat
+            [ noSingleLineRightPizza
+            , noPipelinesWithSimpleInputs
+            , noRepeatedParentheticalApplication
+            , noPipelinesWithConfusingNonCommutativeFunctions
+            , noSemanticallyInfixFunctionsInLeftPipelines
+            ]
     ]

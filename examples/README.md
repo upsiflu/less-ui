@@ -1,5 +1,8 @@
 # Examples
 
+Includes [Simon Lydell's amazing elm-watch](https://github.com/lydell/elm-watch) for live coding; derived from [this example](https://github.com/lydell/elm-watch/tree/main/example).
+
+
 **Install the live server:**
 
 ```shell
@@ -23,6 +26,13 @@ _<small>A note to vscodium users: To activate the language server in your editor
 
 <p align="center" style="font-size:1.5em;">🐌🐌🐌</p>
 
+## Features
+
+A list of features, with code and examples. 
+[[Features.elm]](../src/Features.elm)
+
+Live server: [application.localhost:8001](http://features.localhost:8001)
+
 ## Application
 
 Explores very simple Routing.
@@ -39,8 +49,6 @@ _Work in progress!_
 
 Live server: [garden.localhost:8001](http://garden.localhost:8001)
 
--------
+----
 
-# Credits
-
-This example project uses [Simon Lydell's amazing elm-tooling](https://github.com/lydell/elm-watch) and is derived from [this example](https://github.com/lydell/elm-watch/tree/main/example) which lists all libraries.
+**Credits**: See https://github.com/lydell/elm-watch/tree/main/example for a list of libraries used.

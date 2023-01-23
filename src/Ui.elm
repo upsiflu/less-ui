@@ -217,8 +217,8 @@ This will output:
 
 -}
 wrap : (Foliage html -> Foliage html) -> Ui html -> Ui html
-wrap =
-    Wrap >> (<<) List.singleton
+wrap function =
+    Wrap function >> List.singleton
 
 
 
@@ -245,11 +245,11 @@ with aspect subUi =
         (\original ->
             case original of
                 Twig foliage_ maybeItem ->
-                    maybeItem
-                        |> Maybe.unpack
-                            (\() -> { contingentTransformation = Nothing, get = Get.singleton aspect subUi })
-                            (\it -> { it | get = Get.addList aspect subUi it.get })
-                        |> Just
+                    Maybe.map
+                        (\it -> Just { it | get = Get.addList aspect subUi it.get })
+                        maybeItem
+                        |> Maybe.withDefaultLazy
+                            (\() -> Just { contingentTransformation = Nothing, get = Get.singleton aspect subUi })
                         |> Twig foliage_
 
                 Wrap fu ui ->
@@ -260,8 +260,13 @@ with aspect subUi =
 {-| prepend a freeform label to the contextual aspect
 -}
 addLabel : Ui (Html msg) -> Ui (Html msg) -> Ui (Html msg)
-addLabel l =
-    (++) l >> wrap (Html.Keyed.node "label" [] >> Tuple.pair "" >> List.singleton)
+addLabel label_ ui =
+    wrap
+        (Html.Keyed.node "label" []
+            >> Tuple.pair ""
+            >> List.singleton
+        )
+        (label_ ++ ui)
 
 
 {-| Combine descendents from two `Ui`s. If one `Ui` is longer, its excessive elements are dropped.
@@ -278,7 +283,8 @@ You can easily implement higher order `mapN`s:
 -}
 map2 : (Ui html -> Ui html2 -> Ui html3) -> Ui html -> Ui html2 -> Ui html3
 map2 fu a b =
-    List.map2 fu (List.map List.singleton a) (List.map List.singleton b) |> List.concat
+    List.map2 fu (List.map List.singleton a) (List.map List.singleton b)
+        |> List.concat
 
 
 {-| convenience function to wrap a Ui into an unordered list and give it an id
@@ -453,28 +459,26 @@ view { current, previous } layout =
                 \descendant ->
                     case descendant of
                         Twig foliage_ maybeItem ->
-                            maybeItem
-                                |> Maybe.unwrap ViewModel.empty (viewItem aspect)
+                            Maybe.map (viewItem aspect) maybeItem
+                                |> Maybe.withDefault ViewModel.empty
                                 |> ViewModel.appendGet (Get.singleton aspect foliage_)
 
                         Wrap wrapper descList ->
-                            descList
-                                |> viewUi aspect
+                            viewUi aspect descList
                                 |> ViewModel.mapGet (Get.update aspect wrapper)
 
         viewItem : Aspect -> Item html -> ViewModel html
         viewItem aspect item =
             let
                 { addition, removal, unchanged } =
-                    item.contingentTransformation
-                        |> Maybe.withDefault (\_ -> Transformation.neutral)
+                    Maybe.withDefault (\_ -> Transformation.neutral) item.contingentTransformation
                         |> (\apply ->
-                                apply ( aspect, Maybe.withDefault current previous )
-                                    |> Transformation.difference (apply ( aspect, current ))
+                                Transformation.difference
+                                    (apply ( aspect, current ))
+                                    (apply ( aspect, Maybe.withDefault current previous ))
                            )
             in
-            item.get
-                |> Mask.occludeList unchanged.occlude
+            Mask.occludeList unchanged.occlude item.get
                 |> Get.mapByKey
                     (\aspect_ -> viewUi aspect_)
                 |> Get.updateWhere (\aspect_ -> List.member aspect_ addition.occlude)

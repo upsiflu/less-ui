@@ -42,7 +42,8 @@ sceneOnly : Layout html
 sceneOnly =
     { view =
         \{ get } ->
-            get Scene |> Maybe.withDefault []
+            get Scene
+                |> Maybe.withDefault []
     , markRemovals = \_ -> []
     }
 
@@ -52,7 +53,9 @@ list : Layout html
 list =
     { view =
         \{ handle, get } ->
-            handle :: Get.values Aspect.all get |> List.concat
+            handle
+                :: Get.values Aspect.all get
+                |> List.concat
     , markRemovals = List.map (\( _, v ) -> ( "-", v ))
     }
 

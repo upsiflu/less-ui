@@ -108,19 +108,21 @@ mapHandle fu =
     \v -> { v | handle = fu v.handle }
 
 
-{-| -}
+{-| Note that appending is to the left.
+-}
 appendHandle : Foliage html -> ViewModel html -> ViewModel html
 appendHandle foliage =
-    mapHandle ((++) foliage)
+    mapHandle (List.append foliage)
 
 
-{-| Note that `Nothing` means the handle is appended.
+{-| Note that `Nothing` means the handle is appended. (ToDo: Make a nicer sum type to represent position)
 -}
 append : { a | appendWhat : Foliage html, appendWhere : Maybe Aspect } -> ViewModel html -> ViewModel html
 append { appendWhat, appendWhere } =
     case appendWhere of
         Just aspect ->
-            Get.singleton aspect appendWhat |> appendGet
+            Get.singleton aspect appendWhat
+                |> appendGet
 
         Nothing ->
             appendHandle appendWhat

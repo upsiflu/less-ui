@@ -196,9 +196,8 @@ insert key =
 
 -}
 maybeAdd : (a -> b -> c) -> Aspect -> a -> Get b -> Get c
-maybeAdd composer =
-    singleton
-        >> (<<) (map2 composer)
+maybeAdd =
+    map2 >> composeWithTwoParameters singleton
 
 
 {-| Define a default so that the composition can't fail
@@ -215,8 +214,9 @@ maybeAdd composer =
 
 -}
 addWithDefault : a -> (a -> a -> b) -> Aspect -> a -> Get a -> Get b
-addWithDefault default composer =
-    singleton >> (<<) (map2WithDefaults default composer)
+addWithDefault default =
+    map2WithDefaults default
+        >> composeWithTwoParameters singleton
 
 
 {-| Consider `Nothing` in the `add` composer so that the composition can't fail
@@ -257,8 +257,9 @@ addWithDefault default composer =
 
 -}
 addValue : (Maybe a -> Maybe b -> c) -> Aspect -> a -> Get b -> Get c
-addValue composer =
-    singleton >> (<<) (map2Value composer)
+addValue =
+    map2Value
+        >> composeWithTwoParameters singleton
 
 
 {-| -}
@@ -406,7 +407,7 @@ addList =
 -}
 map : (a -> b) -> Get a -> Get b
 map =
-    Maybe.map >> (<<)
+    mapParameter Maybe.map
 
 
 {-| Apply a sequence of operations on a `Get`:
@@ -445,7 +446,7 @@ sequence operations getA =
 -}
 filter : (a -> Bool) -> Get a -> Get a
 filter =
-    Maybe.filter >> (<<)
+    mapParameter Maybe.filter
 
 
 {-| compose a function behind the result, preserving the 'Maybe' value.
@@ -483,7 +484,8 @@ mapByKey fu getA key =
 {-| -}
 mapValueByKey : (Aspect -> Maybe a -> Maybe b) -> Get a -> Get b
 mapValueByKey fu getA key =
-    getA key |> fu key
+    getA key
+        |> fu key
 
 
 {-| Compose a function behind the results of two `Get`s,
@@ -514,7 +516,10 @@ map2WithDefaults default composer =
 -}
 map2Value : (Maybe a -> Maybe b -> c) -> Get a -> Get b -> Get c
 map2Value fu getA getB =
-    \key -> Just (fu (getA key) (getB key))
+    \key ->
+        getB key
+            |> fu (getA key)
+            |> Just
 
 
 {-| -}
@@ -548,8 +553,8 @@ append =
 {-| Get either the inner `Get`, else `empty`.
 -}
 flat : Get (Get a) -> Aspect -> Get a
-flat =
-    (<<) (Maybe.withDefault empty)
+flat g =
+    g >> Maybe.withDefault empty
 
 
 {-| `get` the inner `Get` with the given key
@@ -653,15 +658,14 @@ andThen createGetB getA =
 -}
 andThenFlat : (a -> Get b) -> Get a -> Get b
 andThenFlat =
-    andThen >> (<<) join
+    composeWithTwoParameters andThen join
 
 
 {-| Like `andThen`, but you supply a fallible creator function
 -}
 andThenMaybe : (a -> Maybe (Get b)) -> Get a -> Get (Get b)
 andThenMaybe =
-    Maybe.andThen
-        >> (<<)
+    mapParameter Maybe.andThen
 
 
 {-| Map the result of the first `get` to the next `get`
@@ -680,7 +684,7 @@ Same as `mapByKey`!
 -}
 andMapFlat : Get (a -> b) -> Get a -> Get b
 andMapFlat =
-    andMap >> (<<) join
+    composeWithTwoParameters andMap join
 
 
 
@@ -700,7 +704,11 @@ andMapFlat =
 -}
 member : Aspect -> Get a -> Bool
 member =
-    get >> (<<) Maybe.isJust
+    composeWithTwoParameters get Maybe.isJust
+
+
+
+-- Maybe a -> Bool                                       /
 
 
 {-| `(|>)`
@@ -722,8 +730,7 @@ get =
 -}
 withDefault : a -> Get a -> (Aspect -> a)
 withDefault =
-    Maybe.withDefault
-        >> (<<)
+    mapParameter Maybe.withDefault
 
 
 
@@ -741,7 +748,14 @@ withDefault =
 -}
 toList : List Aspect -> Get a -> List ( Aspect, a )
 toList list getA =
-    List.foldr (\key -> getA key |> Maybe.map (Tuple.pair key) |> Maybe.cons) [] list
+    List.foldr
+        (\key ->
+            getA key
+                |> Maybe.map (Tuple.pair key)
+                |> Maybe.cons
+        )
+        []
+        list
 
 
 {-| `orAdd`s from the list but skips duplicate keys.
@@ -784,7 +798,13 @@ values list getA =
 {-| -}
 keys : List Aspect -> Get a -> List Aspect
 keys list getA =
-    List.foldr (\key -> getA key |> Maybe.unwrap identity (\_ -> (::) key)) [] list
+    List.foldr
+        (\key ->
+            getA key
+                |> Maybe.unwrap identity (\_ -> (::) key)
+        )
+        []
+        list
 
 
 {-| `concatLists = fromListBy addList`
@@ -807,3 +827,38 @@ fromListBy fu =
     List.map
         (\( key, a ) -> fu key a)
         >> (\operations -> sequence operations empty)
+
+
+
+---- Helper ----
+
+
+{-| This is a strangely important function that deserves an important name.
+
+`mapParameter a = a >> (<<)`
+`mapParameter a b = (|>) >> (a b)`
+`mapParameter a b c = c >> (a b)`
+`mapParameter a b c d = (a b (c d))`
+
+-}
+mapParameter :
+    (a
+     -> (b -> c)
+    )
+    ->
+        (a
+         -> ((input -> b) -> (input -> c))
+        )
+mapParameter function =
+    let
+        composeRightToLeft : (b -> c) -> (input -> b) -> (input -> c)
+        composeRightToLeft =
+            (<<)
+    in
+    function >> composeRightToLeft
+
+
+composeWithTwoParameters : (a -> b -> c) -> (c -> d) -> a -> b -> d
+composeWithTwoParameters function0 function1 a =
+    -- compose left-to-right with two parameters
+    function0 a >> function1

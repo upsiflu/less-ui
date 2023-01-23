@@ -109,8 +109,7 @@ difference current previous =
     in
     { addition =
         { occlude =
-            current.occlude
-                |> subtract previous.occlude
+            subtract previous.occlude current.occlude
         , appendWhere =
             current.appendWhere
         , appendWhat =
@@ -118,8 +117,7 @@ difference current previous =
         }
     , removal =
         { occlude =
-            previous.occlude
-                |> subtract current.occlude
+            subtract current.occlude previous.occlude
         , appendWhere =
             previous.appendWhere
         , appendWhat =

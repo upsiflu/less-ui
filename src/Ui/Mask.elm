@@ -147,4 +147,23 @@ concat =
 {-| -}
 mapSecond : (a -> b) -> Mask a -> Get a -> Get b
 mapSecond =
-    Get.map >> (<<)
+    mapParameter Get.map
+
+
+{-| This is a strangely important function that deserves an important name.
+-}
+mapParameter :
+    (a
+     -> (b -> c)
+    )
+    ->
+        (a
+         -> ((input -> b) -> (input -> c))
+        )
+mapParameter function =
+    let
+        composeRightToLeft : (b -> c) -> (input -> b) -> (input -> c)
+        composeRightToLeft =
+            (<<)
+    in
+    function >> composeRightToLeft

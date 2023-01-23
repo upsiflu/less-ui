@@ -85,7 +85,7 @@ type alias Fragment =
 
 
 {-| -}
-init : State -> State
+init : Url -> State
 init state =
     state
 
@@ -221,14 +221,14 @@ removeAssignments keys =
             { q
                 | assignments =
                     List.filter
-                        (Tuple.first >> (\key -> List.member key keys |> not))
+                        (Tuple.first >> (\key -> not (List.member key keys)))
                         q.assignments
             }
 
 
 mapQuery : (Query -> Query) -> State -> State
 mapQuery fu state =
-    { state | query = state.query |> (parseQueryString >> fu >> serializeQuery) }
+    { state | query = (parseQueryString >> fu >> serializeQuery) state.query }
 
 
 serializeQuery : Query -> Maybe String
