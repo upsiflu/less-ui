@@ -14,7 +14,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Html.Keyed
-import Ui exposing (Ui)
+import Ui
 import Ui.Application exposing (Application, application)
 import Ui.Layout as Layout
 import Ui.Layout.Aspect exposing (Aspect(..))
@@ -85,7 +85,15 @@ update () model =
     ( model + 1, Cmd.none )
 
 
-view : ( Ui.State.Path, Ui.State.Fragment ) -> Model -> Ui.Application.Document (Html ())
+type alias Ui =
+    Ui.Ui Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
+
+
+type alias Document =
+    Ui.Application.Document Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
+
+
+view : ( Ui.State.Path, Ui.State.Fragment ) -> Model -> Document
 view ( rawPath, rawFragment ) model =
     let
         page : Page
@@ -101,12 +109,12 @@ view ( rawPath, rawFragment ) model =
             About ->
                 viewPage
                     (Ui.textLabel "'About' page here!"
-                        |> Ui.with Info (Ui.textLabel "Check out these links:" ++ Ui.html viewNav ++ myTest)
+                        |> Ui.with Info (Ui.textLabel "Check out these links:" ++ Ui.html ( "nav", viewNav ) ++ myTest)
                     )
 
             DomState ->
                 let
-                    counter : Ui (Html ())
+                    counter : Ui
                     counter =
                         List.repeat model ()
                             |> List.indexedMap
@@ -121,16 +129,18 @@ view ( rawPath, rawFragment ) model =
                             |> List.reverse
                             |> Ui.ul "counter"
 
-                    editable : Int -> String -> Ui (Html ())
+                    editable : Int -> String -> Ui
                     editable key str =
-                        Html.p [ Attr.contenteditable True, Attr.title ("Keyed with: " ++ String.fromInt key) ] [ Html.text str ]
-                            |> Ui.keyed (String.fromInt key)
+                        ( String.fromInt key, Html.p [ Attr.contenteditable True, Attr.title ("Keyed with: " ++ String.fromInt key) ] [ Html.text str ] )
+                            |> Ui.html
 
-                    updater : Ui (Html ())
+                    updater : Ui
                     updater =
-                        Html.button [ Events.onClick () ]
+                        ( "updater"
+                        , Html.button [ Events.onClick () ]
                             [ Html.text ("Add item #" ++ String.fromInt model) ]
-                            |> Ui.keyed "updater"
+                        )
+                            |> Ui.html
                 in
                 viewPage
                     (Ui.textLabel "Play with a stateful Dom :-D"
@@ -141,18 +151,18 @@ view ( rawPath, rawFragment ) model =
 
             Lorem ->
                 let
-                    viewArticle : String -> List (Html ()) -> Ui (Html ())
+                    viewArticle : String -> List (Html ()) -> Ui
                     viewArticle title content =
-                        Ui.html (Html.h1 [] [ Html.text ("About " ++ title) ])
+                        Ui.html ( "title", Html.h1 [] [ Html.text ("About " ++ title) ] )
                             :: (if title == fragment then
-                                    Ui.html (Html.node "center-me" [ Attr.attribute "increment" ("->" ++ fragment) ] [])
+                                    Ui.html ( "centerMe", Html.node "center-me" [ Attr.attribute "increment" ("->" ++ fragment) ] [] )
                                         |> Ui.with Control clearFragment
 
                                 else
                                     []
                                )
-                            :: Ui.html (Html.node "focus-when-in-center" [ Attr.attribute "increment" (title ++ "<-" ++ fragment) ] [])
-                            :: List.indexedMap (\i -> Ui.keyed (String.fromInt i)) content
+                            :: Ui.html ( "1", Html.node "focus-when-in-center" [ Attr.attribute "increment" (title ++ "<-" ++ fragment) ] [] )
+                            :: List.indexedMap (\i a -> Ui.html ( String.fromInt i, a )) content
                             |> List.concat
                             |> Ui.wrap (Html.Keyed.node "article" [ Attr.id title, Attr.contenteditable True ] >> Tuple.pair title >> List.singleton)
 
@@ -160,7 +170,7 @@ view ( rawPath, rawFragment ) model =
                         case rawFragment of
                             Just f ->
                                 ( f
-                                , Html.a [ Attr.href ("/" ++ pathFromPage page) ] [ Html.text ("Ignore the " ++ f) ]
+                                , ( "/", Html.a [ Attr.href ("/" ++ pathFromPage page) ] [ Html.text ("Ignore the " ++ f) ] )
                                     |> Ui.html
                                 )
 
@@ -191,7 +201,7 @@ view ( rawPath, rawFragment ) model =
                     (Ui.textLabel ("404 Not found: " ++ rawPath))
 
 
-myTest : Ui (Html ())
+myTest : Ui
 myTest =
     Ui.textLabel "The right order: "
         ++ Ui.textLabel "1"
@@ -200,10 +210,10 @@ myTest =
         |> Ui.with Info (Ui.textLabel "a" ++ Ui.textLabel "b")
 
 
-viewPage : Ui (Html ()) -> Page -> Ui.Application.Document (Html ())
+viewPage : Ui -> Page -> Document
 viewPage content page =
     { body =
-        Ui.handle [ viewNav ]
+        Ui.handle [ ( "myNav", viewNav ) ]
             |> Ui.with Scene content
     , layout = Layout.default
     , title = pathFromPage page ++ " – SPA"

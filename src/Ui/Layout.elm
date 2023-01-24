@@ -16,47 +16,62 @@ import Html.Attributes as Attr
 import Html.Keyed exposing (node)
 import Ui.Get as Get exposing (Get)
 import Ui.Layout.Aspect as Aspect exposing (Aspect(..))
-import Ui.Layout.ViewModel exposing (Foliage, ViewModel)
+import Ui.Layout.ViewModel exposing (ViewModel)
 
 
 {-| -}
-type alias Layout html =
-    { view : ViewModel html -> Foliage html
-    , markRemovals : Foliage html -> Foliage html
+type alias Layout place html wrapper =
+    { forget : wrapper
+    , wrap : wrapper -> List html -> List html
+    , view : ViewModel (Maybe place) html -> List html
+    , all : List place
     }
 
 
 {-| -}
-default : Layout (Html msg)
+default : Layout Aspect ( String, Html msg ) (List ( String, Html msg ) -> List ( String, Html msg ))
 default =
-    { view =
-        \{ handle, get } ->
-            ( "handle", node "nav" [ Attr.class "handle" ] handle )
-                :: Get.toListBy (niceLayout "") Aspect.all get
-    , markRemovals = poof
-    }
-
-
-{-| -}
-sceneOnly : Layout html
-sceneOnly =
-    { view =
+    { forget = poof
+    , wrap = identity
+    , view =
         \{ get } ->
-            get Scene
-                |> Maybe.withDefault []
-    , markRemovals = \_ -> []
+            Get.toListBy (niceLayout "") (Nothing :: List.map Just Aspect.all) get
+    , all = Aspect.all
     }
 
 
 {-| -}
-list : Layout html
-list =
-    { view =
-        \{ handle, get } ->
-            handle
-                :: Get.values Aspect.all get
+sceneOnly : Layout Aspect html (List html -> List html)
+sceneOnly =
+    { forget = \_ -> []
+    , wrap = identity
+    , view =
+        \{ get } ->
+            get (Just Scene)
+                |> Maybe.withDefault []
+    , all = Aspect.all
+    }
+
+
+
+-- aspect = aspect
+-- html = (String, element)
+-- wrapper = (List ( String, element ) -> List ( String, element ))
+-- markRemovals : Mask aspect (List (String, element))
+-- wrap :
+-- view : ViewModel aspect (String, element) -> List (String, element)
+
+
+{-| -}
+list : List aspect -> Layout aspect ( String, element ) (List ( String, element ) -> List ( String, element ))
+list allAspects =
+    { forget = List.map <| \( _, v ) -> ( "-", v )
+    , wrap = identity
+    , view =
+        \{ get } ->
+            Get.values (Nothing :: List.map Just allAspects) get
                 |> List.concat
-    , markRemovals = List.map (\( _, v ) -> ( "-", v ))
+    , all = allAspects
     }
 
 
@@ -64,27 +79,28 @@ list =
 ---- Html ----
 
 
-poof : Foliage (Html html) -> Foliage (Html html)
+poof : List ( String, Html html ) -> List ( String, Html html )
 poof =
     List.indexedMap (\i a -> [ ( "poof" ++ String.fromInt i, Html.span [ Attr.class "poof" ] [ Html.text (String.fromInt i) ] ), a ])
         >> List.concat
 
 
 {-| -}
-withClass : String -> Layout (Html msg)
+withClass : String -> Layout Aspect ( String, Html msg ) (List ( String, Html msg ) -> List ( String, Html msg ))
 withClass prefix =
-    { view =
-        \{ handle, get } ->
-            ( "handle", node "nav" [ Attr.class prefix, Attr.class "handle" ] handle )
-                :: Get.toListBy (niceLayout prefix) Aspect.all get
-    , markRemovals = poof
+    { forget = poof
+    , wrap = identity
+    , view =
+        \{ get } -> Get.toListBy (niceLayout prefix) (Nothing :: List.map Just Aspect.all) get
+    , all = Aspect.all
     }
 
 
-niceLayout : String -> Get (Foliage (Html msg) -> ( String, Html msg ))
+niceLayout : String -> Get (Maybe Aspect) (List ( String, Html msg ) -> ( String, Html msg ))
 niceLayout prefix =
     Get.fromList
-        [ ( Scene, node "div" [ Attr.class prefix, Attr.class "scene" ] >> Tuple.pair "scene" )
-        , ( Control, node "div" [ Attr.class prefix, Attr.class "control" ] >> Tuple.pair "control" )
-        , ( Info, node "div" [ Attr.class prefix, Attr.class "info" ] >> Tuple.pair "info" )
+        [ ( Nothing, node "nav" [ Attr.class prefix, Attr.class "handle" ] >> Tuple.pair "handle" )
+        , ( Just Scene, node "div" [ Attr.class prefix, Attr.class "scene" ] >> Tuple.pair "scene" )
+        , ( Just Control, node "div" [ Attr.class prefix, Attr.class "control" ] >> Tuple.pair "control" )
+        , ( Just Info, node "div" [ Attr.class prefix, Attr.class "info" ] >> Tuple.pair "info" )
         ]

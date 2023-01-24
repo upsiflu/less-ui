@@ -10,7 +10,7 @@ import Html exposing (Html, button, input, text)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed
-import Ui exposing (Ui)
+import Ui
 import Ui.Layout.Aspect exposing (Aspect(..))
 
 
@@ -80,17 +80,21 @@ map toPath ((Rhododendron label descendants) as rhodo) =
     Rhododendron (toPath rhodo) (List.map (map toPath) descendants)
 
 
+type alias Ui msg =
+    Ui.Ui Aspect ( String, Html msg ) (List ( String, Html msg ) -> List ( String, Html msg ))
+
+
 {-| -}
-view : (Msg -> msg) -> Rhododendron -> Ui (Html msg)
+view : (Msg -> msg) -> Rhododendron -> Ui msg
 view howToMessage ((Rhododendron label _) as rhododendron) =
     let
-        controls : Ui (Html msg)
+        controls : Ui msg
         controls =
-            button [ onClick (Grow |> howToMessage) ] [ text "append" ]
+            ( "button", button [ onClick (Grow |> howToMessage) ] [ text "append" ] )
                 |> Ui.html
-                |> (++) (input [ onInput (Edit label >> howToMessage) ] [ Html.text label ] |> Ui.html |> Ui.addTextLabel "Edit")
+                |> (++) (( "edit", input [ onInput (Edit label >> howToMessage) ] [ Html.text label ] ) |> Ui.html |> Ui.addTextLabel "Edit")
 
-        scene : Rhododendron -> Ui (Html msg)
+        scene : Rhododendron -> Ui msg
         scene (Rhododendron s descendants) =
             Ui.singleton
                 |> Ui.with Scene (Ui.textLabel s)

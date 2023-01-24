@@ -2,19 +2,20 @@ module Ui.Mask exposing
     ( Mask
     , transparent, opaque
     , occlude, occludeList, superimpose
+    , filter
     , concat, and
-    , mapSecond
+    , map, mapKey, mapSecond
+    , mask
     )
 
 {-|
 
 @docs Mask
-
-
-# Create
-
 @docs transparent, opaque
 @docs occlude, occludeList, superimpose
+@docs filter
+
+_In addition, many function in `Get` return Masks. Of use may be [`Get.map`](Ui.Get#map)_
 
 
 # Compose
@@ -30,46 +31,49 @@ _Note that Masks are functions so you can compose them easily:_
 
 # Modify
 
-@docs mapSecond
+@docs map, mapKey, mapSecond
+
+
+# Apply
+
+@docs mask
 
 -}
 
 import Ui.Get as Get exposing (Get)
-import Ui.Layout.Aspect exposing (Aspect)
 
 
 {-| -}
-type alias Mask a =
-    Get a -> Get a
+type alias Mask key a =
+    Get key a -> Get key a
 
 
 
 ---- CREATE ----
 
 
-{-| `transparent = identity`
--}
-transparent : Mask a
+{-| -}
+transparent : Mask key a
 transparent =
     identity
 
 
 {-| -}
-opaque : Mask a
+opaque : Mask key a
 opaque =
     \_ _ -> Nothing
 
 
-{-| `superimpose = Get.remove`
+{-| remove aspect
 -}
-occlude : Aspect -> Mask a
+occlude : key -> Mask key a
 occlude =
     Get.remove
 
 
-{-| `superimpose = Get.insert`
+{-| insert (and overwrite) at aspect
 -}
-superimpose : Aspect -> a -> Mask a
+superimpose : key -> a -> Mask key a
 superimpose =
     Get.insert
 
@@ -77,7 +81,7 @@ superimpose =
 {-| Occlude a list of aspects
 
     import Ui.Layout.Aspect exposing (Aspect(..))
-    import Ui.Get as Get exposing (get)
+    import Ui.Get key as Get key exposing (get)
 
     Get.full ()
         |> occludeList [Control]
@@ -90,7 +94,7 @@ superimpose =
         --> Just ()
 
 -}
-occludeList : List Aspect -> Mask a
+occludeList : List key -> Mask key a
 occludeList =
     List.foldl andOcclude transparent
 
@@ -101,13 +105,13 @@ occludeList =
 
 {-| Add occlusions
 
-    import Ui.Get exposing (Get)
+    import Ui.Get key exposing (Get)
     import Ui.Layout.Aspect exposing (Aspect(..))
 
-    mask : Mask Bool
+    mask : Mask Aspect Bool
     mask = occlude Scene |> and (occlude Info)
 
-    get : Get Bool
+    get : Get Aspect Bool
     get = mask (Ui.Get.full True)
 
     get Scene --> Nothing
@@ -115,17 +119,39 @@ occludeList =
     get Control --> Just True
 
 -}
-and : Mask a -> Mask a -> Mask a
+and : Mask key a -> Mask key a -> Mask key a
 and =
     (>>)
 
 
 {-| Occlude one more aspect
 -}
-andOcclude : Aspect -> Mask a -> Mask a
+andOcclude : key -> Mask key a -> Mask key a
 andOcclude =
     occlude
         >> and
+
+
+{-| apply the mask only when the key meets a condition
+-}
+filter : (key -> Bool) -> Mask key a -> Mask key a
+filter condition mask_ getA key =
+    (if condition key then
+        mask_ getA
+
+     else
+        getA
+    )
+        key
+
+
+{-| -}
+mapKey : ( key1 -> Maybe key2, key2 -> Maybe key1 ) -> Mask key2 a -> Mask key1 a
+mapKey ( key12, key21 ) mask2 =
+    -- mask is `Get key1 a -> Get key1 a`
+    Get.mapKey key21
+        >> mask2
+        >> Get.mapKey key12
 
 
 {-| combine a list of masks to a single masks. Nothing if list is empty.
@@ -139,15 +165,32 @@ andOcclude =
         --> ["Control"]
 
 -}
-concat : List (Mask a) -> Mask a
+concat : List (Mask key a) -> Mask key a
 concat =
     List.foldl and transparent
 
 
 {-| -}
-mapSecond : (a -> b) -> Mask a -> Get a -> Get b
+mapSecond : (a -> b) -> Mask key a -> Get key a -> Get key b
 mapSecond =
     mapParameter Get.map
+
+
+{-| -}
+map : (Mask aspect a -> b -> b) -> Mask aspect a -> Mask aspect b
+map project mask_ =
+    Get.map (project mask_)
+
+
+{-| Apply the mask
+-}
+mask : Mask aspect a -> Get aspect a -> Get aspect a
+mask =
+    (<|)
+
+
+
+--maskGet : Mask h -> v -> v
 
 
 {-| This is a strangely important function that deserves an important name.

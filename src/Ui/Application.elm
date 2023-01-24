@@ -79,8 +79,8 @@ type alias Application model modelMsg =
 
 
 {-| -}
-type alias Document html =
-    { body : Ui html, layout : Layout html, title : String }
+type alias Document aspect html wrapper =
+    { body : Ui aspect html wrapper, layout : Layout aspect html wrapper, title : String }
 
 
 {-| Separate Url update from Model update
@@ -101,7 +101,7 @@ type alias Document html =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : ( Path, Fragment ) -> model -> Document (Html modelMsg)
+    , view : ( Path, Fragment ) -> model -> Document aspect ( String, Html modelMsg ) wrapper
     }
     -> Application model modelMsg
 application config =

@@ -8,7 +8,7 @@ module Features exposing (Features, main, Msg)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Ui exposing (Ui)
+import Ui
 import Ui.Application exposing (Application, application)
 import Ui.Layout exposing (Layout)
 import Ui.Layout.Aspect exposing (Aspect(..))
@@ -45,10 +45,18 @@ update () features =
 -- affects the `current Aspect`!
 
 
-view : ( Ui.State.Path, Ui.State.Fragment ) -> Features -> { body : Ui (Html Msg), layout : Layout (Html Msg), title : String }
+type alias Ui =
+    Ui.Ui Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
+
+
+type alias Document =
+    Ui.Application.Document Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
+
+
+view : ( Ui.State.Path, Ui.State.Fragment ) -> Features -> Document
 view ( path, fragment ) _ =
     let
-        showTab : String -> Ui (Html Msg) -> Ui (Html Msg)
+        showTab : String -> Ui -> Ui
         showTab str contents =
             Link.toggle (String.replace " " "-" str)
                 |> Link.view (Link.preset.global [] [ Html.text str ])
@@ -64,7 +72,7 @@ view ( path, fragment ) _ =
                 (paths path)
             ++ showTab "Bounce between fragments"
                 (fragments fragment)
-            ++ (Ui.handle [ Html.label [] [ Html.text "ConStAnt" ] ]
+            ++ (Ui.handle [ ( "constant", Html.label [] [ Html.text "ConStAnt" ] ) ]
                     |> Ui.with Scene (Ui.textLabel "ConsScene")
                )
     , layout = Ui.Layout.withClass "Features"
@@ -74,9 +82,9 @@ view ( path, fragment ) _ =
 
 {-| [Ui](Ui): Flat layout instead of nested components
 -}
-ui : Ui (Html Msg)
+ui : Ui
 ui =
-    Ui.handle [ Html.label [] [ Html.text "Handle" ] ]
+    Ui.handle [ ( "handle", Html.label [] [ Html.text "Handle" ] ) ]
         |> Ui.with Scene (Ui.textLabel "Scene")
         |> Ui.with Control (Ui.textLabel "Control")
         |> Ui.with Info (Ui.textLabel "Info")
@@ -84,7 +92,7 @@ ui =
 
 {-| [Application](Ui.Application): Sever Route from Model
 -}
-paths : Ui.State.Path -> Ui (Html Msg)
+paths : Ui.State.Path -> Ui
 paths path =
     Ui.singleton
         |> Ui.with Scene (Ui.textLabel ("Path: " ++ path))
@@ -95,7 +103,7 @@ paths path =
         |> Ui.with Control (Link.goTo ( Nothing, Just "99" ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go to Fragment #99" ]))
 
 
-globalNav : Ui (Html Msg)
+globalNav : Ui
 globalNav =
     [ "Introduction", "First Steps", "Last Steps" ]
         |> List.concatMap (\title -> Link.goTo ( Just title, Nothing ) |> Link.view (Link.preset.nav [] []))
@@ -103,7 +111,7 @@ globalNav =
 
 {-| [Link](Ui.Link): Manage the Ui State as a URL
 -}
-fragments : Ui.State.Fragment -> Ui (Html Msg)
+fragments : Ui.State.Fragment -> Ui
 fragments fr =
     let
         articles : List (Html msg)
@@ -123,7 +131,7 @@ fragments fr =
                 |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "bounce between 1 and 3" ])
             )
         |> Ui.with Scene
-            (Ui.html (Html.section [] articles))
+            (Ui.html ( "articles", Html.section [] articles ))
         |> Ui.with Info (Ui.textLabel (Maybe.withDefault "(No fragment)" fr))
 
 

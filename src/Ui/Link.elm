@@ -55,7 +55,6 @@ import Maybe.Extra as Maybe
 import String.Extra as String
 import Ui exposing (Ui)
 import Ui.Layout.Aspect as Aspect exposing (Aspect)
-import Ui.Layout.ViewModel exposing (Foliage)
 import Ui.State exposing (Flag, Fragment, Path, State)
 import Url exposing (Url)
 import Url.Codec exposing (Codec, ParseError(..))
@@ -142,10 +141,10 @@ toggle =
 
 -}
 preset :
-    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer
-    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer
-    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer
-    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer
+    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer Aspect
+    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer Aspect
+    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer Aspect
+    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer Aspect
     }
 preset =
     { global = \att con -> { empty | attributes = att, contents = con, position = Global }
@@ -155,7 +154,7 @@ preset =
     }
 
 
-empty : Renderer
+empty : Renderer Aspect
 empty =
     { attributes = []
     , contents = []
@@ -167,11 +166,11 @@ empty =
 
 {-| How to present a Link
 -}
-type alias Renderer =
+type alias Renderer aspect =
     { attributes : List (Html.Attribute Never)
     , contents : List (Html Never)
     , element : List (Html.Attribute Never) -> List (Html Never) -> Html Never
-    , occlusions : List Aspect
+    , occlusions : List aspect
     , position : Position
     }
 
@@ -198,18 +197,18 @@ a link attrs contents =
 
 -}
 view :
-    Renderer
+    Renderer aspect
     -> Link
-    -> Ui (Html msg)
+    -> Ui aspect ( String, Html msg ) wrapper
 view config link =
     Ui.custom <|
         \( aspect, url ) ->
             let
-                linkWithAttributes : List (Html.Attribute Never) -> Foliage (Html msg)
+                linkWithAttributes : List (Html.Attribute Never) -> List ( String, Html msg )
                 linkWithAttributes additionalAttributes =
                     [ ( toId link, a link (config.attributes ++ additionalAttributes) config.contents ) ]
 
-                where_ : Maybe Aspect
+                where_ : Maybe aspect
                 where_ =
                     case config.position of
                         Inline ->

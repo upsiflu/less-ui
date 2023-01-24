@@ -6,15 +6,18 @@ module Ui.Get exposing
     , remove
     , consList, addList
     , map, mapValue, map2, map2WithDefaults, map2Value, filter
+    , mapKey
     , mapByKey, mapValueByKey, map2ByKey
     , append
     , join, unlockInner, unlockOuter
     , orElse
     , andThen, andThenFlat, andThenMaybe, andMap, andMapFlat
-    , member, get, andGet, withDefault
+    , union, intersect, diff
+    , member, andGet, withDefault
     , toList, toListBy, keys, values, fromList, fromListBy
     , consLists, concatLists
     , sequence
+    , get
     )
 
 {-| Dictionary [`Aspect`](Ui.Layout.Aspect) -> `ui`
@@ -39,9 +42,14 @@ module Ui.Get exposing
 @docs consList, addList
 
 
-# Map
+# Modify
 
 @docs map, mapValue, map2, map2WithDefaults, map2Value, filter
+
+
+### Map the key parameter
+
+@docs mapKey
 
 
 ### Map with respect to the key
@@ -72,9 +80,14 @@ module Ui.Get exposing
 @docs andThen, andThenFlat, andThenMaybe, andMap, andMapFlat
 
 
+### Set operations
+
+@docs union, intersect, diff
+
+
 # Query
 
-@docs member, get, andGet, withDefault
+@docs member, andGet, withDefault
 
 
 # Lists
@@ -91,16 +104,20 @@ module Ui.Get exposing
 
 @docs sequence
 
+
+# Apply
+
+@docs get
+
 -}
 
 import Bool.Extra as Bool
 import Maybe.Extra as Maybe
-import Ui.Layout.Aspect exposing (Aspect)
 
 
 {-| -}
-type alias Get a =
-    Aspect -> Maybe a
+type alias Get key a =
+    key -> Maybe a
 
 
 
@@ -109,7 +126,7 @@ type alias Get a =
 
 {-| in any case, return Nothing
 -}
-empty : Get a
+empty : Get key a
 empty =
     always Nothing
 
@@ -123,13 +140,13 @@ empty =
         --> Just 1
 
 -}
-full : a -> Get a
+full : a -> Get key a
 full =
     Just >> always
 
 
 {-| -}
-singleton : Aspect -> a -> Get a
+singleton : key -> a -> Get key a
 singleton key a =
     (==) key >> Bool.toMaybe a
 
@@ -150,7 +167,7 @@ singleton key a =
             --> Just "c"
 
 -}
-orAdd : Aspect -> a -> Get a -> Get a
+orAdd : key -> a -> Get key a -> Get key a
 orAdd key =
     Just >> Maybe.orElse >> updateValue key
 
@@ -170,7 +187,7 @@ orAdd key =
             --> Just 2
 
 -}
-insert : Aspect -> a -> Get a -> Get a
+insert : key -> a -> Get key a -> Get key a
 insert key =
     Just >> always >> updateValue key
 
@@ -195,7 +212,7 @@ insert key =
             --> Just 9
 
 -}
-maybeAdd : (a -> b -> c) -> Aspect -> a -> Get b -> Get c
+maybeAdd : (a -> b -> c) -> key -> a -> Get key b -> Get key c
 maybeAdd =
     map2 >> composeWithTwoParameters singleton
 
@@ -213,7 +230,7 @@ maybeAdd =
         --> Just 1
 
 -}
-addWithDefault : a -> (a -> a -> b) -> Aspect -> a -> Get a -> Get b
+addWithDefault : a -> (a -> a -> b) -> key -> a -> Get key a -> Get key b
 addWithDefault default =
     map2WithDefaults default
         >> composeWithTwoParameters singleton
@@ -256,14 +273,14 @@ addWithDefault default =
             --> Just Nothing
 
 -}
-addValue : (Maybe a -> Maybe b -> c) -> Aspect -> a -> Get b -> Get c
+addValue : (Maybe a -> Maybe b -> c) -> key -> a -> Get key b -> Get key c
 addValue =
     map2Value
         >> composeWithTwoParameters singleton
 
 
 {-| -}
-remove : Aspect -> Get a -> Get a
+remove : key -> Get key a -> Get key a
 remove a get_ aspect =
     if aspect == a then
         Nothing
@@ -301,20 +318,20 @@ mapLists fu ma mb =
 
 -}
 update :
-    Aspect
+    key
     -> (a -> a)
-    -> Get a
-    -> Get a
+    -> Get key a
+    -> Get key a
 update key fu =
     mapByKey ((==) key >> Bool.ifElse fu identity)
 
 
 {-| -}
 updateValue :
-    Aspect
+    key
     -> (Maybe a -> Maybe a)
-    -> Get a
-    -> Get a
+    -> Get key a
+    -> Get key a
 updateValue key fu =
     mapValueByKey ((==) key >> Bool.ifElse fu identity)
 
@@ -336,7 +353,7 @@ updateValue key fu =
         --> Just (1)
 
 -}
-updateWhere : (Aspect -> Bool) -> (a -> a) -> Get a -> Get a
+updateWhere : (key -> Bool) -> (a -> a) -> Get key a -> Get key a
 updateWhere condition fu getA key =
     Maybe.map
         (if condition key then
@@ -363,7 +380,7 @@ Implicitly creates a list if key has no value yet:
             --> Just ["a"]
 
 -}
-consList : Aspect -> a -> Get (List a) -> Get (List a)
+consList : key -> a -> Get key (List a) -> Get key (List a)
 consList =
     addValue
         (\ma mb ->
@@ -387,7 +404,7 @@ consList =
         --> Just [1, 2]
 
 -}
-addList : Aspect -> List a -> Get (List a) -> Get (List a)
+addList : key -> List a -> Get key (List a) -> Get key (List a)
 addList =
     addWithDefault [] (\x y -> y ++ x)
 
@@ -405,9 +422,27 @@ addList =
         --> Just (-1)
 
 -}
-map : (a -> b) -> Get a -> Get b
+map : (a -> b) -> Get key a -> Get key b
 map =
     mapParameter Maybe.map
+
+
+{-|
+
+    singleton 1 ()
+        |> mapKey identity
+        |> get (Just 1)
+        --> Just ()
+
+    singleton "1" ()
+        |> mapKey String.fromInt
+        |> get 1
+        --> Just ()
+
+-}
+mapKey : (key2 -> Maybe key1) -> Get key1 a -> Get key2 a
+mapKey discard get1 =
+    discard >> Maybe.andThen get1
 
 
 {-| Apply a sequence of operations on a `Get`:
@@ -424,7 +459,7 @@ map =
         --> Just 3
 
 -}
-sequence : List (Get a -> Get a) -> Get a -> Get a
+sequence : List (Get key a -> Get key a) -> Get key a -> Get key a
 sequence operations getA =
     List.foldl
         (<|)
@@ -444,7 +479,7 @@ sequence operations getA =
         --> [(Scene, 1), (Info, 1)]
 
 -}
-filter : (a -> Bool) -> Get a -> Get a
+filter : (a -> Bool) -> Get key a -> Get key a
 filter =
     mapParameter Maybe.filter
 
@@ -468,7 +503,7 @@ You can use this function to leverage mapping functions from the `Maybe` and `Ma
         --> [ (Scene, 1), (Control, 2), (Info, 4) ]
 
 -}
-mapValue : (Maybe a -> Maybe b) -> Get a -> Get b
+mapValue : (Maybe a -> Maybe b) -> Get key a -> Get key b
 mapValue =
     (<<)
 
@@ -476,13 +511,13 @@ mapValue =
 {-| Parametrize map over key.
 Same as andMapFlat!
 -}
-mapByKey : (Aspect -> a -> b) -> Get a -> Get b
+mapByKey : (key -> a -> b) -> Get key a -> Get key b
 mapByKey fu getA key =
     Maybe.map (fu key) (getA key)
 
 
 {-| -}
-mapValueByKey : (Aspect -> Maybe a -> Maybe b) -> Get a -> Get b
+mapValueByKey : (key -> Maybe a -> Maybe b) -> Get key a -> Get key b
 mapValueByKey fu getA key =
     getA key
         |> fu key
@@ -501,20 +536,20 @@ Example:
         --> Just [1, 2, 3]
 
 -}
-map2 : (a -> b -> c) -> Get a -> Get b -> Get c
+map2 : (a -> b -> c) -> Get key a -> Get key b -> Get key c
 map2 fu getA getB =
     \key -> Maybe.map2 fu (getA key) (getB key)
 
 
 {-| -}
-map2WithDefaults : a -> (a -> a -> b) -> Get a -> Get a -> Get b
+map2WithDefaults : a -> (a -> a -> b) -> Get key a -> Get key a -> Get key b
 map2WithDefaults default composer =
     map2Value (\m1 m2 -> composer (Maybe.withDefault default m1) (Maybe.withDefault default m2))
 
 
 {-| Never fail
 -}
-map2Value : (Maybe a -> Maybe b -> c) -> Get a -> Get b -> Get c
+map2Value : (Maybe a -> Maybe b -> c) -> Get key a -> Get key b -> Get key c
 map2Value fu getA getB =
     \key ->
         getB key
@@ -522,8 +557,15 @@ map2Value fu getA getB =
             |> Just
 
 
+{-| `map2Maybe fu getA getB = \key -> fu (getA key) (getB key)`
+-}
+map2Maybe : (Maybe a -> Maybe b -> Maybe c) -> Get key a -> Get key b -> Get key c
+map2Maybe fu getA getB =
+    \key -> fu (getA key) (getB key)
+
+
 {-| -}
-map2ByKey : (Aspect -> a -> b -> c) -> Get a -> Get b -> Get c
+map2ByKey : (key -> a -> b -> c) -> Get key a -> Get key b -> Get key c
 map2ByKey fu getA getB =
     \key -> Maybe.map2 (fu key) (getA key) (getB key)
 
@@ -545,14 +587,14 @@ Difference to `addList`: Both lists to append can be Nothing.
             --> Just [1]
 
 -}
-append : Get (List a) -> Get (List a) -> Get (List a)
+append : Get key (List a) -> Get key (List a) -> Get key (List a)
 append =
     map2Value (mapLists (++))
 
 
 {-| Get either the inner `Get`, else `empty`.
 -}
-flat : Get (Get a) -> Aspect -> Get a
+flat : Get key (Get key a) -> key -> Get key a
 flat g =
     g >> Maybe.withDefault empty
 
@@ -562,21 +604,21 @@ flat g =
     import Ui.Layout.Aspect exposing (Aspect(..))
 
 -}
-unlockInner : Aspect -> Get (Get a) -> Get a
+unlockInner : key -> Get key (Get key a) -> Get key a
 unlockInner key =
     map (get key) >> mapValue Maybe.join
 
 
 {-| `get` the outer `Get` with the given key
 -}
-unlockOuter : Aspect -> Get (Get a) -> Get a
+unlockOuter : key -> Get key (Get key a) -> Get key a
 unlockOuter key =
     get key >> Maybe.withDefault empty
 
 
 {-| Apply the same key twice
 -}
-join : Get (Get a) -> Get a
+join : Get key (Get key a) -> Get key a
 join get2 =
     \aspect -> flat get2 aspect aspect
 
@@ -600,26 +642,57 @@ join get2 =
     --> ( Just "a",  Nothing)
 
 -}
-orElse : Get a -> Get a -> Get a
+orElse : Get key a -> Get key a -> Get key a
 orElse second first key =
     first key
         |> Maybe.orElseLazy (\() -> second key)
 
 
 
-{- logical `&&`
-   and : Get a -> Get a -> Get a
-   and get1 get2 a =
-   let
-   result1 = get1 a
-   result2 = get2 a
-   in
-   case result1 of
--}
+---- Set operations ----
 
 
 {-| -}
-andGet : Aspect -> Maybe (Get a) -> Maybe a
+union : (a -> a -> a) -> Get key a -> Get key a -> Get key a
+union handleCollision =
+    map2Maybe <|
+        \maybeA maybeB ->
+            case ( maybeA, maybeB ) of
+                ( Just a, Just b ) ->
+                    Just (handleCollision a b)
+
+                ( Just a, Nothing ) ->
+                    Just a
+
+                ( Nothing, Just b ) ->
+                    Just b
+
+                ( Nothing, Nothing ) ->
+                    Nothing
+
+
+{-| -}
+intersect : Get key a -> Get key b -> Get key ( a, b )
+intersect =
+    Maybe.map2 Tuple.pair
+        |> map2Maybe
+
+
+{-| `diff a b` is b - a in the sense that we "pair a to the set of b"
+-}
+diff : Get key a -> Get key b -> Get key ( Maybe a, b )
+diff =
+    map2Maybe <|
+        \maybeB ->
+            Maybe.andThen (Tuple.pair maybeB >> Just)
+
+
+
+----
+
+
+{-| -}
+andGet : key -> Maybe (Get key a) -> Maybe a
 andGet =
     get >> Maybe.andThen
 
@@ -635,7 +708,7 @@ andGet =
         --> Just (-2)
 
 -}
-andThen : (a -> Get b) -> Get a -> Get (Get b)
+andThen : (a -> Get key b) -> Get key a -> Get key (Get key b)
 andThen createGetB getA =
     getA
         >> Maybe.unwrap
@@ -656,21 +729,21 @@ andThen createGetB getA =
         --> Just (-2)
 
 -}
-andThenFlat : (a -> Get b) -> Get a -> Get b
+andThenFlat : (a -> Get key b) -> Get key a -> Get key b
 andThenFlat =
     composeWithTwoParameters andThen join
 
 
 {-| Like `andThen`, but you supply a fallible creator function
 -}
-andThenMaybe : (a -> Maybe (Get b)) -> Get a -> Get (Get b)
+andThenMaybe : (a -> Maybe (Get key b)) -> Get key a -> Get key (Get key b)
 andThenMaybe =
     mapParameter Maybe.andThen
 
 
 {-| Map the result of the first `get` to the next `get`
 -}
-andMap : Get (a -> b) -> Get a -> Get (Get b)
+andMap : Get key (a -> b) -> Get key a -> Get key (Get key b)
 andMap getAB getA =
     getAB
         >> Maybe.map
@@ -682,7 +755,7 @@ andMap getAB getA =
 {-| Like `andMap`, but apply the same key twice.
 Same as `mapByKey`!
 -}
-andMapFlat : Get (a -> b) -> Get a -> Get b
+andMapFlat : Get key (a -> b) -> Get key a -> Get key b
 andMapFlat =
     composeWithTwoParameters andMap join
 
@@ -702,7 +775,7 @@ andMapFlat =
         |> member Scene -> False
 
 -}
-member : Aspect -> Get a -> Bool
+member : key -> Get key a -> Bool
 member =
     composeWithTwoParameters get Maybe.isJust
 
@@ -728,7 +801,7 @@ get =
         --> "default"
 
 -}
-withDefault : a -> Get a -> (Aspect -> a)
+withDefault : a -> Get key a -> (key -> a)
 withDefault =
     mapParameter Maybe.withDefault
 
@@ -746,7 +819,7 @@ withDefault =
         --> [(Scene, "Hello"), (Control, "Hello")]
 
 -}
-toList : List Aspect -> Get a -> List ( Aspect, a )
+toList : List key -> Get key a -> List ( key, a )
 toList list getA =
     List.foldr
         (\key ->
@@ -771,14 +844,14 @@ or `consList`.
         --> [(Scene, "Scene 1"), (Control, "C")]
 
 -}
-fromList : List ( Aspect, a ) -> Get a
+fromList : List ( key, a ) -> Get key a
 fromList =
     --fromListWith : (Aspect -> a -> Get b -> Get b) -> List ( Aspect, a ) -> Get b
     fromListBy orAdd
 
 
 {-| -}
-toListBy : Get (a -> b) -> List Aspect -> Get a -> List b
+toListBy : Get key (a -> b) -> List key -> Get key a -> List b
 toListBy getAB aspects =
     andMapFlat getAB >> values aspects
 
@@ -790,13 +863,13 @@ toListBy getAB aspects =
     values [Scene, Control] (full 2) --> [2, 2]
 
 -}
-values : List Aspect -> Get a -> List a
+values : List key -> Get key a -> List a
 values list getA =
     List.foldr (getA >> Maybe.cons) [] list
 
 
 {-| -}
-keys : List Aspect -> Get a -> List Aspect
+keys : List key -> Get key a -> List key
 keys list getA =
     List.foldr
         (\key ->
@@ -809,20 +882,20 @@ keys list getA =
 
 {-| `concatLists = fromListBy addList`
 -}
-concatLists : List ( Aspect, List a ) -> Get (List a)
+concatLists : List ( key, List a ) -> Get key (List a)
 concatLists =
     fromListBy addList
 
 
 {-| `consLists = fromListBy consList`
 -}
-consLists : List ( Aspect, a ) -> Get (List a)
+consLists : List ( key, a ) -> Get key (List a)
 consLists =
     fromListBy consList
 
 
 {-| -}
-fromListBy : (Aspect -> a -> Get b -> Get b) -> List ( Aspect, a ) -> Get b
+fromListBy : (key -> a -> Get key b -> Get key b) -> List ( key, a ) -> Get key b
 fromListBy fu =
     List.map
         (\( key, a ) -> fu key a)

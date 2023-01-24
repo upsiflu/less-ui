@@ -1,6 +1,6 @@
 module Ui.Transformation exposing
     ( Transformation, neutral
-    , mapContent
+    , map, mapContent
     , difference
     )
 
@@ -8,22 +8,21 @@ module Ui.Transformation exposing
 
 @docs Transformation, neutral
 
-@docs mapContent
+@docs map, mapContent
 
 @docs difference
 
 -}
 
-import Ui.Layout.Aspect exposing (Aspect, intersect, subtract)
-import Ui.Layout.ViewModel exposing (Keyed)
 
-
-{-| Note that an `Aspect` of `Nothing` implies a global position.
+{-| A Transformation is the deviation of a Ui Item from the `neutral` state.
+It is defunctionalised so that different Ui states can be compared ([see `difference`](#difference)), and removals can be postponed
+for animation purposes.
 -}
-type alias Transformation content =
-    { occlude : List Aspect
-    , appendWhere : Maybe Aspect
-    , appendWhat : List (Keyed content)
+type alias Transformation aspect content =
+    { occlude : List aspect
+    , appendWhere : Maybe aspect
+    , appendWhat : List content
     }
 
 
@@ -39,7 +38,7 @@ type alias Transformation content =
     }
 
 -}
-neutral : Transformation content
+neutral : Transformation aspect content
 neutral =
     { occlude = []
     , appendWhere = Nothing
@@ -48,13 +47,26 @@ neutral =
 
 
 
----- Query ----
+---- Map ----
+
+
+{-| -}
+map : (content -> content2) -> Transformation aspect content -> Transformation aspect content2
+map fu { occlude, appendWhere, appendWhat } =
+    { occlude = occlude
+    , appendWhere = appendWhere
+    , appendWhat = List.map fu appendWhat
+    }
 
 
 {-| -}
 mapContent : (b -> b) -> { t | appendWhat : b } -> { t | appendWhat : b }
 mapContent fu t =
     { t | appendWhat = fu t.appendWhat }
+
+
+
+---- Query ----
 
 
 {-|
@@ -95,9 +107,9 @@ mapContent fu t =
 
 -}
 difference :
-    Transformation a
-    -> Transformation a
-    -> { addition : Transformation a, removal : Transformation a, unchanged : Transformation a }
+    Transformation aspect content
+    -> Transformation aspect content
+    -> { addition : Transformation aspect content, removal : Transformation aspect content, unchanged : Transformation aspect content }
 difference current previous =
     let
         ( addedContent, removedContent, unchangedContent ) =
@@ -106,6 +118,18 @@ difference current previous =
 
             else
                 ( current.appendWhat, previous.appendWhat, [] )
+
+        intersect : List a -> List a -> List a
+        intersect =
+            List.filter << isMemberOf
+
+        subtract : List a -> List a -> List a
+        subtract negative =
+            List.filter (not << isMemberOf negative)
+
+        isMemberOf : List a -> a -> Bool
+        isMemberOf list a =
+            List.member a list
     in
     { addition =
         { occlude =

@@ -1,7 +1,7 @@
 module Ui.Layout.ViewModel exposing
-    ( ViewModel, Foliage, Keyed
-    , empty
-    , appendGet, mapGet, appendHandle, mapHandle, append
+    ( ViewModel
+    , empty, full
+    , appendGet, maskGet, append
     , merge
     , concat, concatMap
     )
@@ -10,17 +10,17 @@ module Ui.Layout.ViewModel exposing
 
 You can probably ignore this module.
 
-@docs ViewModel, Foliage, Keyed
+@docs ViewModel
 
 
 # Create
 
-@docs empty
+@docs empty, full
 
 
 # Map
 
-@docs appendGet, mapGet, appendHandle, mapHandle, append
+@docs appendGet, maskGet, append
 
 
 # Compose
@@ -31,30 +31,23 @@ You can probably ignore this module.
 -}
 
 import Ui.Get as Get exposing (Get)
-import Ui.Layout.Aspect exposing (Aspect)
 
 
 {-| -}
-type alias ViewModel html =
-    { handle : Foliage html
-    , get : Get (Foliage html)
-    }
+type alias ViewModel aspect html =
+    { get : Get aspect (List html) }
 
 
 {-| -}
-type alias Foliage html =
-    List ( String, html )
-
-
-{-| -}
-type alias Keyed html =
-    ( String, html )
-
-
-{-| -}
-empty : ViewModel html
+empty : ViewModel aspect html
 empty =
-    { handle = [], get = Get.empty }
+    { get = Get.empty }
+
+
+{-| -}
+full : List html -> ViewModel aspect html
+full html =
+    { get = Get.full html }
 
 
 {-| Combine two ViewModels a and b into one, concatenating its contents like a++b.
@@ -69,60 +62,40 @@ empty =
     --> Just []
 
 -}
-merge : ViewModel html -> ViewModel html -> ViewModel html
+merge : ViewModel aspect html -> ViewModel aspect html -> ViewModel aspect html
 merge a b =
-    { handle = a.handle ++ b.handle
-    , get = Get.append a.get b.get
-    }
+    { get = Get.append a.get b.get }
 
 
 {-| `concat = List.foldl merge empty`
 -}
-concat : List (ViewModel html) -> ViewModel html
+concat : List (ViewModel aspect html) -> ViewModel aspect html
 concat =
     List.foldr merge empty
 
 
 {-| Merge the results of `fu`
 -}
-concatMap : (a -> ViewModel html) -> List a -> ViewModel html
+concatMap : (a -> ViewModel aspect html) -> List a -> ViewModel aspect html
 concatMap fu =
     List.map fu >> concat
 
 
 {-| -}
-mapGet : (Get (Foliage html) -> Get (Foliage html)) -> ViewModel html -> ViewModel html
-mapGet fu =
-    \v -> { v | get = fu v.get }
+maskGet : (Get aspect (List html) -> Get aspect (List html)) -> ViewModel aspect html -> ViewModel aspect html
+maskGet mask =
+    \v -> { v | get = mask v.get }
 
 
 {-| -}
-appendGet : Get (Foliage html) -> ViewModel html -> ViewModel html
+appendGet : Get aspect (List html) -> ViewModel aspect html -> ViewModel aspect html
 appendGet =
-    Get.append >> mapGet
-
-
-{-| -}
-mapHandle : (Foliage html -> Foliage html) -> ViewModel html -> ViewModel html
-mapHandle fu =
-    \v -> { v | handle = fu v.handle }
-
-
-{-| Note that appending is to the left.
--}
-appendHandle : Foliage html -> ViewModel html -> ViewModel html
-appendHandle foliage =
-    mapHandle (List.append foliage)
+    Get.append >> maskGet
 
 
 {-| Note that `Nothing` means the handle is appended. (ToDo: Make a nicer sum type to represent position)
 -}
-append : { a | appendWhat : Foliage html, appendWhere : Maybe Aspect } -> ViewModel html -> ViewModel html
+append : { a | appendWhat : List html, appendWhere : Maybe aspect } -> ViewModel (Maybe aspect) html -> ViewModel (Maybe aspect) html
 append { appendWhat, appendWhere } =
-    case appendWhere of
-        Just aspect ->
-            Get.singleton aspect appendWhat
-                |> appendGet
-
-        Nothing ->
-            appendHandle appendWhat
+    Get.singleton appendWhere appendWhat
+        |> appendGet
