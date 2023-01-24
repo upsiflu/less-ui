@@ -20,6 +20,7 @@ npm start
 _<small>A note to vscodium users: To activate the language server in your editor, choose "Open Folder..." and select `examples`.</small>_
 1. In that browser tab, you can activate the **Elm debugger** by clicking the `elm-watch` menu in the bottom left corner.
 1. Browse the **documentation** at [localhost:8000](http://localhost:8000/packages/upsiflu/restrictive-examples/latest).
+1. You can see the **Package Readme** on http://localhost:8099/packages/upsiflu/restrictive/latest
 1. Click on the `elm-watch hot` buttons in your terminal output to check for errors.
 
 **Have a lot of fun <3**
@@ -31,7 +32,7 @@ _<small>A note to vscodium users: To activate the language server in your editor
 A list of features, with code and examples. 
 [[Features.elm]](../src/Features.elm)
 
-Live server: [application.localhost:8001](http://features.localhost:8001)
+Live server: [features.localhost:8001](http://features.localhost:8001)
 
 ## Application
 

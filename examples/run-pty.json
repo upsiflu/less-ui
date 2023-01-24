@@ -55,7 +55,7 @@
       "edp",
       "--no-browser"
     ],
-    "title": "elm-doc-preview",
+    "title": "elm-doc-preview (examples)",
     "status": {
       "ERROR": [
         "🚨",
@@ -64,6 +64,26 @@
     },
     "defaultStatus": [
       "📚",
+      "+"
+    ]
+  },
+  {
+    "command": [
+      "edp",
+      "--no-browser",
+      "--port",
+      "8099",
+      "../"
+    ],
+    "title": "elm-doc-preview (Readme)",
+    "status": {
+      "ERROR": [
+        "🚨",
+        "E"
+      ]
+    },
+    "defaultStatus": [
+      "📄",
       "+"
     ]
   }

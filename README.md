@@ -1,4 +1,4 @@
-# Less power, less control, less fun? --- Less go for it!
+# Less power, less control? Less go for it!
 
 
 This WIP package constrains how you construct a Ui for your Elm app:
