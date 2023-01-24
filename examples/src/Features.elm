@@ -10,7 +10,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Ui
 import Ui.Application exposing (Application, application)
-import Ui.Layout exposing (Layout)
+import Ui.Layout
 import Ui.Layout.Aspect exposing (Aspect(..))
 import Ui.Link as Link
 import Ui.State

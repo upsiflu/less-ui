@@ -20,7 +20,6 @@ import NoExposingEverything
 import NoImportingEverything
 import NoMissingTypeAnnotation
 import NoMissingTypeAnnotationInLetIn
-import NoMissingTypeExpose
 import NoPrematureLetComputation
 import NoSimpleLetBody
 import NoUnused.CustomTypeConstructorArgs
@@ -38,14 +37,6 @@ import NoUnsortedTopLevelDeclarations
 import Simplify
 import ReviewPipelineStyles
 import ReviewPipelineStyles.Premade
-    exposing
-        ( noMultilineLeftPizza
-        , noPipelinesWithConfusingNonCommutativeFunctions
-        , noPipelinesWithSimpleInputs
-        , noRepeatedParentheticalApplication
-        , noSemanticallyInfixFunctionsInLeftPipelines
-        , noSingleLineRightPizza
-        )
 
 
 config : List Rule
@@ -57,7 +48,6 @@ config =
     , NoExposingEverything.rule
     , NoMissingTypeAnnotation.rule
     , NoMissingTypeAnnotationInLetIn.rule
-    --, NoMissingTypeExpose.rule
     , NoSimpleLetBody.rule
     , NoPrematureLetComputation.rule
     , NoUnused.CustomTypeConstructors.rule []
@@ -68,21 +58,16 @@ config =
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule
     , Simplify.rule Simplify.defaults
-    -- Enforce ordering of case patterns
     , NoUnsortedCases.rule
         (NoUnsortedCases.defaults
             |> NoUnsortedCases.sortListPatternsByLength
         )
-
-    -- Enforce ordering of let declarations
     , NoUnsortedLetDeclarations.rule
         (NoUnsortedLetDeclarations.sortLetDeclarations
             |> NoUnsortedLetDeclarations.usedInExpressionFirst
             |> NoUnsortedLetDeclarations.alphabetically
             |> NoUnsortedLetDeclarations.glueHelpersAfter
         )
-
-    -- Enforce ordering of record fields
     , NoUnsortedRecords.rule
         (NoUnsortedRecords.defaults
             |> NoUnsortedRecords.treatAllSubrecordsAsCanonical
@@ -91,10 +76,10 @@ config =
         )
     , ReviewPipelineStyles.rule <|
         List.concat
-            [ noSingleLineRightPizza
-            , noPipelinesWithSimpleInputs
-            , noRepeatedParentheticalApplication
-            , noPipelinesWithConfusingNonCommutativeFunctions
-            , noSemanticallyInfixFunctionsInLeftPipelines
+            [ ReviewPipelineStyles.Premade.noSingleLineRightPizza
+            , ReviewPipelineStyles.Premade.noPipelinesWithSimpleInputs
+            , ReviewPipelineStyles.Premade.noRepeatedParentheticalApplication
+            , ReviewPipelineStyles.Premade.noPipelinesWithConfusingNonCommutativeFunctions
+            , ReviewPipelineStyles.Premade.noSemanticallyInfixFunctionsInLeftPipelines
             ]
     ]

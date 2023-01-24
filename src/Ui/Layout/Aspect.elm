@@ -1,7 +1,7 @@
 module Ui.Layout.Aspect exposing
     ( Aspect(..)
     , all
-    , intersect, inverse, subtract
+    , inverse, subtract
     )
 
 {-| Categorise the parts of your [Ui item](Ui)
@@ -12,7 +12,7 @@ This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#togg
 
 @docs all
 
-@docs intersect, inverse, subtract
+@docs inverse, subtract
 
 -}
 
@@ -66,20 +66,3 @@ subtract : List Aspect -> List Aspect -> List Aspect
 subtract whatToSubstract =
     List.filter
         (\a -> not <| List.member a whatToSubstract)
-
-
-{-|
-
-    [ Scene, Control ]
-        |> intersect [ Control, Info ]
-        --> [Control]
-
-    [ Scene ]
-        |> intersect [ Control, Info ]
-        --> []
-
--}
-intersect : List Aspect -> List Aspect -> List Aspect
-intersect comparison =
-    List.filter
-        (\a -> List.member a comparison)

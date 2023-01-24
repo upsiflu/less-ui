@@ -366,8 +366,11 @@ destinationFragment =
         >> Maybe.andThen Tuple.second
 
 
-{-| Note that in Elm, an absolute Url path always starts with a slash.
-To check if the intended path is relative, we compare it with the previous path first.
+{-| Generates a Link, given the current path.
+
+Note that in Elm, an absolute Url path always starts with a slash.
+To check if the path is intended to be relative, we compare it with the previous path first.
+This is not absolutely necessary because the Elm runtime does the same check. However, it gives terser and more expressive Hrefs.
 
 In the following tests, we assume a previous path of "/"
 
@@ -436,15 +439,15 @@ In the following tests, we assume a previous path of "/"
 fromUrl : Path -> Url -> Link
 fromUrl currentPath url =
     case
-        { url
-            | path =
-                if currentPath == url.path then
-                    ""
+        Url.Codec.parseUrl codecs
+            { url
+                | path =
+                    if currentPath == url.path then
+                        ""
 
-                else
-                    url.path
-        }
-            |> Url.Codec.parseUrl codecs
+                    else
+                        url.path
+            }
     of
         Ok link ->
             link
