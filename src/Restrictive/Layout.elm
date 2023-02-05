@@ -25,21 +25,19 @@ import Restrictive.Layout.Region as Region exposing (Aspect(..), OrHeader(..), w
 
 
 {-| -}
-type alias Layout region html wrapper =
-    { forget : wrapper
-    , substitute : { current : wrapper, previous : wrapper }
-    , wrap : wrapper -> List html -> List html
+type alias Layout region html =
+    { forget : List html -> List html
+    , substitute : { current : List html -> List html, previous : List html -> List html }
     , view : Get (OrHeader region) (List html) -> List html
     , regions : List region
     }
 
 
 {-| -}
-default : Layout Aspect ( String, Html msg ) (List ( String, Html msg ) -> List ( String, Html msg ))
+default : Layout Aspect ( String, Html msg )
 default =
     { forget = poof
     , substitute = { current = identity, previous = \_ -> [] }
-    , wrap = identity
     , view =
         withHeader Region.allAspects
             |> Get.toListBy (niceLayout "")
@@ -48,11 +46,10 @@ default =
 
 
 {-| -}
-sceneOnly : Layout Aspect html (List html -> List html)
+sceneOnly : Layout Aspect html
 sceneOnly =
     { forget = \_ -> []
     , substitute = { current = identity, previous = \_ -> [] }
-    , wrap = identity
     , view =
         Get.get (Region Scene)
             >> Maybe.withDefault []
@@ -61,11 +58,10 @@ sceneOnly =
 
 
 {-| -}
-list : List region -> Layout region ( String, element ) (List ( String, element ) -> List ( String, element ))
+list : List region -> Layout region ( String, element )
 list allAspects =
     { forget = List.map <| \( _, v ) -> ( "-", v )
     , substitute = { current = identity, previous = \_ -> [] }
-    , wrap = identity
     , view = Get.concatValues (Header :: List.map Region allAspects)
     , regions = allAspects
     }
@@ -82,10 +78,9 @@ poof =
 
 
 {-| -}
-withClass : String -> Layout Aspect ( String, Html msg ) (List ( String, Html msg ) -> List ( String, Html msg ))
+withClass : String -> Layout Aspect ( String, Html msg )
 withClass prefix =
     { forget = poof
-    , wrap = identity
     , substitute = { current = identity, previous = \_ -> [] }
     , view =
         withHeader Region.allAspects

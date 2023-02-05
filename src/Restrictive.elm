@@ -64,8 +64,8 @@ type alias Application model modelMsg =
 
 
 {-| -}
-type alias Document aspect html wrapper =
-    { body : Ui aspect html wrapper, layout : Layout aspect html wrapper, title : String }
+type alias Document aspect html =
+    { body : Ui aspect html, layout : Layout aspect html, title : String }
 
 
 {-| Separate Url update from Model update
@@ -86,7 +86,7 @@ type alias Document aspect html wrapper =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : model -> Document aspect ( String, Html modelMsg ) wrapper
+    , view : model -> Document aspect ( String, Html modelMsg )
     }
     -> Application model modelMsg
 application config =
@@ -190,7 +190,7 @@ type Msg modelMsg
 
 
 {-| -}
-bounce : { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) } -> Ui aspect ( String, Html msg ) wrapper
+bounce : { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) } -> Ui aspect ( String, Html msg )
 bounce =
     State.bounce
         >> State.inlineLink
@@ -203,7 +203,7 @@ bounce =
 
 
 {-| -}
-goTo : ( Maybe Path, Fragment ) -> Ui aspect ( String, Html msg ) wrapper
+goTo : ( Maybe Path, Fragment ) -> Ui aspect ( String, Html msg )
 goTo =
     State.goTo
         >> State.inlineLink
@@ -216,7 +216,7 @@ goTo =
 
 
 {-| -}
-toggle : Flag -> Ui aspect ( String, Html msg ) wrapper
+toggle : Flag -> Ui aspect ( String, Html msg )
 toggle =
     State.toggle
         >> State.inlineLink
