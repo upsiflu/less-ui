@@ -11,7 +11,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout as Layout
-import Restrictive.Layout.Aspect exposing (Aspect(..))
+import Restrictive.Layout.Region exposing (Aspect(..))
 import Restrictive.State
 import Restrictive.Ui as Ui
 
@@ -41,11 +41,11 @@ update msg garden =
 
 
 type alias Ui =
-    Restrictive.Ui.Ui Aspect ( String, Html Msg ) (List ( String, Html Msg ) -> List ( String, Html Msg ))
+    Ui.Ui Aspect ( String, Html Msg )
 
 
 type alias Document =
-    Restrictive.Document Aspect ( String, Html Msg ) (List ( String, Html Msg ) -> List ( String, Html Msg ))
+    Restrictive.Document Aspect ( String, Html Msg )
 
 
 view : Garden -> Document
@@ -53,8 +53,7 @@ view garden =
     { body =
         page
             |> Ui.with Scene
-                (Restrictive.State.toggle "rhododendron"
-                    |> Ui.Link.view (Ui.Link.preset.global [] [ Html.text "rhododendron" ])
+                (Restrictive.toggle "rhododendron"
                     |> Ui.with Control
                         (Rhododendron.view RhododendronMsg garden.rhododendron)
                 )
