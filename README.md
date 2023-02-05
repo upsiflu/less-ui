@@ -11,6 +11,9 @@
   - `(++) : Ui -> Ui -> Ui` to concatenate Uis. 
 - No layout in your views: Define soft transitions, visual wrappers, and a global semantic Layout only once.
 
+**Play with me!** [Online demo on elm-editor.com](https://elm-editor.com/?project-state=https%3A%2F%2Fgithub.com%2Fupsiflu%2Frestrictive%2Ftree%2Fc29dcbfec0a4c8f56149335db5e3a206a55c0cc6%2F&project-state-hash=c0ec0715a1b24d945334d382c55186d3594b48443a824c459eb8584bf10c9264)
+
+
 **Outside of the scope of this package:**
 
 This package can help you create predictable and pleasurable interfaces without making design decisions. It is not a complete Ui package.

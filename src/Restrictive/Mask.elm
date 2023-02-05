@@ -53,7 +53,8 @@ type alias Mask key a =
 ---- CREATE ----
 
 
-{-| -}
+{-| `transparent = identity`
+-}
 transparent : Mask key a
 transparent =
     identity

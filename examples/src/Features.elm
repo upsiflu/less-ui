@@ -48,11 +48,10 @@ type alias Ui =
     Ui.Ui
         Aspect
         ( String, Html () )
-        (List ( String, Html () ) -> List ( String, Html () ))
 
 
 type alias Document =
-    Restrictive.Document Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
+    Restrictive.Document Aspect ( String, Html () )
 
 
 view : Features -> Document
@@ -60,7 +59,7 @@ view _ =
     let
         showTab : String -> Ui -> Ui
         showTab str contents =
-            toggle (String.replace " " "-" str)
+            Restrictive.toggle (String.replace " " "-" str)
                 |> Ui.with Scene contents
     in
     { body =
@@ -87,49 +86,23 @@ ui =
         |> Ui.with Info (Ui.textLabel "Info")
 
 
-toggle : String -> Ui
-toggle props =
-    Restrictive.State.toggle props
-        |> Restrictive.State.inlineLink
-        |> Ui.custom
-
-
-goTo : ( Maybe Restrictive.State.Path, Restrictive.State.Fragment ) -> Ui
-goTo props =
-    Restrictive.State.goTo props
-        |> Restrictive.State.inlineLink
-        --ViewModel.Change region ( String, Html msg ))
-        |> Ui.custom
-
-
-
---(( OrHeader aspect, Url ) -> ViewModel.Change aspect html) -> Ui aspect html wrapper
-
-
-bounce : { there : ( Maybe Restrictive.State.Path, Restrictive.State.Fragment ), here : ( Maybe Restrictive.State.Path, Restrictive.State.Fragment ) } -> Ui
-bounce props =
-    Restrictive.State.bounce props
-        |> Restrictive.State.inlineLink
-        |> Ui.custom
-
-
 {-| [Application](Ui.Application): Sever Route from Model
 -}
 paths : Restrictive.State.Path -> Ui
 paths path =
     Ui.singleton
         |> Ui.with Scene (Ui.textLabel ("Path: " ++ path))
-        |> Ui.with Control (goTo ( Just "Path-1", Nothing ))
-        |> Ui.with Control (goTo ( Just "Path-2", Nothing ))
-        |> Ui.with Control (goTo ( Just "", Nothing ))
-        |> Ui.with Control (goTo ( Nothing, Nothing ))
-        |> Ui.with Control (goTo ( Nothing, Just "99" ))
+        |> Ui.with Control (Restrictive.goTo ( Just "Path-1", Nothing ))
+        |> Ui.with Control (Restrictive.goTo ( Just "Path-2", Nothing ))
+        |> Ui.with Control (Restrictive.goTo ( Just "", Nothing ))
+        |> Ui.with Control (Restrictive.goTo ( Nothing, Nothing ))
+        |> Ui.with Control (Restrictive.goTo ( Nothing, Just "99" ))
 
 
 globalNav : Ui
 globalNav =
     [ "Introduction", "First Steps", "Last Steps" ]
-        |> List.concatMap (\title -> goTo ( Just title, Nothing ))
+        |> List.concatMap (\title -> Restrictive.goTo ( Just title, Nothing ))
 
 
 {-| [Link](Ui.Link): Manage the Ui State as a URL
@@ -149,7 +122,7 @@ fragments fr =
     in
     Ui.singleton
         |> Ui.with Control
-            (bounce
+            (Restrictive.bounce
                 { here = ( Nothing, Just "1" ), there = ( Nothing, Just "3" ) }
             )
         |> Ui.with Scene

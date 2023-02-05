@@ -557,7 +557,7 @@ view config link =
                 let
                     ( isChecked, mask ) =
                         if hasFlag flag url then
-                            ( "true", identity )
+                            ( "true", Mask.transparent )
 
                         else
                             ( "false", Mask.occludeOrAll config.occlusions )
@@ -575,7 +575,7 @@ view config link =
                 { linkHtml =
                     linkWithAttributes []
                         |> Get.singleton (config.position region)
-                , occlude = identity
+                , occlude = Mask.transparent
                 }
 
 

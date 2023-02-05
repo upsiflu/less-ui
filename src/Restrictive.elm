@@ -189,7 +189,8 @@ type Msg modelMsg
     | ModelMsg modelMsg
 
 
-{-| -}
+{-| As of now, will only attach an inline text link, not occlude any regions
+-}
 bounce : { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) } -> Ui aspect ( String, Html msg )
 bounce =
     State.bounce
@@ -202,7 +203,8 @@ bounce =
         >> Ui.custom
 
 
-{-| -}
+{-| As of now, will only attach an inline text link, not occlude any regions
+-}
 goTo : ( Maybe Path, Fragment ) -> Ui aspect ( String, Html msg )
 goTo =
     State.goTo
@@ -215,7 +217,11 @@ goTo =
         >> Ui.custom
 
 
-{-| -}
+{-| Will add an inline text link and occlude all regions while unchecked.
+
+    a[role="switch"]:aria-checked {}
+
+-}
 toggle : Flag -> Ui aspect ( String, Html msg )
 toggle =
     State.toggle
