@@ -32,6 +32,37 @@ article {
     animation: come .4s;
 }
 
+fieldset {
+    border: 1px groove currentColor;
+}
+
+fieldset>label {
+    display       : flex;
+    flex-direction: row;
+    align-items   : baseline;
+}
+
+label>input+button {
+    margin-left: 4px;
+    clip-path  : polygon(0 -4px, calc(100% + 4px) -4px, calc(100% + 4px) calc(100% + 4px), 0px calc(100% + 4px));
+}
+
+input:has(+button) {
+    border-right: 0px;
+    margin-right: -4px;
+}
+
+label>span:first-of-type {
+    min-width: 4rem;
+    display  : inline-block;
+}
+
+:not(p) ul {
+    list-style: none;
+    padding   : 0;
+    margin    : 0;
+}
+
 .handle,
 .info,
 .control {
@@ -93,18 +124,35 @@ a:link[href] {
     text-decoration: underline;
 }
 
-button {
+button,
+input {
     background: #bbb;
     padding   : 2px 10px;
     border    : 4px #ddd outset;
+    outline   : 4px solid #bababa;
+}
+
+input {
+    border-style: inset;
+}
+
+label>span+input,
+label+button {
+    margin-left: 8px;
+}
+
+input:focus,
+input:hover {
+    background: white;
 }
 
 button:active {
     border: 4px #ccc inset;
 }
 
-button:focus {
-    outline: 2px double black;
+button:focus,
+input:focus {
+    outline: 4px solid orange;
 }
 
 
@@ -254,9 +302,6 @@ article {
 /*-------------------------------------------*/
 /* Garden */
 
-.rhododendron {
-    border: 1px solid white;
-}
 
 /*-------------------------------------------*/
 /* Features */

@@ -12,7 +12,6 @@ import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout as Layout
 import Restrictive.Layout.Region exposing (Aspect(..))
-import Restrictive.State
 import Restrictive.Ui as Ui
 
 

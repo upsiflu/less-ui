@@ -90,9 +90,10 @@ view howToMessage ((Rhododendron label _) as rhododendron) =
     let
         controls : Ui msg
         controls =
-            ( "button", button [ onClick (Grow |> howToMessage) ] [ text "append" ] )
-                |> Ui.html
-                |> (++) (( "edit", input [ onInput (Edit label >> howToMessage) ] [ Html.text label ] ) |> Ui.html |> Ui.addTextLabel "Edit")
+            [ ( "edit", input [ onInput (Edit label >> howToMessage) ] [ Html.text label ] ), ( "button", button [ onClick (Grow |> howToMessage) ] [ text "append" ] ) ]
+                |> Ui.foliage
+                |> Ui.addTextLabel "Edit"
+                |> Ui.wrap ((::) ( "legend", Html.legend [] [ Html.text "Rododendron" ] ) >> Html.Keyed.node "fieldset" [] >> Tuple.pair "rhodo" >> List.singleton)
 
         scene : Rhododendron -> Ui msg
         scene (Rhododendron s descendants) =
