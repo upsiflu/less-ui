@@ -1,4 +1,4 @@
-module Ui exposing
+module Restrictive.Ui exposing
     ( Ui, Descendant
     , singleton, html, textLabel, foliage, fromList
     , wrap
@@ -10,14 +10,16 @@ module Ui exposing
     , ol, ul, node
     , uncons
     , handle
-    , custom
+    , custom, page
     , indexedMap, mapList
     , mapEach, map2
     , ifJust, notIf, none
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
-and build accessible patterns orthogonal to the Dom tree
+and build accessible patterns orthogonal to the Dom tree.
+
+Ui is headless (like elm-widgets will be).
 
 @docs Ui, Descendant
 
@@ -75,7 +77,7 @@ For convenient functions and inspiration, check out the [Link](Ui.Link) module w
 interface with the Ui context.
 
 @docs handle
-@docs custom
+@docs custom, page
 
 
 ## Map
@@ -102,12 +104,11 @@ import Html.Attributes as Attr
 import Html.Keyed
 import List.Extra as List
 import Maybe.Extra as Maybe
-import Ui.Get as Get exposing (Get)
-import Ui.Layout exposing (Layout)
-import Ui.Layout.ViewModel as ViewModel exposing (ViewModel)
-import Ui.Mask as Mask
-import Ui.State exposing (State)
-import Ui.Transformation as Transformation exposing (Transformation)
+import Restrictive.Get as Get exposing (Get)
+import Restrictive.Layout exposing (Layout)
+import Restrictive.Layout.Region as Region exposing (OrHeader(..))
+import Restrictive.Mask as Mask exposing (Mask)
+import Restrictive.State as State exposing (State)
 import Url exposing (Url)
 
 
@@ -122,10 +123,29 @@ type Descendant aspect html wrapper
     | Wrap wrapper (Ui aspect html wrapper)
 
 
-{-| -}
+{-| An Item logically nests `Ui`s and may dybamically react to the Url.
+Only `Dynamic` aspects produce `Header` content.
+
+For example,
+
+  - an inline toggle link will
+      - ask the Url whether the toggle is on or off
+      - if off, then hide all regions `Mask.occludeOrAll occlusions`
+      - place the toggle link itself `Get.append (Get.singleton inlineRegion (foliage link))`
+      - activate the Header region `Get.mapKey Region.justRegion`
+  - a page link will
+      - ask the Url whether the path includes the page path
+      - if yes, replace the item's `get` with the page `superimpose (Get.singleton inlineRegion pageUi)`
+      - activate the Header region `Get.mapKey Region.justRegion`
+      - place the page link itself `Get.append (Get.singleton Header (foliage link))`
+  - a constant header (`handle`) will
+      - activate the Header region `Get.mapKey Region.justRegion`
+      - place the handle content `Get.append (Get.singleton Header (foliage handle))`
+
+-}
 type alias Item aspect html wrapper =
-    { contingentTransformation : Maybe (( aspect, State ) -> Transformation aspect html)
-    , get : Get aspect (Ui aspect html wrapper)
+    { get : Get aspect (Ui aspect html wrapper)
+    , mask : ( OrHeader aspect, Url ) -> Mask (OrHeader aspect) (Ui aspect html wrapper)
     }
 
 
@@ -254,10 +274,10 @@ with aspect subUi =
             case original of
                 Twig foliage_ maybeItem ->
                     Maybe.map
-                        (\it -> Just { it | get = Get.addList aspect subUi it.get })
+                        (\item_ -> Just { item_ | get = Get.addList aspect subUi item_.get })
                         maybeItem
                         |> Maybe.withDefaultLazy
-                            (\() -> Just { contingentTransformation = Nothing, get = Get.singleton aspect subUi })
+                            (\() -> Just { get = Get.singleton aspect subUi, mask = always identity })
                         |> Twig foliage_
 
                 Wrap fu ui ->
@@ -462,76 +482,94 @@ As the following example shows, you can substitute Html by any other type:
         --> Just [ ("Scene", 1), ("Info", 200), ("Info", 201), ("Control", 3) ]
 
 -}
-view : { current : State, previous : Maybe State } -> Layout aspect html wrapper -> Ui aspect html wrapper -> List html
-view { current, previous } layout =
+view : State -> Layout aspect html wrapper -> Ui aspect html wrapper -> List html
+view state layout =
     let
-        viewUi : aspect -> Ui aspect html wrapper -> ViewModel (Maybe aspect) html
+        viewUi : OrHeader aspect -> Ui aspect html wrapper -> Get (OrHeader aspect) (List html)
         viewUi aspect =
-            ViewModel.concatMap <|
+            Get.concatMap <|
                 \descendant ->
                     case descendant of
                         Twig foliage_ maybeItem ->
                             Maybe.map (viewItem aspect) maybeItem
-                                |> Maybe.withDefault ViewModel.empty
-                                |> ViewModel.appendGet (Get.singleton (Just aspect) foliage_)
+                                |> Maybe.withDefault Get.empty
+                                |> Get.append (Get.singleton aspect foliage_)
 
-                        Wrap wrapper descList ->
-                            viewUi aspect descList
-                                |> ViewModel.maskGet (Get.update (Just aspect) (layout.wrap wrapper))
+                        Wrap wrapper ui_ ->
+                            viewUi aspect ui_
+                                |> Get.update aspect (layout.wrap wrapper)
 
-        viewItem : aspect -> Item aspect html wrapper -> ViewModel (Maybe aspect) html
+        viewItem : OrHeader aspect -> Item aspect html wrapper -> Get (OrHeader aspect) (List html)
         viewItem aspect item =
-            let
-                { addition, removal, unchanged } =
-                    Maybe.withDefault (\_ -> Transformation.neutral) item.contingentTransformation
-                        |> (\apply ->
-                                Transformation.difference
-                                    (apply ( aspect, current ))
-                                    (apply ( aspect, Maybe.withDefault current previous ))
-                           )
+            -- Calculate the mutation between the states     -> Get (OrHeader aspect) (Mutation(List html))
+            State.map
+                (\url_ ->
+                    item.mask ( aspect, url_ ) (Get.mapKey Region.justRegion item.get)
+                        -- Render logically nested Uis
+                        |> Get.mapByKey viewUi
+                        |> Get.values (Region.withHeader layout.regions)
+                        |> Get.concat
+                )
+                state
+                |> Get.mutation
+                -- Resolve the mutation                          -> Get (OrHeader aspect) (List html)
+                |> Get.map
+                    (\mutation ->
+                        case mutation of
+                            Get.Substitution m ->
+                                layout.wrap layout.substitute.current m.current ++ layout.wrap layout.substitute.previous m.previous
 
-                -- calculate
-                --
-            in
-            Mask.occludeList unchanged.occlude item.get
-                -- DRAW ADDED AND REMOVED VIEWMODELS
-                |> Get.mapByKey
-                    (\aspect_ -> viewUi aspect_)
-                -- INCLUDE THE NOTHING ASPECT
-                |> Get.mapKey identity
-                -- MARK NEWLY OCCLUDED VIEWMODELS
-                |> Get.updateWhere
-                    (\key -> List.member key (List.map Just addition.occlude))
-                    (layout.wrap layout.forget
-                        |> Get.map
-                        |> ViewModel.maskGet
+                            Get.Insertion a ->
+                                a
+
+                            Get.Deletion a ->
+                                layout.wrap layout.forget a
+
+                            Get.Protraction a ->
+                                a
                     )
-                ------------
-                -- DONE WITH GET -- FLATTEN THE HIERARCHY -- IT'S OVER!
-                |> Get.values (Nothing :: List.map Just layout.all)
-                |> ViewModel.concat
-                ------------
-                -- NOW FOR DYNAMIC APPENDING
-                |> ViewModel.append unchanged
-                |> ViewModel.append addition
-                -- REMOVAL-APPEND MUST BE MARKED AS NEWLY REMOVED BY LAYOUT.
-                --
-                -- WE HAVE
-                -- A mask for removals that responds to any aspect, and is able to map aspects --
-                -- Do we really want to move things around on the screen?
-                -- I.e. if I go away from a page, or if I close a dialog, should this dialog appear somewhere,
-                -- in a different form, to remind me what was there?
-                -- Probably not. Probably we just want to replace the things with a fading memory, just to keep the
-                -- transitions through the app a little less jarring...
-                -- WE WANT
-                |> ViewModel.append
-                    { removal
-                        | appendWhat = layout.wrap layout.forget removal.appendWhat
-                    }
+
+        -- DONE
+        {-
+           -- OCCLUDE ASPECTS THAT REMAIN OCCLUDED ACROSS THIS TRANSITION
+           Mask.occludeOrAll unchanged.occlude item.get
+               -- DRAW ADDED AND REMOVED VIEWMODELS
+               |> Get.mapByKey viewUi
+               -- MARK NEWLY OCCLUDED VIEWMODELS
+               |> Get.updateWhere
+                   (Transformation.isMember addition.occlude)
+                   (layout.wrap layout.forget
+                       |> Get.map
+                       |> ViewModel.maskGet
+                   )
+               -- INCLUDE THE HEADER ASPECT
+               |> Get.mapKey Transformation.justRegion
+               ------------: Get (OrHeader aspect) (ViewModel (OrHeader aspect) html)
+               -- DONE WITH REGIONS -- FLATTEN!
+               |> Get.values allWithHeader
+               |> ViewModel.concat
+               ------------: ViewModel (OrHeader aspect) html
+               -- NOW FOR DYNAMIC APPENDING
+               |> ViewModel.append (Transformation.mapList (viewUi aspect >> .get >> Get.values allWithHeader >> List.concat) unchanged)
+               |> ViewModel.append (Transformation.mapList (viewUi aspect >> .get >> Get.values allWithHeader >> List.concat) addition)
+               -- REMOVAL-APPEND MUST BE MARKED AS NEWLY REMOVED BY LAYOUT
+               |> ViewModel.append
+                   (Transformation.mapList (viewUi aspect >> .get >> Get.values allWithHeader >> List.concat >> layout.wrap layout.forget) removal)
+        -}
+        -- TODO: When appending, we want to append anywhere, not only in one place. So we need to expand Transformation!
+        -- TODO: Specifically, When we add a link or handle, it is only added in one region, but if we add a page, we want to proliferate Controls and
+        -- nested handles and info and so on.
+        -- TODO: Solution: Transformation _is_ {occlude : OrAll region, viewModel : ViewModel (orHeader region)...}
+        -- Difference between transformations is {addition : {occlude, viewModel}, removal : {occlude, viewModel}, unchanged : {occlude, viewModel}}
+        -- and then we can integrate these here easily by merging before the `Get.values... |> ViewModel.concat`
+        -- TODO: Can we replace the notion of mask as list of aspects by mask as mask? Then we can do `Get.mutationTo`
+        -- Interesting to make a diagram with the possible transformations (Get k a, Get k (Mutation a), Mask k a, List a, OrHeader a, OrAll a,...)
+        -- And then remove everything we don't need any more...
+        -- DONE :-)
     in
-    case List.head layout.all of
+    case List.head layout.regions of
         Just initial ->
-            viewUi initial >> layout.view
+            viewUi (Region initial) >> layout.view
 
         Nothing ->
             \_ -> []
@@ -541,12 +579,26 @@ view { current, previous } layout =
 ---- Working with contingent transformations ----
 
 
-{-| Here you can add your own button, input, or indicator.
+{-| Here you can add your own button, input, or indicator in the Header region.
 -}
 handle : List html -> Ui aspect html wrapper
-handle html_ =
-    (always >> custom)
-        { occlude = [], appendWhere = Nothing, appendWhat = html_ }
+handle foliage_ =
+    foliage foliage_
+        |> Get.singleton Header
+        |> Get.append
+        |> always
+        |> custom
+
+
+{-| Whatever you add to this item will only be visible . Use `bounce` and `goTo` links to navigate to the corresponding path.
+-}
+page : State.Path -> Ui aspect html wrapper -> Ui aspect html wrapper
+page path_ ui_ =
+    custom <|
+        \( region, url ) ->
+            Get.singleton region ui_
+                |> Get.append
+                |> Mask.filter (\_ -> State.getPath url == path_)
 
 
 {-| This interface is mostly interesting for library authors.
@@ -668,9 +720,12 @@ handle html_ =
         -->  [ "/Cool", "/Hot", "Cool page is open", "-" ]
 
 -}
-custom : (( aspect, Url ) -> Transformation aspect html) -> Ui aspect html wrapper
-custom h =
-    fromItem { contingentTransformation = Just h, get = Get.empty }
+custom : (( OrHeader aspect, Url ) -> Mask (OrHeader aspect) (Ui aspect html wrapper)) -> Ui aspect html wrapper
+custom mask =
+    fromItem
+        { get = Get.empty
+        , mask = mask
+        }
 
 
 
@@ -702,15 +757,3 @@ none =
 toHtml : List ( String, Html msg ) -> Html msg
 toHtml =
     Html.Keyed.node "div" []
-
-
-
----- Testing ----
-{- Get aspect the length of keyed Html for each Aspect, given the Url "<http://localhost/">
-
-   lengths : Ui msg -> Get aspect Int
-   lengths ui =
-       Url.fromString "http://localhost/"
-           |> Maybe.map (\url -> render url ui |> .get |> Get.map List.length)
-           |> Maybe.withDefault Get.empty
--}

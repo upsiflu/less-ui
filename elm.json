@@ -5,16 +5,13 @@
     "license": "MIT",
     "version": "0.5.0",
     "exposed-modules": [
-        "Ui",
-        "Ui.Layout",
-        "Ui.Mask",
-        "Ui.Get",
-        "Ui.Application",
-        "Ui.Link",
-        "Ui.State",
-        "Ui.Layout.Aspect",
-        "Ui.Layout.ViewModel",
-        "Ui.Transformation"
+        "Restrictive",
+        "Restrictive.Ui",
+        "Restrictive.Mask",
+        "Restrictive.Get",
+        "Restrictive.State",
+        "Restrictive.Layout",
+        "Restrictive.Layout.Region"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {

@@ -1,15 +1,21 @@
 # Less power, less control? Less go for it!
 
 - No Url in your Model: The complete Ui state is resides in the Url, not in your Elm code
+
+(in other words: Get rid of user interface related `Msg`s
+-> `Application`)
+
 - No mingling of logic and presentation: Write a `view` for your type, then declare how the views are composed: 
-- - `with : aspect -> Ui -> Ui -> Ui` to nest elements semantically
-- - `wrap : wrapper -> Ui -> Ui` to nest elements of one semantic aspect visually
-- - `(++) : Ui -> Ui -> Ui` to concatenate Uis.
+  - `with : aspect -> Ui -> Ui -> Ui` to nest elements semantically
+  - `wrap : wrapper -> Ui -> Ui` to nest elements of one semantic aspect visually
+  - `(++) : Ui -> Ui -> Ui` to concatenate Uis. 
 - No layout in your views: Define soft transitions, visual wrappers, and a global semantic Layout only once.
 
 **Outside of the scope of this package:**
 
-- No inaccessible, invalid, inconsistently styled Html – Use _elm-w3_, _elm-widgets_, _elm-ui+ and friends
+This package can help you create predictable and pleasurable interfaces without making design decisions. It is not a complete Ui package.
+
+- No inaccessible, invalid, inconsistently styled Html – Use _elm-w3_, _elm-widgets_, _elm-ui_ and friends
 - No interactive controls without corresponding Model types: This will probably be a separate package because it's beyond the scope of this one. I love
   the concept of Codecs _elm-codec_, _elm-url-codec_) where you define two-way relations between types. 
   The new package will be a Codec between your Model type and a corresponding Component, adhering to UX best practices.
@@ -19,10 +25,11 @@
 - It is headless, so you need to bring your own widget framework such as _elm-widgets_ and _elm-ui_.
   There is a convergence in the Ui APIs, and Restrictive adheres to this standard so that you can easily
   integrate it with these. No need to learn yet another API.
-- TODO: On the side of Routing and Data it aims to worl well with elm-pages v3.
+- TODO: On the side of Routing and Data it aims to work well with elm-pages v3.
 - Being `Restrictive`, the focus is on offering a very limited set of semantically sound and conventional features to manage Ui state. 
   All interactive components this library offers are "Links" that map from a given Url to another. As far as possible, they should
   render as `<a href>`, and only Tabs should render as `<button>`s. You need to use other libraries to modify your `Model`.
+- You get high degree of cohesion so it's useful for quick, small projects, unlike _elm-pages_ which allows for stronger decoupling (?).
 
 **By integrating `Restrictive`, you get the following benefits:**
 

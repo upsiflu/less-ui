@@ -1,15 +1,14 @@
 {
   "root": "../src",
   "tests": [
-    "Ui",
-    "Ui.Application",
-    "Ui.Get",
-    "Ui.Layout",
-    "Ui.Layout.Aspect",
-    "Ui.Layout.ViewModel",
-    "Ui.Link",
-    "Ui.State",
-    "Ui.Mask",
-    "Ui.Transformation"
+    "Restrictive",
+    "Restrictive.Ui",
+    "Restrictive.Mask",
+    "Restrictive.Get",
+    "Restrictive.State",
+    "Restrictive.Layout",
+    "Restrictive.Layout.Aspect",
+    "Restrictive.Layout.ViewModel",
+    "Restrictive.Transformation"
   ]
 }

@@ -9,12 +9,11 @@ module Garden exposing (Garden, main, Msg)
 import Garden.Rhododendron as Rhododendron exposing (Rhododendron)
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Ui
-import Ui.Application exposing (Application, application)
-import Ui.Layout as Layout
-import Ui.Layout.Aspect exposing (Aspect(..))
-import Ui.Link
-import Ui.State
+import Restrictive exposing (Application, application)
+import Restrictive.Layout as Layout
+import Restrictive.Layout.Aspect exposing (Aspect(..))
+import Restrictive.State
+import Restrictive.Ui as Ui
 
 
 {-| -}
@@ -42,19 +41,19 @@ update msg garden =
 
 
 type alias Ui =
-    Ui.Ui Aspect ( String, Html Msg ) (List ( String, Html Msg ) -> List ( String, Html Msg ))
+    Restrictive.Ui.Ui Aspect ( String, Html Msg ) (List ( String, Html Msg ) -> List ( String, Html Msg ))
 
 
 type alias Document =
-    Ui.Application.Document Aspect ( String, Html Msg ) (List ( String, Html Msg ) -> List ( String, Html Msg ))
+    Restrictive.Document Aspect ( String, Html Msg ) (List ( String, Html Msg ) -> List ( String, Html Msg ))
 
 
-view : ( Ui.State.Path, Ui.State.Fragment ) -> Garden -> Document
-view _ garden =
+view : Garden -> Document
+view garden =
     { body =
         page
             |> Ui.with Scene
-                (Ui.Link.toggle "rhododendron"
+                (Restrictive.State.toggle "rhododendron"
                     |> Ui.Link.view (Ui.Link.preset.global [] [ Html.text "rhododendron" ])
                     |> Ui.with Control
                         (Rhododendron.view RhododendronMsg garden.rhododendron)

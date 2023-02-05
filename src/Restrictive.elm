@@ -1,9 +1,17 @@
-module Ui.Application exposing (application, Application, Document, Msg)
+module Restrictive exposing
+    ( application, Application, Document, Msg
+    , toggle, goTo, bounce
+    )
 
 {-| In contrast to `Browser.Application`, this module maks the `Url` the
 single source of truth for the state of your user interface.
 
 @docs application, Application, Document, Msg
+
+
+# Links
+
+@docs toggle, goTo, bounce
 
 ---
 
@@ -41,41 +49,18 @@ This opens two possible pitfalls:
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (Html)
-import Ui exposing (Ui)
-import Ui.Layout exposing (Layout)
-import Ui.Link
-import Ui.State exposing (Fragment, Path, State)
+import Restrictive.Get as Get exposing (Get)
+import Restrictive.Layout exposing (Layout)
+import Restrictive.Layout.Region as Region exposing (OrHeader(..))
+import Restrictive.Mask as Mask exposing (Mask)
+import Restrictive.State as State exposing (Flag, Fragment, Path, State)
+import Restrictive.Ui as Ui exposing (Ui)
 import Url exposing (Url)
 
 
-{-| An Api for `href` composition!
-
-Discussion: Is `Handle` just for the links in the top area of the
-app, or for all Flag manipulating links (including tabs inside
-the Control), or for all internal links?
-
-  - It is very reassuring to know which layout area a node is drawn in
-
-  - Nesting a Scene in a Control means that the Control 'controls' the
-    Scene. So it may be feasible to say:
-
-    Scene a
-    Handle h (with some static content)
-    Control c
-    Scene b
-
-which means, Scene a contains Scene b if Handle h is `on`
-(Control c is transparent)
-
-  - We don't know enough about links. It would be smart to visualise
-    all hrefs in the google docs example.
-    For example, the Menu link implements a dropdown, i.e. 'spring-
-    loaded' state, so the flag must auto-delete when a new context is
-    opened.
-
--}
+{-| -}
 type alias Application model modelMsg =
-    Program () ( Nav.Key, { current : State, previous : Maybe State }, model ) (Msg modelMsg)
+    Program () ( Nav.Key, State, model ) (Msg modelMsg)
 
 
 {-| -}
@@ -101,7 +86,7 @@ type alias Document aspect html wrapper =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : ( Path, Fragment ) -> model -> Document aspect ( String, Html modelMsg ) wrapper
+    , view : model -> Document aspect ( String, Html modelMsg ) wrapper
     }
     -> Application model modelMsg
 application config =
@@ -110,10 +95,10 @@ application config =
             \_ url key ->
                 let
                     ( ( updatedModel, modelCmd ), initialState ) =
-                        ( config.init, Ui.State.init url )
+                        ( config.init, State.init url )
                 in
-                ( ( key, { current = initialState, previous = Nothing }, updatedModel )
-                , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString initialState) ]
+                ( ( key, initialState, updatedModel )
+                , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString initialState.current) ]
                 )
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
@@ -121,19 +106,19 @@ application config =
         , update =
             \msg ( key, state, model ) ->
                 let
-                    updateUrl : Ui.Link.Link -> ( ( Nav.Key, { current : State, previous : Maybe State }, model ), Cmd msg )
+                    updateUrl : State.Link -> ( ( Nav.Key, { current : Url, previous : Maybe Url }, model ), Cmd msg )
                     updateUrl link =
-                        Ui.Link.toStateTransition link state.current
+                        State.toStateTransition link state.current
                             |> (\canonicalState ->
                                     ( ( key, { state | current = canonicalState, previous = Just state.current }, model )
                                     , if state.current == canonicalState then
                                         Cmd.none
 
                                       else if canonicalState.path == state.current.path && canonicalState.fragment == state.current.fragment then
-                                        Nav.replaceUrl key (Ui.State.toUrlString canonicalState)
+                                        Nav.replaceUrl key (State.toUrlString canonicalState)
 
                                       else
-                                        Nav.pushUrl key (Ui.State.toUrlString canonicalState)
+                                        Nav.pushUrl key (State.toUrlString canonicalState)
                                     )
                                )
                 in
@@ -143,17 +128,17 @@ application config =
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            updateUrl (Ui.Link.fromUrl state.current.path url)
+                            State.getLink state.current.path url
+                                |> updateUrl
 
                     LinkClicked (Browser.Internal url) ->
                         if url == state.current then
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            updateUrl
-                                (Ui.Link.fromUrl state.current.path url
-                                    |> Ui.Link.relative
-                                )
+                            State.getLink state.current.path url
+                                |> State.relative
+                                |> updateUrl
 
                     LinkClicked (Browser.External href) ->
                         ( ( key, state, model ), Nav.load href )
@@ -165,7 +150,7 @@ application config =
                                )
         , view =
             \( _, state, model ) ->
-                config.view ( Ui.State.getPath state.current, Ui.State.getFragment state.current ) model
+                config.view model
                     |> (\document ->
                             { title = document.title
                             , body =
@@ -191,7 +176,7 @@ application config =
 
    In the case of (a), we share a href, which is a string.
    The friend opens the link, and Elm turns it into the initial Url.
-   Now, `canonical.init` canonicalises the initial Url
+   Now, `canonical.init` canonicalises the initial Url.
 
 -}
 ---- Update ----
@@ -202,3 +187,42 @@ type Msg modelMsg
     = UrlChanged Url
     | LinkClicked Browser.UrlRequest
     | ModelMsg modelMsg
+
+
+{-| -}
+bounce : { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) } -> Ui aspect ( String, Html msg ) wrapper
+bounce =
+    State.bounce
+        >> State.inlineLink
+        >> (<<)
+            (\{ linkHtml, occlude } ->
+                Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
+                    >> Get.append (Get.map Ui.foliage linkHtml)
+            )
+        >> Ui.custom
+
+
+{-| -}
+goTo : ( Maybe Path, Fragment ) -> Ui aspect ( String, Html msg ) wrapper
+goTo =
+    State.goTo
+        >> State.inlineLink
+        >> (<<)
+            (\{ linkHtml, occlude } ->
+                Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
+                    >> Get.append (Get.map Ui.foliage linkHtml)
+            )
+        >> Ui.custom
+
+
+{-| -}
+toggle : Flag -> Ui aspect ( String, Html msg ) wrapper
+toggle =
+    State.toggle
+        >> State.inlineLink
+        >> (<<)
+            (\{ linkHtml, occlude } ->
+                Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
+                    >> Get.append (Get.map Ui.foliage linkHtml)
+            )
+        >> Ui.custom

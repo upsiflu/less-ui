@@ -1,14 +1,57 @@
-module Ui.Link exposing
-    ( goTo, bounce, toggle
-    , Link(..), fromUrl
+module Restrictive.State exposing
+    ( State, Path, Flag, Fragment, Query
+    , init
+    , map, setPath, setFragment
+    , addAssignment, removeAssignments, toggleFlag, turnOnFlag
+    , hasFlag
+    , toUrlString
+    , getFragment, getPath
+    , headerLink, inlineLink
+    , goTo, bounce, toggle
+    , Link, getLink
     , relative
-    , view, Renderer, preset, Position(..)
-    , toUrlString, toStateTransition
-    , a
-    , queryParseLocation, querySerialiseLocation, upTo
+    , view
+    , toStateTransition
     )
 
-{-| Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest) on click
+{-| We use the Url query to keep track of the Ui state. This makes sharing a Ui state as easy as copying the Url.
+
+@docs State, Path, Flag, Fragment, Query
+
+
+# Create
+
+@docs init
+
+
+# Map
+
+@docs map, setPath, setFragment
+
+@docs addAssignment, removeAssignments, toggleFlag, turnOnFlag
+
+
+# Query
+
+@docs hasFlag
+
+
+# Deconstruct
+
+@docs toUrlString
+@docs getFragment, getPath
+
+
+# Link
+
+@docs headerLink, inlineLink
+
+---
+
+
+# Links are cool!
+
+Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest) on click
 
   - [Jump Navigation (goTo)](#goTo)
       - [With two consecutive navigation steps (bounce)](#bounce)
@@ -18,7 +61,7 @@ module Ui.Link exposing
 
 @docs goTo, bounce, toggle
 
-@docs Link, fromUrl
+@docs Link, getLink
 
 
 # Map
@@ -28,39 +71,327 @@ module Ui.Link exposing
 
 # View
 
-@docs view, Renderer, preset, Position
+@docs view
 
 
 # Deconstruct
 
-@docs toUrlString, toStateTransition
-
-
-# Convenience
-
-@docs a
+@docs toStateTransition
 
 
 # Advanced
 
 The following functions are mostly here for testing
 
-@docs queryParseLocation, querySerialiseLocation, upTo
-
 -}
 
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Maybe.Extra as Maybe
+import Restrictive.Get as Get exposing (Get)
+import Restrictive.Layout.Region exposing (OrAll(..), OrHeader(..))
+import Restrictive.Mask as Mask exposing (Mask)
+import Set exposing (Set)
+import Set.Extra as Set
 import String.Extra as String
-import Ui exposing (Ui)
-import Ui.Layout.Aspect as Aspect exposing (Aspect)
-import Ui.State exposing (Flag, Fragment, Path, State)
 import Url exposing (Url)
 import Url.Codec exposing (Codec, ParseError(..))
 
 
+{-| -}
+type alias State =
+    { current : Url, previous : Maybe Url }
+
+
+{-| -}
+map : (a -> b) -> { current : a, previous : Maybe a } -> { current : b, previous : Maybe b }
+map fu state_ =
+    { current = fu state_.current, previous = Maybe.map fu state_.previous }
+
+
+{-| Turning off a `Flag` renders invisible the corresponding [Aspects](Ui.Layout.Aspect) in the corresponding [toggle Link](Ui.Link#toggle).
+
+Assignments such as `?a=b` may represent currently active Tabs or a search string.
+
+The patterns are **progressive disclosure** and **fulltext search**.
+
+-}
+type alias Flag =
+    String
+
+
+{-| Paths may represent an **editing-cursor position** or **viewport**. This is up to the app to define for now.
+-}
+type alias Path =
+    String
+
+
+{-| "Graphical Web browsers typically scroll to position pages so that the top of the element
+identified by the fragment id is aligned with the top of the viewport;
+thus fragment identifiers are often used in tables of content and in permalinks.
+The appearance of the identified element can be changed through
+the `:target` CSS pseudoclass; Wikipedia uses this to highlight the selected reference."
+(from Wikipedia)
+
+The **target** is somewhat tied to the **focus**, but when updating the fragment (hash) via Elm,
+the Browser may not update the focus, so it's safer to add a `focus-me` custom element to the DOM.
+
+-}
+type alias Fragment =
+    Maybe String
+
+
+
+---- Create ----
+
+
+{-| -}
+init : Url -> State
+init state =
+    { current = state, previous = Nothing }
+
+
+
+---- Map ----
+
+
+{-| -}
+setPath : Path -> Url -> Url
+setPath path state =
+    { state | path = "/" ++ path }
+
+
+{-| -}
+setFragment : Fragment -> Url -> Url
+setFragment fragment state =
+    { state | fragment = fragment }
+
+
+{-|
+
+    import Url
+
+    testQuery : (State -> State) -> String -> String
+    testQuery fu =
+        (++) "http://localhost/?"
+            >> Url.fromString
+            >> Maybe.andThen (fu >> .query)
+            >> Maybe.withDefault "Url.fromString or .query failed"
+
+    testQuery (turnOnFlag "g")
+        "f&g&h&a=b&c=d=e"
+    --> "f&g&h&a=b&c=d=e"
+
+    testQuery (turnOnFlag "h")
+        "a=b&c=d=e&f&g"
+    --> "f&g&h&a=b&c=d=e"
+
+    testQuery (turnOnFlag "")
+        "f"
+    --> "f"
+
+
+    testQuery (turnOnFlag "h")
+        ""
+    --> "h"
+
+    testQuery (turnOnFlag "")
+        ""
+    --> ""
+
+-}
+turnOnFlag : Flag -> Url -> Url
+turnOnFlag flag =
+    if flag == "" then
+        identity
+
+    else
+        mapQuery <| \q -> { q | flags = Set.insert flag q.flags }
+
+
+{-|
+
+    import Url
+
+    testQuery : (State -> State) -> String -> String
+    testQuery fu =
+        (++) "http://localhost/?"
+            >> Url.fromString
+            >> Maybe.andThen (fu >> .query)
+            >> Maybe.withDefault "Url.fromString or .query failed"
+
+
+    testQuery (toggleFlag "g")
+        "f&g&h&a=b&c=d=e"
+    --> "f&h&a=b&c=d=e"
+
+
+    testQuery (toggleFlag "g")
+        "f&h&a=b&c=d=e"
+    --> "f&g&h&a=b&c=d=e"
+
+-}
+toggleFlag : Flag -> Url -> Url
+toggleFlag flag =
+    if flag == "" then
+        identity
+
+    else
+        mapQuery <| \q -> { q | flags = Set.toggle flag q.flags }
+
+
+{-|
+
+    import Url
+
+    testQuery : (State -> State) -> String -> String
+    testQuery fu =
+        (++) "http://./?"
+            >> Url.fromString
+            >> Maybe.andThen (fu >> .query)
+            >> Maybe.withDefault "Url.fromString or .query failed"
+
+    testQuery (addAssignment "c" "x")
+        "f&g&h&a=b&c=d=e"
+    --> "f&g&h&c=x&a=b&c=d=e"
+
+
+    testQuery (addAssignment "" "x")
+        ""
+    --> "=x"
+
+    testQuery (addAssignment "" "y")
+        "=x"
+    --> "=y&=x"
+
+    testQuery (addAssignment "" "")
+        "=y&=x"
+    --> "=&=y&=x"
+
+-}
+addAssignment : String -> String -> Url -> Url
+addAssignment key value =
+    mapQuery <| \q -> { q | assignments = ( key, value ) :: q.assignments }
+
+
+{-| -}
+removeAssignments : List String -> Url -> Url
+removeAssignments keys =
+    mapQuery <|
+        \q ->
+            { q
+                | assignments =
+                    List.filter
+                        (Tuple.first >> (\key -> not (List.member key keys)))
+                        q.assignments
+            }
+
+
+mapQuery : (Query -> Query) -> Url -> Url
+mapQuery fu state =
+    { state | query = (parseQueryString >> fu >> serializeQuery) state.query }
+
+
+serializeQuery : Query -> Maybe String
+serializeQuery query =
+    Set.toList query.flags
+        ++ List.map (\( k, v ) -> k ++ "=" ++ v) query.assignments
+        |> String.join "&"
+        |> String.nonEmpty
+
+
+parseQueryString : Maybe String -> Query
+parseQueryString =
+    Maybe.withDefault ""
+        >> String.split "&"
+        >> List.foldr
+            (\entry query ->
+                case String.split "=" entry of
+                    [] ->
+                        query
+
+                    [ "" ] ->
+                        query
+
+                    [ flag ] ->
+                        { query | flags = Set.insert flag query.flags }
+
+                    ass :: ignment ->
+                        { query | assignments = ( ass, String.join "=" ignment ) :: query.assignments }
+            )
+            { flags = Set.empty, assignments = [] }
+
+
+
+---- Query ----
+
+
+{-|
+
+    import Set
+    import Url
+
+    "http://a/?y"
+        |> Url.fromString
+        |> Maybe.map (hasFlag "z")
+        --> Just False
+
+    "http://a/?y&z"
+        |> Url.fromString
+        |> Maybe.map (hasFlag "z")
+        --> Just True
+
+-}
+hasFlag : Flag -> Url -> Bool
+hasFlag flag =
+    getFlags >> List.member flag
+
+
+
+---- Deconstruct ----
+
+
+{-| -}
+toUrlString : Url -> String
+toUrlString =
+    Url.toString
+
+
+{-| -}
+getFragment : Url -> Fragment
+getFragment =
+    .fragment
+
+
+{-| -}
+getPath : Url -> Path
+getPath { path } =
+    String.dropLeft 1 path
+
+
+{-| -}
+type alias Query =
+    { flags : Set Flag, assignments : List ( String, String ) }
+
+
+getFlags : Url -> List Flag
+getFlags =
+    .query >> parseQueryString >> .flags >> Set.toList
+
+
+
+------------------
+-----------------
+----------------
+--------------
+-----------
+-------
+
+
 {-| Encodes an intended transition of [the Ui State](Ui.State).
+
+Use the convenience functions in `Restrictive` to build
+
 -}
 type Link
     = GoTo ( Maybe Path, Fragment )
@@ -141,42 +472,59 @@ toggle =
 
 -}
 preset :
-    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer Aspect
-    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer Aspect
-    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer Aspect
-    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer Aspect
+    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
+    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
+    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
+    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
     }
 preset =
-    { global = \att con -> { empty | attributes = att, contents = con, position = Global }
-    , inline = \att con -> { empty | attributes = att, contents = con, position = Inline }
-    , nav = \att con -> { empty | attributes = Attr.type_ "radio" :: att, contents = con, element = Html.input, position = Global }
-    , tab = \att con -> { empty | attributes = Attr.type_ "radio" :: att, contents = con, element = Html.input, position = Inline }
+    { global = \att con -> { empty | attributes = att, contents = con, position = always Header }
+    , inline = \att con -> { empty | attributes = att, contents = con, position = identity }
+    , nav = \att con -> { empty | attributes = Attr.type_ "radio" :: att, contents = con, element = Html.input, position = always Header }
+    , tab = \att con -> { empty | attributes = Attr.type_ "radio" :: att, contents = con, element = Html.input, position = identity }
     }
 
 
-empty : Renderer Aspect
+
+-- NEED TO CHECK IF TRANSFORMATION CAN HAVE ALL!
+
+
+empty : Renderer region
 empty =
     { attributes = []
     , contents = []
     , element = Html.a
-    , occlusions = Aspect.all
-    , position = Global
+    , occlusions = All
+    , position = always Header
     }
 
 
 {-| How to present a Link
 -}
-type alias Renderer aspect =
+type alias Renderer region =
     { attributes : List (Html.Attribute Never)
     , contents : List (Html Never)
     , element : List (Html.Attribute Never) -> List (Html Never) -> Html Never
-    , occlusions : List aspect
-    , position : Position
+    , occlusions : OrAll region
+    , position : OrHeader region -> OrHeader region
     }
 
 
-{-| A bit like `Html.a`
+{-| simple inline link
 -}
+headerLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
+headerLink link =
+    view (preset.global [] [ Html.text (toId link) ]) link
+
+
+{-| simple inline link
+-}
+inlineLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
+inlineLink link =
+    view (preset.inline [] [ Html.text (toId link) ]) link
+
+
+{-| -}
 a : Link -> List (Html.Attribute Never) -> List (Html Never) -> Html msg
 a link attrs contents =
     Html.a (toHref link :: attrs) contents
@@ -196,60 +544,39 @@ a link attrs contents =
             }
 
 -}
-view :
-    Renderer aspect
-    -> Link
-    -> Ui aspect ( String, Html msg ) wrapper
+view : Renderer region -> Link -> ( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a }
 view config link =
-    Ui.custom <|
-        \( aspect, url ) ->
-            let
-                linkWithAttributes : List (Html.Attribute Never) -> List ( String, Html msg )
-                linkWithAttributes additionalAttributes =
-                    [ ( toId link, a link (config.attributes ++ additionalAttributes) config.contents ) ]
+    \( region, url ) ->
+        let
+            linkWithAttributes : List (Html.Attribute Never) -> List ( String, Html msg )
+            linkWithAttributes additionalAttributes =
+                [ ( toId link, a link (config.attributes ++ additionalAttributes) config.contents ) ]
+        in
+        case link of
+            Toggle _ flag ->
+                let
+                    ( isChecked, mask ) =
+                        if hasFlag flag url then
+                            ( "true", identity )
 
-                where_ : Maybe aspect
-                where_ =
-                    case config.position of
-                        Inline ->
-                            Just aspect
+                        else
+                            ( "false", Mask.occludeOrAll config.occlusions )
+                in
+                { linkHtml =
+                    linkWithAttributes
+                        [ Attr.attribute "role" "switch"
+                        , Attr.attribute "aria-checked" isChecked
+                        ]
+                        |> Get.singleton (config.position region)
+                , occlude = mask
+                }
 
-                        Global ->
-                            Nothing
-            in
-            case link of
-                Toggle _ flag ->
-                    let
-                        ( isChecked, mask ) =
-                            if Ui.State.hasFlag flag url then
-                                ( "true", [] )
-
-                            else
-                                ( "false", config.occlusions )
-                    in
-                    { occlude = mask
-                    , appendWhere = where_
-                    , appendWhat =
-                        linkWithAttributes
-                            [ Attr.attribute "role" "switch"
-                            , Attr.attribute "aria-checked" isChecked
-                            ]
-                    }
-
-                _ ->
-                    { occlude = []
-                    , appendWhere = where_
-                    , appendWhat = linkWithAttributes []
-                    }
-
-
-{-| Define whether the link anchor
-appears as a global handle or in the
-`Aspect` of the current Item
--}
-type Position
-    = Inline
-    | Global
+            _ ->
+                { linkHtml =
+                    linkWithAttributes []
+                        |> Get.singleton (config.position region)
+                , occlude = identity
+                }
 
 
 codecs : List (Codec Link)
@@ -436,8 +763,8 @@ In the following tests, we assume a previous path of "/"
         --> GoTo (Nothing, Just "?fragment")
 
 -}
-fromUrl : Path -> Url -> Link
-fromUrl currentPath url =
+getLink : Path -> Url -> Link
+getLink currentPath url =
     case
         Url.Codec.parseUrl codecs
             { url
@@ -494,21 +821,21 @@ fromUrl currentPath url =
 -> Update the app with that
 
 -}
-toStateTransition : Link -> State -> State
+toStateTransition : Link -> Url -> Url
 toStateTransition link =
     let
-        getLocation : State -> ( Maybe String, Fragment )
-        getLocation state =
-            ( String.nonEmpty (Ui.State.getPath state), Ui.State.getFragment state )
+        getLocation : Url -> ( Maybe String, Fragment )
+        getLocation url =
+            ( String.nonEmpty (getPath url), getFragment url )
 
-        setLocation : ( Maybe Path, Fragment ) -> State -> State
+        setLocation : ( Maybe Path, Fragment ) -> Url -> Url
         setLocation destination =
             case destination of
                 ( Just path, fragment ) ->
-                    Ui.State.setPath path >> Ui.State.setFragment fragment
+                    setPath path >> setFragment fragment
 
                 ( Nothing, fragment ) ->
-                    Ui.State.setFragment fragment
+                    setFragment fragment
     in
     case link of
         GoTo destination ->
@@ -527,22 +854,22 @@ toStateTransition link =
                     setLocation there state
 
         Toggle { isAbsolute } f ->
-            Ui.State.removeAssignments [ "toggle", "reroute" ]
+            removeAssignments [ "toggle", "reroute" ]
                 >> (if isAbsolute then
-                        Ui.State.turnOnFlag f
+                        turnOnFlag f
 
                     else
-                        Ui.State.toggleFlag f
+                        toggleFlag f
                    )
 
         ErrorMessage err ->
-            Ui.State.addAssignment "errorMessage" err
+            addAssignment "errorMessage" err
 
 
 {-| -}
 toHref : Link -> Html.Attribute Never
 toHref =
-    toUrlString
+    linkToString
         >> Attr.href
 
 
@@ -554,88 +881,88 @@ toHref =
         { there = (Just "there", Just "f1")
         , here = (Just "here", Just "f2")
         }
-        |> toUrlString
+        |> linkToString
         --> "/there?reroute=here~f2#f1"
 
     Bounce { isAbsolute = False }
         { there = (Just "there", Just "f1")
         , here = (Just "", Just "f2")
         }
-        |> toUrlString
+        |> linkToString
         --> "/there?reroute=/~f2#f1"
 
     Bounce { isAbsolute = False }
         { there = (Just "there", Just "f1")
         , here = (Just "", Nothing)
         }
-        |> toUrlString
+        |> linkToString
         --> "/there?reroute=/#f1"
 
     Bounce { isAbsolute = False }
         { there = (Just "", Just "f1")
         , here = (Just "here", Just "f2")
         }
-        |> toUrlString
+        |> linkToString
         --> "/?reroute=here~f2#f1"
 
     Bounce { isAbsolute = False }
         { there = (Just "", Nothing)
         , here = (Just "here", Just "f2")
         }
-        |> toUrlString
+        |> linkToString
         --> "/?reroute=here~f2"
 
     Bounce { isAbsolute = False }
         { there = (Nothing, Just "f1")
         , here = (Just "here", Just "f2")
         }
-        |> toUrlString
+        |> linkToString
         --> "?reroute=here~f2#f1"
 
     Bounce { isAbsolute = False }
         { there = (Nothing, Nothing)
         , here = (Just "here", Just "f2")
         }
-        |> toUrlString
+        |> linkToString
         --> "?reroute=here~f2"
 
 
     --Toggle
 
     Toggle {isAbsolute = False} "flag"
-        |> toUrlString
+        |> linkToString
         --> "?toggle=flag"
 
     Toggle {isAbsolute = True} "flag"
-        |> toUrlString
+        |> linkToString
         --> "?toggle=flag&!"
 
 
     --GoTo
 
     GoTo (Just "path", Just "fragment")
-        |> toUrlString
+        |> linkToString
         --> "/path#fragment"
 
     GoTo (Just "path", Nothing)
-        |> toUrlString
+        |> linkToString
         --> "/path"
 
     GoTo (Nothing, Just "fragment")
-        |> toUrlString
+        |> linkToString
         --> "#fragment"
 
     GoTo (Nothing, Nothing)
-        |> toUrlString
+        |> linkToString
         --> ""
 
     GoTo (Nothing, Just "")
-        |> toUrlString
+        |> linkToString
         --> "#"
 
 -}
-toUrlString : Link -> String
-toUrlString =
+linkToString : Link -> String
+linkToString =
     Url.Codec.toString codecs
         >> Maybe.andThen Url.percentDecode
         >> Maybe.withDefault "?errorMessage=Error converting link to string"

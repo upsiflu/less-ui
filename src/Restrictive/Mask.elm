@@ -1,10 +1,10 @@
-module Ui.Mask exposing
+module Restrictive.Mask exposing
     ( Mask
     , transparent, opaque
-    , occlude, occludeList, superimpose
+    , occlude, occludeList, occludeOrAll, superimpose
     , filter
     , concat, and
-    , map, mapKey, mapSecond
+    , map, mapKey, mapSecond, invert
     , mask
     )
 
@@ -12,7 +12,7 @@ module Ui.Mask exposing
 
 @docs Mask
 @docs transparent, opaque
-@docs occlude, occludeList, superimpose
+@docs occlude, occludeList, occludeOrAll, superimpose
 @docs filter
 
 _In addition, many function in `Get` return Masks. Of use may be [`Get.map`](Ui.Get#map)_
@@ -31,7 +31,7 @@ _Note that Masks are functions so you can compose them easily:_
 
 # Modify
 
-@docs map, mapKey, mapSecond
+@docs map, mapKey, mapSecond, invert
 
 
 # Apply
@@ -40,7 +40,8 @@ _Note that Masks are functions so you can compose them easily:_
 
 -}
 
-import Ui.Get as Get exposing (Get)
+import Restrictive.Get as Get exposing (Get)
+import Restrictive.Layout.Region exposing (OrAll(..))
 
 
 {-| -}
@@ -99,6 +100,44 @@ occludeList =
     List.foldl andOcclude transparent
 
 
+{-|
+
+    import Ui.Get key as Get key exposing (get)
+    import Restrictive.Transformation exposing (OrAll(..))
+
+    Get.full ()
+        |> occludeOrAll (AllExcept [1, 2])
+        |> get 2
+        --> Just ()
+
+    Get.full ()
+        |> occludeOrAll (AllExcept [1, 2])
+        |> get 3
+        --> Nothing
+
+-}
+occludeOrAll : OrAll key -> Mask key a
+occludeOrAll orAll =
+    case orAll of
+        All ->
+            opaque
+
+        Some list ->
+            occludeList list
+
+        AllExcept list ->
+            List.foldl
+                (\key mask_ ->
+                    if List.member key list then
+                        mask_
+
+                    else
+                        andOcclude key mask_
+                )
+                transparent
+                list
+
+
 
 ---- COMPOSE ----
 
@@ -122,6 +161,29 @@ occludeList =
 and : Mask key a -> Mask key a -> Mask key a
 and =
     (>>)
+
+
+{-|
+
+    Just
+        |> invert transparent
+        |> Get.get ()
+        --> Nothing
+
+    Just
+        |> invert opaque
+        |> Get.get ()
+        --> Nothing
+
+-}
+invert : Mask key a -> Mask key a
+invert mask_ getA key =
+    case mask_ getA key of
+        Just _ ->
+            Nothing
+
+        Nothing ->
+            getA key
 
 
 {-| Occlude one more aspect

@@ -8,12 +8,11 @@ module Features exposing (Features, main, Msg)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Ui
-import Ui.Application exposing (Application, application)
-import Ui.Layout
-import Ui.Layout.Aspect exposing (Aspect(..))
-import Ui.Link as Link
-import Ui.State
+import Restrictive exposing (Application, application)
+import Restrictive.Layout
+import Restrictive.Layout.Region exposing (Aspect(..))
+import Restrictive.State
+import Restrictive.Ui as Ui
 
 
 {-| -}
@@ -46,20 +45,22 @@ update () features =
 
 
 type alias Ui =
-    Ui.Ui Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
+    Ui.Ui
+        Aspect
+        ( String, Html () )
+        (List ( String, Html () ) -> List ( String, Html () ))
 
 
 type alias Document =
-    Ui.Application.Document Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
+    Restrictive.Document Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
 
 
-view : ( Ui.State.Path, Ui.State.Fragment ) -> Features -> Document
-view ( path, fragment ) _ =
+view : Features -> Document
+view _ =
     let
         showTab : String -> Ui -> Ui
         showTab str contents =
-            Link.toggle (String.replace " " "-" str)
-                |> Link.view (Link.preset.global [] [ Html.text str ])
+            toggle (String.replace " " "-" str)
                 |> Ui.with Scene contents
     in
     { body =
@@ -68,14 +69,10 @@ view ( path, fragment ) _ =
                 ui
             ++ showTab "Global Navbar"
                 globalNav
-            ++ showTab "Path in View"
-                (paths path)
-            ++ showTab "Bounce between fragments"
-                (fragments fragment)
             ++ (Ui.handle [ ( "constant", Html.label [] [ Html.text "ConStAnt" ] ) ]
                     |> Ui.with Scene (Ui.textLabel "ConsScene")
                )
-    , layout = Ui.Layout.withClass "Features"
+    , layout = Restrictive.Layout.withClass "Features"
     , title = "Restrictive Ui feature test"
     }
 
@@ -90,28 +87,54 @@ ui =
         |> Ui.with Info (Ui.textLabel "Info")
 
 
+toggle : String -> Ui
+toggle props =
+    Restrictive.State.toggle props
+        |> Restrictive.State.inlineLink
+        |> Ui.custom
+
+
+goTo : ( Maybe Restrictive.State.Path, Restrictive.State.Fragment ) -> Ui
+goTo props =
+    Restrictive.State.goTo props
+        |> Restrictive.State.inlineLink
+        --ViewModel.Change region ( String, Html msg ))
+        |> Ui.custom
+
+
+
+--(( OrHeader aspect, Url ) -> ViewModel.Change aspect html) -> Ui aspect html wrapper
+
+
+bounce : { there : ( Maybe Restrictive.State.Path, Restrictive.State.Fragment ), here : ( Maybe Restrictive.State.Path, Restrictive.State.Fragment ) } -> Ui
+bounce props =
+    Restrictive.State.bounce props
+        |> Restrictive.State.inlineLink
+        |> Ui.custom
+
+
 {-| [Application](Ui.Application): Sever Route from Model
 -}
-paths : Ui.State.Path -> Ui
+paths : Restrictive.State.Path -> Ui
 paths path =
     Ui.singleton
         |> Ui.with Scene (Ui.textLabel ("Path: " ++ path))
-        |> Ui.with Control (Link.goTo ( Just "Path-1", Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go to Path 1" ]))
-        |> Ui.with Control (Link.goTo ( Just "Path-2", Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go to Path 2" ]))
-        |> Ui.with Control (Link.goTo ( Just "", Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go home" ]))
-        |> Ui.with Control (Link.goTo ( Nothing, Nothing ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go nowhere" ]))
-        |> Ui.with Control (Link.goTo ( Nothing, Just "99" ) |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "Go to Fragment #99" ]))
+        |> Ui.with Control (goTo ( Just "Path-1", Nothing ))
+        |> Ui.with Control (goTo ( Just "Path-2", Nothing ))
+        |> Ui.with Control (goTo ( Just "", Nothing ))
+        |> Ui.with Control (goTo ( Nothing, Nothing ))
+        |> Ui.with Control (goTo ( Nothing, Just "99" ))
 
 
 globalNav : Ui
 globalNav =
     [ "Introduction", "First Steps", "Last Steps" ]
-        |> List.concatMap (\title -> Link.goTo ( Just title, Nothing ) |> Link.view (Link.preset.nav [] []))
+        |> List.concatMap (\title -> goTo ( Just title, Nothing ))
 
 
 {-| [Link](Ui.Link): Manage the Ui State as a URL
 -}
-fragments : Ui.State.Fragment -> Ui
+fragments : Restrictive.State.Fragment -> Ui
 fragments fr =
     let
         articles : List (Html msg)
@@ -126,9 +149,8 @@ fragments fr =
     in
     Ui.singleton
         |> Ui.with Control
-            (Link.bounce
+            (bounce
                 { here = ( Nothing, Just "1" ), there = ( Nothing, Just "3" ) }
-                |> Link.view (Link.preset.inline [ Attr.class "paths" ] [ Html.text "bounce between 1 and 3" ])
             )
         |> Ui.with Scene
             (Ui.html ( "articles", Html.section [] articles ))

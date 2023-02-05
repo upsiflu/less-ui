@@ -1,4 +1,4 @@
-module Ui.Get exposing
+module Restrictive.Get exposing
     ( Get
     , empty, full, singleton
     , orAdd, insert, update, updateValue, updateWhere
@@ -8,19 +8,20 @@ module Ui.Get exposing
     , map, mapValue, map2, map2WithDefaults, map2Value, filter
     , mapKey
     , mapByKey, mapValueByKey, map2ByKey
-    , append
     , join, unlockInner, unlockOuter
-    , orElse
+    , append, concat, concatMap
+    , orElse, superimpose
     , andThen, andThenFlat, andThenMaybe, andMap, andMapFlat
     , union, intersect, diff
     , member, andGet, withDefault
+    , Mutation(..), mutation
     , toList, toListBy, keys, values, fromList, fromListBy
-    , consLists, concatLists
+    , consLists, concatLists, concatValues
     , sequence
     , get
     )
 
-{-| Dictionary [`Aspect`](Ui.Layout.Aspect) -> `ui`
+{-| Fallible mapping from `key` to `value`
 
 @docs Get
 
@@ -57,11 +58,6 @@ module Ui.Get exposing
 @docs mapByKey, mapValueByKey, map2ByKey
 
 
-### Map `Get (List a)`
-
-@docs append
-
-
 ### Map `Get (Get a)`
 
 @docs join, unlockInner, unlockOuter
@@ -70,9 +66,14 @@ module Ui.Get exposing
 # Compose
 
 
-### Or
+### `Get (List a)`
 
-@docs orElse
+@docs append, concat, concatMap
+
+
+### Get either value
+
+@docs orElse, superimpose
 
 
 ### Chain
@@ -90,6 +91,11 @@ module Ui.Get exposing
 @docs member, andGet, withDefault
 
 
+### Mutations
+
+@docs Mutation, mutation
+
+
 # Lists
 
 @docs toList, toListBy, keys, values, fromList, fromListBy
@@ -97,7 +103,7 @@ module Ui.Get exposing
 
 ### Convenience functions for `Get (List a)`
 
-@docs consLists, concatLists
+@docs consLists, concatLists, concatValues
 
 
 ### Folding
@@ -121,7 +127,7 @@ type alias Get key a =
 
 
 
--- CREATE
+---- CREATE ----
 
 
 {-| in any case, return Nothing
@@ -139,6 +145,8 @@ empty =
         |> get Scene
         --> Just 1
 
+Note that `Just` is an even more general `Get`.
+
 -}
 full : a -> Get key a
 full =
@@ -152,7 +160,7 @@ singleton key a =
 
 
 
--- ASSOCIATE VALUES
+---- ASSOCIATE VALUES ----
 
 
 {-| insert at key if not yet populated
@@ -410,7 +418,7 @@ addList =
 
 
 
--- MAP
+---- MAP ----
 
 
 {-| compose a function behind the result
@@ -427,7 +435,7 @@ map =
     mapParameter Maybe.map
 
 
-{-|
+{-| Map to a more inclusive key
 
     singleton 1 ()
         |> mapKey identity
@@ -570,28 +578,6 @@ map2ByKey fu getA getB =
     \key -> Maybe.map2 (fu key) (getA key) (getB key)
 
 
-{-| Interprets Nothing as [].
-
-Difference to `addList`: Both lists to append can be Nothing.
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    singleton Scene [1]
-        |> append (singleton Scene [2, 3])
-        |> get Scene
-            --> Just [2, 3, 1]
-
-    full [1]
-        |> append (singleton Scene [2, 3])
-        |> get Control
-            --> Just [1]
-
--}
-append : Get key (List a) -> Get key (List a) -> Get key (List a)
-append =
-    map2Value (mapLists (++))
-
-
 {-| Get either the inner `Get`, else `empty`.
 -}
 flat : Get key (Get key a) -> key -> Get key a
@@ -624,10 +610,46 @@ join get2 =
 
 
 
--- COMPOSE
+---- COMPOSE ----
 
 
-{-| returns the first parameter if the second fails, using the same key. Lazy.
+{-| Interprets Nothing as [].
+
+Difference to `addList`: Both lists to append can be Nothing.
+
+    import Ui.Layout.Aspect exposing (Aspect(..))
+
+    singleton Scene [1]
+        |> append (singleton Scene [2, 3])
+        |> get Scene
+            --> Just [2, 3, 1]
+
+    full [1]
+        |> append (singleton Scene [2, 3])
+        |> get Control
+            --> Just [1]
+
+-}
+append : Get key (List a) -> Get key (List a) -> Get key (List a)
+append =
+    map2Value (mapLists (++))
+
+
+{-| `concat = List.foldl merge empty`
+-}
+concat : List (Get aspect (List html)) -> Get aspect (List html)
+concat =
+    List.foldr append empty
+
+
+{-| Merge the results of `fu`
+-}
+concatMap : (a -> Get aspect (List html)) -> List a -> Get aspect (List html)
+concatMap fu =
+    List.map fu >> concat
+
+
+{-| Return the first value only if the second fails, using the same key. Lazy.
 
     import Ui.Layout.Aspect exposing (Aspect(..))
 
@@ -646,6 +668,13 @@ orElse : Get key a -> Get key a -> Get key a
 orElse second first key =
     first key
         |> Maybe.orElseLazy (\() -> second key)
+
+
+{-| \`override first second = orElse second first
+-}
+superimpose : Get key a -> Get key a -> Get key a
+superimpose first second =
+    orElse second first
 
 
 
@@ -761,7 +790,7 @@ andMapFlat =
 
 
 
--- QUERY
+---- QUERY ----
 
 
 {-| Example:
@@ -780,11 +809,7 @@ member =
     composeWithTwoParameters get Maybe.isJust
 
 
-
--- Maybe a -> Bool                                       /
-
-
-{-| `(|>)`
+{-| `get = (|>)`
 -}
 get : key -> (key -> value) -> value
 get =
@@ -806,8 +831,61 @@ withDefault =
     mapParameter Maybe.withDefault
 
 
+{-| `Substitution a b`: b was substituted by a
+-}
+type Mutation a
+    = Substitution { current : a, previous : a }
+    | Insertion a
+    | Deletion a
+    | Protraction a
 
--- LISTS
+
+{-| Compare the current with an optional previous `Get` at each key and return the [`Mutation`s](Mutation)
+
+    mutation {current = full 1, previous = Just (singleton () 2)} ()
+        --> Just (Substitution { current = 1, previous = 2})
+
+    mutation {current = full 2, previous = Just (empty)}
+        --> Just (Insertion 12)
+
+    mutation {current = empty, previous = Just (full 3)} ()
+        --> Just (Deletion 3)
+
+    mutation {current = full 4, previous = Just (full 4)} ()
+        --> Just (Protraction 4)
+
+Note that in this implementation `previous` implicitly defaults to `empty`:
+
+    mutation {current = singleton () 5, previous = Nothing} ()
+        --> Just (Insertion 5)
+
+
+    mutation {current = empty, previous = Nothing} ()
+        --> Nothing
+
+-}
+mutation : { current : Get key a, previous : Maybe (Get key a) } -> Get key (Mutation a)
+mutation { current, previous } key =
+    case ( current key, Maybe.andThen (get key) previous ) of
+        ( Just current_, Just previous_ ) ->
+            if current_ == previous_ then
+                Just (Protraction previous_)
+
+            else
+                Just (Substitution { current = current_, previous = previous_ })
+
+        ( Just a, Nothing ) ->
+            Just (Insertion a)
+
+        ( Nothing, Just a ) ->
+            Just (Deletion a)
+
+        ( Nothing, Nothing ) ->
+            Nothing
+
+
+
+---- SERIALISE TO LIST ----
 
 
 {-|
@@ -869,6 +947,12 @@ values list getA =
 
 
 {-| -}
+concatValues : List key -> Get key (List a) -> List a
+concatValues list =
+    values list >> List.concat
+
+
+{-| -}
 keys : List key -> Get key a -> List key
 keys list getA =
     List.foldr
@@ -903,7 +987,7 @@ fromListBy fu =
 
 
 
----- Helper ----
+---- Helpers ----
 
 
 {-| This is a strangely important function that deserves an important name.
