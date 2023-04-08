@@ -1,6 +1,6 @@
 module Restrictive exposing
     ( application, Application, Document, Msg
-    , toggle, goTo, bounce
+    , toggle, goTo, goTo_, bounce
     )
 
 {-| In contrast to `Browser.Application`, this module maks the `Url` the
@@ -11,7 +11,7 @@ single source of truth for the state of your user interface.
 
 # Links
 
-@docs toggle, goTo, bounce
+@docs toggle, goTo, goTo_, bounce
 
 ---
 
@@ -49,10 +49,10 @@ This opens two possible pitfalls:
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (Html)
-import Restrictive.Get as Get exposing (Get)
+import Restrictive.Get as Get
 import Restrictive.Layout exposing (Layout)
-import Restrictive.Layout.Region as Region exposing (OrHeader(..))
-import Restrictive.Mask as Mask exposing (Mask)
+import Restrictive.Layout.Region as Region
+import Restrictive.Mask as Mask
 import Restrictive.State as State exposing (Flag, Fragment, Path, State)
 import Restrictive.Ui as Ui exposing (Ui)
 import Url exposing (Url)
@@ -191,7 +191,7 @@ type Msg modelMsg
 
 {-| As of now, will only attach an inline text link, not occlude any regions
 -}
-bounce : { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) } -> Ui aspect ( String, Html msg )
+bounce : { here : ( Maybe Path, Fragment ), there : ( Maybe Path, Fragment ) } -> Ui aspect ( String, Html msg )
 bounce =
     State.bounce
         >> State.inlineLink
@@ -215,6 +215,19 @@ goTo =
                     >> Get.append (Get.map Ui.foliage linkHtml)
             )
         >> Ui.custom
+
+
+{-| As of now, will only attach an inline text link, not occlude any regions
+-}
+goTo_ : ( Maybe Path, Fragment ) -> List (Html Never) -> Ui aspect ( String, Html msg )
+goTo_ config contents =
+    State.headerLink_ [] (always contents) (State.goTo config)
+        |> (<<)
+            (\{ linkHtml, occlude } ->
+                Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
+                    >> Get.append (Get.map Ui.foliage linkHtml)
+            )
+        |> Ui.custom
 
 
 {-| Will add an inline text link and occlude all regions while unchecked.

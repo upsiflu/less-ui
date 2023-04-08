@@ -5,10 +5,10 @@ module Restrictive.State exposing
     , addAssignment, removeAssignments, toggleFlag, turnOnFlag
     , hasFlag
     , toUrlString
-    , getFragment, getPath
-    , headerLink, inlineLink
+    , getLocation, getFragment, getPath
     , goTo, bounce, toggle
     , Link, getLink
+    , headerLink, headerLink_, inlineLink, inlineLink_, preset
     , relative
     , view
     , toStateTransition
@@ -39,17 +39,10 @@ module Restrictive.State exposing
 # Deconstruct
 
 @docs toUrlString
-@docs getFragment, getPath
+@docs getLocation, getFragment, getPath
 
 
 # Link
-
-@docs headerLink, inlineLink
-
----
-
-
-# Links are cool!
 
 Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest) on click
 
@@ -62,6 +55,8 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
 @docs goTo, bounce, toggle
 
 @docs Link, getLink
+
+@docs headerLink, headerLink_, inlineLink, inlineLink_, preset
 
 
 # Map
@@ -165,6 +160,12 @@ setPath path state =
 setFragment : Fragment -> Url -> Url
 setFragment fragment state =
     { state | fragment = fragment }
+
+
+{-| -}
+getLocation : Url -> ( Maybe String, Fragment )
+getLocation url =
+    ( String.nonEmpty (getPath url), getFragment url )
 
 
 {-|
@@ -455,6 +456,14 @@ toggle =
 ---- View ----
 
 
+type alias Preset aspect =
+    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
+    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
+    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
+    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
+    }
+
+
 {-| A familiar syntax, similar to how you compose Html:
 
     import Html
@@ -510,18 +519,40 @@ type alias Renderer region =
     }
 
 
-{-| simple inline link
+{-| Textual header link
 -}
 headerLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
-headerLink link =
-    view (preset.global [] [ Html.text (toId link) ]) link
+headerLink =
+    headerLink_ [] (toId >> Html.text >> List.singleton)
 
 
-{-| simple inline link
+{-| Header with custom html
+-}
+headerLink_ : List (Html.Attribute Never) -> (Link -> List (Html Never)) -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
+headerLink_ attributes makeContents link =
+    (makeContents link
+        |> preset.global attributes
+        |> view
+    )
+        link
+
+
+{-| Textual inline link
 -}
 inlineLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
 inlineLink link =
-    view (preset.inline [] [ Html.text (toId link) ]) link
+    view (preset.inline [] [ Html.span [] [ Html.text (toId link) ] ]) link
+
+
+{-| Inline link with custom html
+-}
+inlineLink_ : List (Html.Attribute Never) -> (Link -> List (Html Never)) -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
+inlineLink_ attributes makeContents link =
+    (makeContents link
+        |> preset.global attributes
+        |> view
+    )
+        link
 
 
 {-| -}
@@ -824,10 +855,6 @@ getLink currentPath url =
 toStateTransition : Link -> Url -> Url
 toStateTransition link =
     let
-        getLocation : Url -> ( Maybe String, Fragment )
-        getLocation url =
-            ( String.nonEmpty (getPath url), getFragment url )
-
         setLocation : ( Maybe Path, Fragment ) -> Url -> Url
         setLocation destination =
             case destination of

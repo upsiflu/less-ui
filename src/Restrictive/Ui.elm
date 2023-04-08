@@ -10,7 +10,7 @@ module Restrictive.Ui exposing
     , ol, ul, node
     , uncons
     , handle
-    , custom, page
+    , custom, page, byLocation
     , indexedMap, mapList
     , mapEach, map2
     , ifJust, notIf, none
@@ -77,7 +77,7 @@ For convenient functions and inspiration, check out the [Link](Ui.Link) module w
 interface with the Ui context.
 
 @docs handle
-@docs custom, page
+@docs custom, page, byLocation
 
 
 ## Map
@@ -123,7 +123,9 @@ type Descendant aspect html
     | Wrap (List html -> List html) (Ui aspect html)
 
 
-{-| An Item logically nests `Ui`s and may dybamically react to the Url.
+{-| TODO: update this comment
+
+An Item logically nests `Ui`s and may dybamically react to the Url.
 Only `Dynamic` aspects produce `Header` content.
 
 For example,
@@ -561,6 +563,16 @@ page path_ ui_ =
             Get.singleton region ui_
                 |> Get.append
                 |> Mask.filter (\_ -> State.getPath url == path_)
+
+
+{-| -}
+byLocation : (( Maybe State.Path, State.Fragment ) -> Ui aspect html) -> Ui aspect html
+byLocation fromPage =
+    custom <|
+        \( region, url ) ->
+            fromPage (State.getLocation url)
+                |> Get.singleton region
+                |> Get.append
 
 
 {-| This interface is mostly interesting for library authors.
