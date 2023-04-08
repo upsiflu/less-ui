@@ -4,6 +4,12 @@
         "postprocess.js"
     ],
     "targets": {
+        "Main": {
+            "inputs": [
+                "src/Main.elm"
+            ],
+            "output": "public/build/Main.js"
+        },
         "Features": {
             "inputs": [
                 "src/Features.elm"

@@ -86,8 +86,8 @@ body {
 
 .scene {
     flex-grow      : 1;
-    background     : black;
-    color          : white;
+    background     : silver;
+    color          : black;
     overflow       : auto;
     scroll-behavior: smooth;
 }
@@ -125,11 +125,13 @@ a:link[href] {
 }
 
 button,
-input {
+input,
+fieldset {
     background: #bbb;
-    padding   : 2px 10px;
+    padding   : 2px 4px;
     border    : 4px #ddd outset;
-    outline   : 4px solid #bababa;
+    outline   : 4px solid transparent;
+    margin    : 2px;
 }
 
 input {
@@ -152,7 +154,7 @@ button:active {
 
 button:focus,
 input:focus {
-    outline: 4px solid orange;
+    outline: 4px solid #00ffb7;
 }
 
 
@@ -327,4 +329,26 @@ article {
 
 .Features article:target {
     outline: 10px solid orange;
+}
+
+
+/***** Forms ****/
+
+li:has(label) {
+    display    : flex;
+    align-items: baseline;
+}
+
+li>label {
+    width: 5rem;
+}
+
+fieldset,
+form {
+    border-style: groove;
+}
+
+form>button {
+    margin-left: auto;
+    display    : block;
 }

@@ -20,13 +20,13 @@ const ESBUILD_PORT = process.argv[2];
 const servers = [
   {
     port: 8002,
-    subdomain: "application",
+    subdomain: "main",
     serve: (req, res, log) => {
       serveWithEsbuild(
         req,
         res,
         log,
-        looksLikeFile(req.url) ? req.url : "/ApplicationMain.html"
+        looksLikeFile(req.url) ? req.url : "/Main.html"
       );
     },
   },

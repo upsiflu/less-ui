@@ -1,5 +1,5 @@
 function run(): void {
-  window["Elm"]?.ApplicationMain?.init();
+  window["Elm"]?.Main?.init();
 }
 
 run();
