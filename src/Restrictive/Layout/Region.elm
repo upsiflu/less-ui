@@ -1,20 +1,20 @@
 module Restrictive.Layout.Region exposing
-    ( allAspects
+    ( Region(..)
+    , allRegions
     , inverse, subtract
     , OrHeader(..)
     , isMember, justRegion, orHeader
     , OrAll(..)
     , intersect, isMemberOf, negate, subtract_, withHeader
-    , Region(..)
     )
 
 {-| Categorise the parts of your [Ui item](Ui)
 
 This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#toggle)
 
-@docs Aspect
+@docs Region
 
-@docs allAspects
+@docs allRegions
 
 @docs inverse, subtract
 
@@ -49,8 +49,8 @@ type Region
 
 
 {-| -}
-allAspects : List Region
-allAspects =
+allRegions : List Region
+allRegions =
     [ Scene, Info, Control ]
 
 
@@ -187,7 +187,7 @@ negate orAll =
 -}
 inverse : List Region -> List Region
 inverse comparison =
-    subtract_ comparison allAspects
+    subtract_ comparison allRegions
 
 
 {-|

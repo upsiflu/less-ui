@@ -21,7 +21,7 @@ Note that `Restrictive` always assumes a `Header` region.
 
 ## For Keyed Html
 
-default, withClass
+@docs default, withClass
 
 -}
 
@@ -53,11 +53,11 @@ sceneOnly : Layout Region (List html -> List html) html
 sceneOnly =
     { forget = \_ -> []
     , substitute = { current = identity, previous = \_ -> [] }
+    , regions = Region.allRegions
+    , wrap = identity
     , view =
         Get.get (Region Scene)
             >> Maybe.withDefault []
-    , wrap = identity
-    , regions = Region.allAspects
     }
 
 
@@ -66,9 +66,9 @@ list : List region -> Layout region (List ( String, element ) -> List ( String, 
 list allAspects =
     { forget = List.map <| \( _, v ) -> ( "-", v )
     , substitute = { current = identity, previous = \_ -> [] }
-    , view = Get.concatValues (Header :: List.map Region allAspects)
-    , wrap = identity
     , regions = allAspects
+    , wrap = identity
+    , view = Get.concatValues (Header :: List.map Region allAspects)
     }
 
 
@@ -91,11 +91,11 @@ default : Layout Region (KeyedHtmlWrapper msg) ( String, Html msg )
 default =
     { forget = poof
     , substitute = { current = identity, previous = \_ -> [] }
-    , view =
-        withHeader Region.allAspects
-            |> Get.toListBy (niceLayout "")
+    , regions = Region.allRegions
     , wrap = identity
-    , regions = Region.allAspects
+    , view =
+        withHeader Region.allRegions
+            |> Get.toListBy (niceLayout "")
     }
 
 
@@ -104,7 +104,7 @@ withClass : String -> Layout Region (KeyedHtmlWrapper msg) ( String, Html msg )
 withClass prefix =
     { default
         | view =
-            withHeader Region.allAspects
+            withHeader Region.allRegions
                 |> Get.toListBy (niceLayout prefix)
     }
 
