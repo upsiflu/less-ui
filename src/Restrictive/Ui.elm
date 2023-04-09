@@ -11,10 +11,9 @@ module Restrictive.Ui exposing
     , uncons
     , handle
     , custom, page, byLocation
-    , mapList
+    , indexedMapList, mapList
     , mapEach
     , ifJust, notIf, none
-    , indexedMapList
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
@@ -103,7 +102,7 @@ The big drawback when using `Ui`s as `List`s is that you cannot inspect (compare
 the `Descendant` type is opaque.
 It is usually easier to build exactly the `Ui` you need instead of altering and recombining them after the fact.
 
-@docs indexedMap, mapList
+@docs indexedMapList, mapList
 @docs mapEach
 
 
@@ -135,7 +134,7 @@ type alias Ui region wrapper html =
 {-| -}
 type Descendant region wrapper html
     = Twig (List html) (Maybe (Item region wrapper html))
-    | Wrap (List html -> List html) (Ui region wrapper html)
+    | Wrap wrapper (Ui region wrapper html)
 
 
 {-| TODO: update this comment
@@ -177,7 +176,7 @@ singleton =
 
 
 {-| -}
-textLabel : String -> KeyedUi region wrapper msg
+textLabel : String -> KeyedUi region msg
 textLabel =
     addTextLabel >> (|>) []
 
@@ -261,9 +260,9 @@ This will output:
 `Info -> "I am wrapped" []`
 
 -}
-wrap : (List html -> List html) -> Ui region wrapper html -> Ui region wrapper html
-wrap fu =
-    Wrap fu >> List.singleton
+wrap : wrapper -> Ui region wrapper html -> Ui region wrapper html
+wrap wrapper =
+    Wrap wrapper >> List.singleton
 
 
 
@@ -297,14 +296,14 @@ with region subUi =
                             (\() -> Just { get = Get.singleton region subUi, mask = always identity })
                         |> Twig foliage_
 
-                Wrap fu ui ->
-                    Wrap fu (with region subUi ui)
+                Wrap wrapper ui ->
+                    Wrap wrapper (with region subUi ui)
         )
 
 
 {-| prepend a freeform label to the contextual region
 -}
-addLabel : Ui region wrapper ( String, Html msg ) -> Ui region wrapper ( String, Html msg ) -> Ui region wrapper ( String, Html msg )
+addLabel : KeyedUi region msg -> Ui region (List ( String, Html msg ) -> List ( String, Html msg )) ( String, Html msg ) -> Ui region (List ( String, Html msg ) -> List ( String, Html msg )) ( String, Html msg )
 addLabel label_ ui =
     wrap
         (Html.Keyed.node "label" []
@@ -314,34 +313,34 @@ addLabel label_ ui =
         (label_ ++ ui)
 
 
-type alias KeyedUi region wrapper msg =
-    Ui region wrapper ( String, Html msg )
+type alias KeyedUi region msg =
+    Ui region (List ( String, Html msg ) -> List ( String, Html msg )) ( String, Html msg )
 
 
 {-| convenience function to wrap a Ui into an unordered list and give it an id
 -}
-ul : String -> KeyedUi region wrapper msg -> KeyedUi region wrapper msg
+ul : String -> KeyedUi region msg -> KeyedUi region msg
 ul idString =
     wrap (Html.Keyed.ul [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| convenience function to wrap a Ui into an ordered list and give it an id
 -}
-ol : String -> KeyedUi region wrapper msg -> KeyedUi region wrapper msg
+ol : String -> KeyedUi region msg -> KeyedUi region msg
 ol idString =
     wrap (Html.Keyed.ul [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| convenience function to wrap a Ui into any Html node and give it an id
 -}
-node : String -> String -> KeyedUi region wrapper msg -> KeyedUi region wrapper msg
+node : String -> String -> KeyedUi region msg -> KeyedUi region msg
 node nodeType idString =
     wrap (Html.Keyed.node nodeType [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| prepend a text label to the contextual region
 -}
-addTextLabel : String -> KeyedUi region wrapper msg -> KeyedUi region wrapper msg
+addTextLabel : String -> KeyedUi region msg -> KeyedUi region msg
 addTextLabel =
     labelFromString >> addLabel
 
@@ -374,7 +373,7 @@ repeat n =
 {-|
 
     List.repeat 10 ()
-        |> indexedMap (\i _ -> textLabel (String.fromInt i))
+        |> indexedMapList (\i _ -> textLabel (String.fromInt i))
         |> mapList (List.intersperse (textLabel "and"))
 
 You may find it handy to use functions such as `List.Extra.setAt` to replace the n-th descendant in a List:
@@ -496,7 +495,7 @@ view state layout =
 
                         Wrap wrapper ui_ ->
                             viewUi region ui_
-                                |> Get.update region wrapper
+                                |> Get.update region (layout.wrap wrapper)
 
         viewItem : OrHeader region -> Item region wrapper html -> Get (OrHeader region) (List html)
         viewItem region item =
