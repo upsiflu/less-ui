@@ -11,9 +11,10 @@ module Restrictive.Ui exposing
     , uncons
     , handle
     , custom, page, byLocation
-    , indexedMap, mapList
-    , mapEach, map2
+    , mapList
+    , mapEach
     , ifJust, notIf, none
+    , indexedMapList
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
@@ -85,11 +86,25 @@ interface with the Ui context.
 Since `Ui`s are `List`s, it is easy to use the library functions from the `List` and `List.Extra` packages.
 However, I recommend against it.
 
-The big drawback when using `Ui`s as `List`s is that you cannot inspect (compare, filter, sort) them because the `Descendant` type is opaque.
+    {-| Combines descendents from two `Ui`s. If one `Ui` is longer, its excessive elements are dropped.
+    -}
+    map2 fu a b =
+        List.map2 fu (List.map List.singleton a) (List.map List.singleton b)
+            |> List.concat
+
+    map3 fu a b c =
+        List.map3 fu
+            (List.map List.singleton a)
+            (List.map List.singleton b)
+            (List.map List.singleton c)
+            |> List.concat
+
+The big drawback when using `Ui`s as `List`s is that you cannot inspect (compare, filter, sort) them because
+the `Descendant` type is opaque.
 It is usually easier to build exactly the `Ui` you need instead of altering and recombining them after the fact.
 
 @docs indexedMap, mapList
-@docs mapEach, map2
+@docs mapEach
 
 
 # Conditional helpers
@@ -113,14 +128,14 @@ import Url exposing (Url)
 
 
 {-| -}
-type alias Ui aspect html =
-    List (Descendant aspect html)
+type alias Ui region wrapper html =
+    List (Descendant region wrapper html)
 
 
 {-| -}
-type Descendant aspect html
-    = Twig (List html) (Maybe (Item aspect html))
-    | Wrap (List html -> List html) (Ui aspect html)
+type Descendant region wrapper html
+    = Twig (List html) (Maybe (Item region wrapper html))
+    | Wrap (List html -> List html) (Ui region wrapper html)
 
 
 {-| TODO: update this comment
@@ -145,9 +160,9 @@ For example,
       - place the handle content `Get.append (Get.singleton Header (foliage handle))`
 
 -}
-type alias Item aspect html =
-    { get : Get aspect (Ui aspect html)
-    , mask : ( OrHeader aspect, Url ) -> Mask (OrHeader aspect) (Ui aspect html)
+type alias Item region wrapper html =
+    { get : Get region (Ui region wrapper html)
+    , mask : ( OrHeader region, Url ) -> Mask (OrHeader region) (Ui region wrapper html)
     }
 
 
@@ -156,13 +171,13 @@ type alias Item aspect html =
 
 
 {-| -}
-singleton : Ui aspect html
+singleton : Ui region wrapper html
 singleton =
     [ Twig [] Nothing ]
 
 
 {-| -}
-textLabel : String -> KeyedUi aspect msg
+textLabel : String -> KeyedUi region wrapper msg
 textLabel =
     addTextLabel >> (|>) []
 
@@ -171,31 +186,31 @@ textLabel =
 even [when nodes before this are removed or added](https://guide.elm-lang.org/optimization/keyed.html),
 use (key, Html) and then wrap with `Html.Keyed.node`.
 -}
-html : html -> Ui aspect html
+html : html -> Ui region wrapper html
 html =
     List.singleton >> foliage
 
 
 {-| [Foliage](Ui.Layout.ViewModel#Foliage) is a list of String-keyed Html
 -}
-foliage : List html -> Ui aspect html
+foliage : List html -> Ui region wrapper html
 foliage =
     Twig >> (|>) Nothing >> List.singleton
 
 
-labelFromString : String -> Ui aspect ( String, Html msg )
+labelFromString : String -> Ui region wrapper ( String, Html msg )
 labelFromString t =
     foliage [ ( t, Html.span [ Attr.class "text label" ] [ Html.text t ] ) ]
 
 
 {-| `fromList = List.concatMap`
 -}
-fromList : (a -> Ui aspect html) -> List a -> Ui aspect html
+fromList : (a -> Ui region wrapper html) -> List a -> Ui region wrapper html
 fromList =
     List.concatMap
 
 
-fromItem : Item aspect html -> Ui aspect html
+fromItem : Item region wrapper html -> Ui region wrapper html
 fromItem =
     Just >> Twig [] >> List.singleton
 
@@ -206,9 +221,9 @@ fromItem =
 
 {-| Shorthand for `singleton |> with ...`
 -}
-setAspect : aspect -> Ui aspect html -> Ui aspect html
-setAspect aspect subUi =
-    with aspect subUi singleton
+setAspect : region -> Ui region wrapper html -> Ui region wrapper html
+setAspect region subUi =
+    with region subUi singleton
 
 
 {-| Nest Foliage at the given `Aspect`.
@@ -225,8 +240,8 @@ setAspect aspect subUi =
                        ╭▒▒╮       ╭▒╮
                      ──┘◉◉└●────◆◆┘◉└──
 
-If you wrap, and then define the contextual aspect,
-the will wrap all descendants that constitute this aspect.
+If you wrap, and then define the contextual region,
+the will wrap all descendants that constitute this region.
 
     example : Ui msg
     example =
@@ -235,7 +250,7 @@ the will wrap all descendants that constitute this aspect.
             |> wrap ((++) ( "message", Html.text "I am wrapped" ))
             |> with Control []
 
-Now, let's see what happens if we define a contextual aspect.
+Now, let's see what happens if we define a contextual region.
 
     singleton
         |> with Info example
@@ -246,7 +261,7 @@ This will output:
 `Info -> "I am wrapped" []`
 
 -}
-wrap : (List html -> List html) -> Ui aspect html -> Ui aspect html
+wrap : (List html -> List html) -> Ui region wrapper html -> Ui region wrapper html
 wrap fu =
     Wrap fu >> List.singleton
 
@@ -255,7 +270,7 @@ wrap fu =
 ---- COMPOSE ----
 
 
-{-| Nest a sub-Ui to each descendant, via a [semantic aspect](Ui.Layout.Aspect):
+{-| Nest a sub-Ui to each descendant, via a [semantic region](Ui.Layout.Aspect):
 
 Note that an empty list will stay an empty list:
 
@@ -269,27 +284,27 @@ Note that an empty list will stay an empty list:
         -> ???
 
 -}
-with : aspect -> Ui aspect html -> Ui aspect html -> Ui aspect html
-with aspect subUi =
+with : region -> Ui region wrapper html -> Ui region wrapper html -> Ui region wrapper html
+with region subUi =
     List.map
         (\original ->
             case original of
                 Twig foliage_ maybeItem ->
                     Maybe.map
-                        (\item_ -> Just { item_ | get = Get.addList aspect subUi item_.get })
+                        (\item_ -> Just { item_ | get = Get.addList region subUi item_.get })
                         maybeItem
                         |> Maybe.withDefaultLazy
-                            (\() -> Just { get = Get.singleton aspect subUi, mask = always identity })
+                            (\() -> Just { get = Get.singleton region subUi, mask = always identity })
                         |> Twig foliage_
 
                 Wrap fu ui ->
-                    Wrap fu (with aspect subUi ui)
+                    Wrap fu (with region subUi ui)
         )
 
 
-{-| prepend a freeform label to the contextual aspect
+{-| prepend a freeform label to the contextual region
 -}
-addLabel : Ui aspect ( String, Html msg ) -> Ui aspect ( String, Html msg ) -> Ui aspect ( String, Html msg )
+addLabel : Ui region wrapper ( String, Html msg ) -> Ui region wrapper ( String, Html msg ) -> Ui region wrapper ( String, Html msg )
 addLabel label_ ui =
     wrap
         (Html.Keyed.node "label" []
@@ -299,52 +314,34 @@ addLabel label_ ui =
         (label_ ++ ui)
 
 
-{-| Combine descendents from two `Ui`s. If one `Ui` is longer, its excessive elements are dropped.
-
-You can easily implement higher order `mapN`s:
-
-    map3 fu a b c =
-        List.map3 fu
-            (List.map List.singleton a)
-            (List.map List.singleton b)
-            (List.map List.singleton c)
-            |> List.concat
-
--}
-map2 : (Ui aspect html -> Ui aspect2 html2 -> Ui aspect3 html3) -> Ui aspect html -> Ui aspect2 html2 -> Ui aspect3 html3
-map2 fu a b =
-    List.map2 fu (List.map List.singleton a) (List.map List.singleton b)
-        |> List.concat
-
-
-type alias KeyedUi aspect msg =
-    Ui aspect ( String, Html msg )
+type alias KeyedUi region wrapper msg =
+    Ui region wrapper ( String, Html msg )
 
 
 {-| convenience function to wrap a Ui into an unordered list and give it an id
 -}
-ul : String -> KeyedUi aspect msg -> KeyedUi aspect msg
+ul : String -> KeyedUi region wrapper msg -> KeyedUi region wrapper msg
 ul idString =
     wrap (Html.Keyed.ul [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| convenience function to wrap a Ui into an ordered list and give it an id
 -}
-ol : String -> KeyedUi aspect msg -> KeyedUi aspect msg
+ol : String -> KeyedUi region wrapper msg -> KeyedUi region wrapper msg
 ol idString =
     wrap (Html.Keyed.ul [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
 
 
 {-| convenience function to wrap a Ui into any Html node and give it an id
 -}
-node : String -> String -> KeyedUi aspect msg -> KeyedUi aspect msg
+node : String -> String -> KeyedUi region wrapper msg -> KeyedUi region wrapper msg
 node nodeType idString =
     wrap (Html.Keyed.node nodeType [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
 
 
-{-| prepend a text label to the contextual aspect
+{-| prepend a text label to the contextual region
 -}
-addTextLabel : String -> KeyedUi aspect msg -> KeyedUi aspect msg
+addTextLabel : String -> KeyedUi region wrapper msg -> KeyedUi region wrapper msg
 addTextLabel =
     labelFromString >> addLabel
 
@@ -355,11 +352,11 @@ addTextLabel =
 
 {-| Modify descendent `Ui`s according to their order.
 
-    indexedMap (\i -> addTextLabel (String.fromInt i)) (textLabel "I am a labeled label")
+    indexedMapList (\i -> addTextLabel (String.fromInt i)) (textLabel "I am a labeled label")
 
 -}
-indexedMap : (Int -> Ui aspect html -> Ui aspect html) -> Ui aspect html -> Ui aspect html
-indexedMap fu =
+indexedMapList : (Int -> Ui region wrapper html -> Ui region wrapper html) -> Ui region wrapper html -> Ui region wrapper html
+indexedMapList fu =
     List.indexedMap (\i -> List.singleton >> fu i) >> List.concat
 
 
@@ -369,7 +366,7 @@ indexedMap fu =
         List.repeat n >> List.concat
 
 -}
-repeat : Int -> Ui aspect html -> Ui aspect html
+repeat : Int -> Ui region wrapper html -> Ui region wrapper html
 repeat n =
     List.repeat n >> List.concat
 
@@ -395,19 +392,19 @@ or to remove a descendant:
         |> mapList (List.remove 1)
 
 -}
-mapList : (List (Ui aspect html) -> List (Ui aspect2 html2)) -> Ui aspect html -> Ui aspect2 html2
+mapList : (List (Ui region wrapper html) -> List (Ui region2 wrapper2 html2)) -> Ui region wrapper html -> Ui region2 wrapper2 html2
 mapList fu =
     List.map List.singleton >> fu >> List.concat
 
 
 {-| Modify each descendent as a separate Ui and then recombine them.
 
-    aspect html   "A" ++ aspect html   "B" ++ aspect html   "C"
+    region wrapper html   "A" ++ region wrapper html   "B" ++ region wrapper html   "C"
         |> mapEach ((++) (html ", "))
         ---> something like A, B, C
 
 -}
-mapEach : (Ui aspect html -> Ui aspect2 html2) -> Ui aspect html -> Ui aspect2 html2
+mapEach : (Ui region wrapper html -> Ui region2 wrapper2 html2) -> Ui region wrapper html -> Ui region2 wrapper2 html2
 mapEach fu =
     List.concatMap (List.singleton >> fu)
 
@@ -447,7 +444,7 @@ mapEach fu =
         --> Nothing
 
 -}
-uncons : Ui aspect html -> Maybe ( Ui aspect html, Ui aspect html )
+uncons : Ui region wrapper html -> Maybe ( Ui region wrapper html, Ui region wrapper html )
 uncons =
     List.uncons >> Maybe.map (Tuple.mapFirst List.singleton)
 
@@ -465,7 +462,7 @@ As the following example shows, you can substitute Html by any other type:
     import Url exposing (Url)
     import Ui.Layout
 
-    view_ : String -> Ui aspect html   -> Maybe (Foliage html)
+    view_ : String -> Ui region wrapper html   -> Maybe (Foliage html)
     view_ urlString ui_=
         Url.fromString urlString
             |> Maybe.map
@@ -484,29 +481,29 @@ As the following example shows, you can substitute Html by any other type:
         --> Just [ ("Scene", 1), ("Info", 200), ("Info", 201), ("Control", 3) ]
 
 -}
-view : State -> Layout aspect html -> Ui aspect html -> List html
+view : State -> Layout region wrapper html -> Ui region wrapper html -> List html
 view state layout =
     let
-        viewUi : OrHeader aspect -> Ui aspect html -> Get (OrHeader aspect) (List html)
-        viewUi aspect =
+        viewUi : OrHeader region -> Ui region wrapper html -> Get (OrHeader region) (List html)
+        viewUi region =
             Get.concatMap <|
                 \descendant ->
                     case descendant of
                         Twig foliage_ maybeItem ->
-                            Maybe.map (viewItem aspect) maybeItem
+                            Maybe.map (viewItem region) maybeItem
                                 |> Maybe.withDefault Get.empty
-                                |> Get.append (Get.singleton aspect foliage_)
+                                |> Get.append (Get.singleton region foliage_)
 
                         Wrap wrapper ui_ ->
-                            viewUi aspect ui_
-                                |> Get.update aspect wrapper
+                            viewUi region ui_
+                                |> Get.update region wrapper
 
-        viewItem : OrHeader aspect -> Item aspect html -> Get (OrHeader aspect) (List html)
-        viewItem aspect item =
-            -- Calculate the mutation between the states     -> Get (OrHeader aspect) (Mutation(List html))
+        viewItem : OrHeader region -> Item region wrapper html -> Get (OrHeader region) (List html)
+        viewItem region item =
+            -- Calculate the mutation between the states     -> Get (OrHeader region) (Mutation(List html))
             State.map
                 (\url_ ->
-                    item.mask ( aspect, url_ ) (Get.mapKey Region.justRegion item.get)
+                    item.mask ( region, url_ ) (Get.mapKey Region.justRegion item.get)
                         -- Render logically nested Uis
                         |> Get.mapByKey viewUi
                         |> Get.values (Region.withHeader layout.regions)
@@ -514,18 +511,18 @@ view state layout =
                 )
                 state
                 |> Get.mutation
-                -- Resolve the mutation                          -> Get (OrHeader aspect) (List html)
+                -- Resolve the mutation                          -> Get (OrHeader region) (List html)
                 |> Get.map
                     (\mutation ->
                         case mutation of
                             Get.Substitution m ->
-                                layout.substitute.current m.current ++ layout.substitute.previous m.previous
+                                layout.wrap layout.substitute.current m.current ++ layout.wrap layout.substitute.previous m.previous
 
                             Get.Insertion a ->
                                 a
 
                             Get.Deletion a ->
-                                layout.forget a
+                                layout.wrap layout.forget a
 
                             Get.Protraction a ->
                                 a
@@ -545,7 +542,7 @@ view state layout =
 
 {-| Here you can add your own button, input, or indicator in the Header region.
 -}
-handle : List html -> Ui aspect html
+handle : List html -> Ui region wrapper html
 handle foliage_ =
     foliage foliage_
         |> Get.singleton Header
@@ -556,7 +553,7 @@ handle foliage_ =
 
 {-| Whatever you add to this item will only be visible . Use `bounce` and `goTo` links to navigate to the corresponding path.
 -}
-page : State.Path -> Ui aspect html -> Ui aspect html
+page : State.Path -> Ui region wrapper html -> Ui region wrapper html
 page path_ ui_ =
     custom <|
         \( region, url ) ->
@@ -566,7 +563,7 @@ page path_ ui_ =
 
 
 {-| -}
-byLocation : (( Maybe State.Path, State.Fragment ) -> Ui aspect html) -> Ui aspect html
+byLocation : (( Maybe State.Path, State.Fragment ) -> Ui region wrapper html) -> Ui region wrapper html
 byLocation fromPage =
     custom <|
         \( region, url ) ->
@@ -588,7 +585,7 @@ byLocation fromPage =
     noControl : Ui ()
     noControl =
       custom
-        (\(aspect, url) ->
+        (\(region, url) ->
             { occlude = [Control]
             , appendWhere = Nothing
             , appendWhat = [("Handle", ())]
@@ -598,7 +595,7 @@ byLocation fromPage =
     page : String -> Ui ()
     page route =
       custom
-        (\(aspect, { path }) ->
+        (\(region, { path }) ->
             { occlude = if path == route then [] else Aspect.all
             , appendWhere = Nothing
             , appendWhat = [(route, ())]
@@ -608,7 +605,7 @@ byLocation fromPage =
     toggle : String -> Ui ()
     toggle flag =
       custom
-        (\(aspect, { query }) ->
+        (\(region, { query }) ->
             { occlude = if Maybe.map (String.contains flag) query |> Maybe.withDefault False
                             then []
                             else Aspect.all
@@ -619,7 +616,7 @@ byLocation fromPage =
 
     -- Test --
 
-    viewWithState : {current : String, previous : String } -> Ui aspect html   -> List String
+    viewWithState : {current : String, previous : String } -> Ui region wrapper html   -> List String
     viewWithState state ui =
         case Url.fromString state.current of
             Nothing ->
@@ -694,7 +691,7 @@ byLocation fromPage =
         -->  [ "/Cool", "/Hot", "Cool page is open", "-" ]
 
 -}
-custom : (( OrHeader aspect, Url ) -> Mask (OrHeader aspect) (Ui aspect html)) -> Ui aspect html
+custom : (( OrHeader region, Url ) -> Mask (OrHeader region) (Ui region wrapper html)) -> Ui region wrapper html
 custom mask =
     fromItem
         { get = Get.empty

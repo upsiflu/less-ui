@@ -1,11 +1,11 @@
 module Restrictive.Layout.Region exposing
-    ( Aspect(..)
-    , allAspects
+    ( allAspects
     , inverse, subtract
     , OrHeader(..)
     , isMember, justRegion, orHeader
     , OrAll(..)
     , intersect, isMemberOf, negate, subtract_, withHeader
+    , Region(..)
     )
 
 {-| Categorise the parts of your [Ui item](Ui)
@@ -42,14 +42,14 @@ This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#togg
 **Info:** Status bar, Help screen, Tooltip bubble, Snack bar
 
 -}
-type Aspect
+type Region
     = Scene
     | Info
     | Control
 
 
 {-| -}
-allAspects : List Aspect
+allAspects : List Region
 allAspects =
     [ Scene, Info, Control ]
 
@@ -185,7 +185,7 @@ negate orAll =
         --> [Info]
 
 -}
-inverse : List Aspect -> List Aspect
+inverse : List Region -> List Region
 inverse comparison =
     subtract_ comparison allAspects
 
@@ -204,7 +204,7 @@ inverse comparison =
         --> []
 
 -}
-subtract_ : List Aspect -> List Aspect -> List Aspect
+subtract_ : List Region -> List Region -> List Region
 subtract_ whatToSubstract =
     List.filter
         (\a -> not <| List.member a whatToSubstract)

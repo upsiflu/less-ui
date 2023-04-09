@@ -64,8 +64,8 @@ type alias Application model modelMsg =
 
 
 {-| -}
-type alias Document aspect html =
-    { body : Ui aspect html, layout : Layout aspect html, title : String }
+type alias Document aspect wrapper html =
+    { body : Ui aspect wrapper html, layout : Layout aspect wrapper html, title : String }
 
 
 {-| Separate Url update from Model update
@@ -86,7 +86,7 @@ type alias Document aspect html =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : model -> Document aspect ( String, Html modelMsg )
+    , view : model -> Document aspect wrapper ( String, Html modelMsg )
     }
     -> Application model modelMsg
 application config =
@@ -191,7 +191,7 @@ type Msg modelMsg
 
 {-| As of now, will only attach an inline text link, not occlude any regions
 -}
-bounce : { here : ( Maybe Path, Fragment ), there : ( Maybe Path, Fragment ) } -> Ui aspect ( String, Html msg )
+bounce : { here : ( Maybe Path, Fragment ), there : ( Maybe Path, Fragment ) } -> Ui aspect wrapper ( String, Html msg )
 bounce =
     State.bounce
         >> State.inlineLink
@@ -205,7 +205,7 @@ bounce =
 
 {-| As of now, will only attach an inline text link, not occlude any regions
 -}
-goTo : ( Maybe Path, Fragment ) -> Ui aspect ( String, Html msg )
+goTo : ( Maybe Path, Fragment ) -> Ui aspect wrapper ( String, Html msg )
 goTo =
     State.goTo
         >> State.inlineLink
@@ -219,7 +219,7 @@ goTo =
 
 {-| As of now, will only attach an inline text link, not occlude any regions
 -}
-goTo_ : ( Maybe Path, Fragment ) -> List (Html Never) -> Ui aspect ( String, Html msg )
+goTo_ : ( Maybe Path, Fragment ) -> List (Html Never) -> Ui aspect wrapper ( String, Html msg )
 goTo_ config contents =
     State.headerLink_ [] (always contents) (State.goTo config)
         |> (<<)
@@ -235,7 +235,7 @@ goTo_ config contents =
     a[role="switch"]:aria-checked {}
 
 -}
-toggle : Flag -> Ui aspect ( String, Html msg )
+toggle : Flag -> Ui aspect wrapper ( String, Html msg )
 toggle =
     State.toggle
         >> State.inlineLink
