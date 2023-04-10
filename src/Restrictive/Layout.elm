@@ -38,9 +38,10 @@ import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), w
 type alias Layout region wrapper html =
     { forget : wrapper
     , substitute : { current : wrapper, previous : wrapper }
-    , regions : List region
-    , wrap : wrapper -> List html -> List html
-    , view : Get (OrHeader region) (List html) -> List html
+    , regions : ( region, List region )
+    , wrap : wrapper -> html -> html
+    , concat : List html -> html
+    , view : Get (OrHeader region) html -> html
     }
 
 
@@ -49,12 +50,13 @@ type alias Layout region wrapper html =
 
 
 {-| -}
-sceneOnly : Layout Region (List html -> List html) html
+sceneOnly : Layout Region (List html -> List html) (List html)
 sceneOnly =
     { forget = \_ -> []
     , substitute = { current = identity, previous = \_ -> [] }
     , regions = Region.allRegions
     , wrap = identity
+    , concat = List.concat
     , view =
         Get.get (Region Scene)
             >> Maybe.withDefault []
@@ -62,13 +64,14 @@ sceneOnly =
 
 
 {-| -}
-list : List region -> Layout region (List ( String, element ) -> List ( String, element )) ( String, element )
-list allAspects =
+list : ( region, List region ) -> Layout region (List ( String, element ) -> List ( String, element )) (List ( String, element ))
+list regions =
     { forget = List.map <| \( _, v ) -> ( "-", v )
     , substitute = { current = identity, previous = \_ -> [] }
-    , regions = allAspects
+    , regions = regions
     , wrap = identity
-    , view = Get.concatValues (Header :: List.map Region allAspects)
+    , concat = List.concat
+    , view = Get.concatValues (Region.withHeader regions)
     }
 
 
@@ -87,12 +90,13 @@ poof =
 
 
 {-| -}
-default : Layout Region (KeyedHtmlWrapper msg) ( String, Html msg )
+default : Layout Region (KeyedHtmlWrapper msg) (List ( String, Html msg ))
 default =
     { forget = poof
     , substitute = { current = identity, previous = \_ -> [] }
     , regions = Region.allRegions
     , wrap = identity
+    , concat = List.concat
     , view =
         withHeader Region.allRegions
             |> Get.toListBy (niceLayout "")
@@ -100,7 +104,7 @@ default =
 
 
 {-| -}
-withClass : String -> Layout Region (KeyedHtmlWrapper msg) ( String, Html msg )
+withClass : String -> Layout Region (KeyedHtmlWrapper msg) (List ( String, Html msg ))
 withClass prefix =
     { default
         | view =

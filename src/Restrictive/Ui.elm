@@ -1,11 +1,9 @@
 module Restrictive.Ui exposing
     ( Ui, Descendant
-    , singleton, html, textLabel, foliage, fromList
+    , singleton, fromList
     , wrap
     , with
     , view, toHtml
-    , addLabel, addTextLabel
-    , setAspect
     , repeat
     , ol, ul, node
     , uncons
@@ -26,7 +24,7 @@ Ui is headless (like elm-widgets will be).
 
 # Create
 
-@docs singleton, html, textLabel, foliage, fromList
+@docs singleton, fromList
 
 
 # Modify
@@ -50,8 +48,6 @@ To merge two `Ui`s on the same level, use [`++`](https://package.elm-lang.org/pa
 
 # Convenience
 
-@docs addLabel, addTextLabel
-@docs setAspect
 @docs repeat
 
 In addition, many List functions directly work with `Ui`, for example `List.length`, `List.reverse` or `List.Extra.permutations`.
@@ -117,7 +113,6 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Keyed
 import List.Extra as List
-import Maybe.Extra as Maybe
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout exposing (Layout)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..))
@@ -133,7 +128,8 @@ type alias Ui region wrapper html =
 
 {-| -}
 type Descendant region wrapper html
-    = Twig (List html) (Maybe (Item region wrapper html))
+    = Leaf html
+    | Twig (Item region wrapper html)
     | Wrap wrapper (Ui region wrapper html)
 
 
@@ -170,36 +166,9 @@ type alias Item region wrapper html =
 
 
 {-| -}
-singleton : Ui region wrapper html
-singleton =
-    [ Twig [] Nothing ]
-
-
-{-| -}
-textLabel : String -> KeyedUi region msg
-textLabel =
-    addTextLabel >> (|>) []
-
-
-{-| To preserve data in controls or [custom elements](https://guide.elm-lang.org/interop/custom_elements.html)
-even [when nodes before this are removed or added](https://guide.elm-lang.org/optimization/keyed.html),
-use (key, Html) and then wrap with `Html.Keyed.node`.
--}
-html : html -> Ui region wrapper html
-html =
-    List.singleton >> foliage
-
-
-{-| [Foliage](Ui.Layout.ViewModel#Foliage) is a list of String-keyed Html
--}
-foliage : List html -> Ui region wrapper html
-foliage =
-    Twig >> (|>) Nothing >> List.singleton
-
-
-labelFromString : String -> Ui region wrapper ( String, Html msg )
-labelFromString t =
-    foliage [ ( t, Html.span [ Attr.class "text label" ] [ Html.text t ] ) ]
+singleton : html -> Ui region wrapper html
+singleton html_ =
+    [ Leaf html_ ]
 
 
 {-| `fromList = List.concatMap`
@@ -209,20 +178,8 @@ fromList =
     List.concatMap
 
 
-fromItem : Item region wrapper html -> Ui region wrapper html
-fromItem =
-    Just >> Twig [] >> List.singleton
-
-
 
 ---- MODIFY ----
-
-
-{-| Shorthand for `singleton |> with ...`
--}
-setAspect : region -> Ui region wrapper html -> Ui region wrapper html
-setAspect region subUi =
-    with region subUi singleton
 
 
 {-| Nest Foliage at the given `Aspect`.
@@ -285,36 +242,22 @@ Note that an empty list will stay an empty list:
 -}
 with : region -> Ui region wrapper html -> Ui region wrapper html -> Ui region wrapper html
 with region subUi =
-    List.map
+    List.concatMap
         (\original ->
             case original of
-                Twig foliage_ maybeItem ->
-                    Maybe.map
-                        (\item_ -> Just { item_ | get = Get.addList region subUi item_.get })
-                        maybeItem
-                        |> Maybe.withDefaultLazy
-                            (\() -> Just { get = Get.singleton region subUi, mask = always identity })
-                        |> Twig foliage_
+                Leaf html_ ->
+                    [ Leaf html_, Twig { get = Get.singleton region subUi, mask = always identity } ]
+
+                Twig item_ ->
+                    [ Twig { item_ | get = Get.addList region subUi item_.get } ]
 
                 Wrap wrapper ui ->
-                    Wrap wrapper (with region subUi ui)
+                    [ Wrap wrapper (with region subUi ui) ]
         )
-
-
-{-| prepend a freeform label to the contextual region
--}
-addLabel : KeyedUi region msg -> Ui region (List ( String, Html msg ) -> List ( String, Html msg )) ( String, Html msg ) -> Ui region (List ( String, Html msg ) -> List ( String, Html msg )) ( String, Html msg )
-addLabel label_ ui =
-    wrap
-        (Html.Keyed.node "label" []
-            >> Tuple.pair ""
-            >> List.singleton
-        )
-        (label_ ++ ui)
 
 
 type alias KeyedUi region msg =
-    Ui region (List ( String, Html msg ) -> List ( String, Html msg )) ( String, Html msg )
+    Ui region (List ( String, Html msg ) -> List ( String, Html msg )) (List ( String, Html msg ))
 
 
 {-| convenience function to wrap a Ui into an unordered list and give it an id
@@ -336,13 +279,6 @@ ol idString =
 node : String -> String -> KeyedUi region msg -> KeyedUi region msg
 node nodeType idString =
     wrap (Html.Keyed.node nodeType [ Attr.id idString ] >> Tuple.pair idString >> List.singleton)
-
-
-{-| prepend a text label to the contextual region
--}
-addTextLabel : String -> KeyedUi region msg -> KeyedUi region msg
-addTextLabel =
-    labelFromString >> addLabel
 
 
 
@@ -480,24 +416,29 @@ As the following example shows, you can substitute Html by any other type:
         --> Just [ ("Scene", 1), ("Info", 200), ("Info", 201), ("Control", 3) ]
 
 -}
-view : State -> Layout region wrapper html -> Ui region wrapper html -> List html
+view : State -> Layout region wrapper html -> Ui region wrapper html -> html
 view state layout =
     let
-        viewUi : OrHeader region -> Ui region wrapper html -> Get (OrHeader region) (List html)
+        {- Expected:     `Ui region wrapper html -> OrHeader region -> Maybe html`
+           Found:                  `Ui region wrapper html -> List (OrHeader region -> Maybe html)`Elm
+        -}
+        viewUi : OrHeader region -> Ui region wrapper html -> Get (OrHeader region) html
         viewUi region =
-            Get.concatMap <|
-                \descendant ->
+            List.map
+                (\descendant ->
                     case descendant of
-                        Twig foliage_ maybeItem ->
-                            Maybe.map (viewItem region) maybeItem
-                                |> Maybe.withDefault Get.empty
-                                |> Get.append (Get.singleton region foliage_)
+                        Leaf html_ ->
+                            Get.singleton region html_
+
+                        Twig item_ ->
+                            viewItem region item_
 
                         Wrap wrapper ui_ ->
-                            viewUi region ui_
-                                |> Get.update region (layout.wrap wrapper)
+                            Get.update region (layout.wrap wrapper) (viewUi region ui_)
+                )
+                >> Get.concatCustom layout.concat
 
-        viewItem : OrHeader region -> Item region wrapper html -> Get (OrHeader region) (List html)
+        viewItem : OrHeader region -> Item region wrapper html -> Get (OrHeader region) html
         viewItem region item =
             -- Calculate the mutation between the states     -> Get (OrHeader region) (Mutation(List html))
             State.map
@@ -506,7 +447,7 @@ view state layout =
                         -- Render logically nested Uis
                         |> Get.mapByKey viewUi
                         |> Get.values (Region.withHeader layout.regions)
-                        |> Get.concat
+                        |> Get.concatCustom layout.concat
                 )
                 state
                 |> Get.mutation
@@ -515,7 +456,10 @@ view state layout =
                     (\mutation ->
                         case mutation of
                             Get.Substitution m ->
-                                layout.wrap layout.substitute.current m.current ++ layout.wrap layout.substitute.previous m.previous
+                                layout.concat
+                                    [ layout.wrap layout.substitute.current m.current
+                                    , layout.wrap layout.substitute.previous m.previous
+                                    ]
 
                             Get.Insertion a ->
                                 a
@@ -527,12 +471,7 @@ view state layout =
                                 a
                     )
     in
-    case List.head layout.regions of
-        Just initial ->
-            viewUi (Region initial) >> layout.view
-
-        Nothing ->
-            \_ -> []
+    viewUi (Region (Tuple.first layout.regions)) >> layout.view
 
 
 
@@ -541,9 +480,9 @@ view state layout =
 
 {-| Here you can add your own button, input, or indicator in the Header region.
 -}
-handle : List html -> Ui region wrapper html
+handle : html -> Ui region wrapper html
 handle foliage_ =
-    foliage foliage_
+    singleton foliage_
         |> Get.singleton Header
         |> Get.append
         |> always
@@ -692,10 +631,11 @@ byLocation fromPage =
 -}
 custom : (( OrHeader region, Url ) -> Mask (OrHeader region) (Ui region wrapper html)) -> Ui region wrapper html
 custom mask =
-    fromItem
+    [ Twig
         { get = Get.empty
         , mask = mask
         }
+    ]
 
 
 

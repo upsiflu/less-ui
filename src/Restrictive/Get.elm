@@ -9,7 +9,7 @@ module Restrictive.Get exposing
     , mapKey
     , mapByKey, mapValueByKey, map2ByKey
     , join, unlockInner, unlockOuter
-    , append, concat, concatMap
+    , append, concat, concatMap, concatCustom
     , orElse, superimpose
     , andThen, andThenFlat, andThenMaybe, andMap, andMapFlat
     , union, intersect, diff
@@ -68,7 +68,7 @@ module Restrictive.Get exposing
 
 ### `Get (List a)`
 
-@docs append, concat, concatMap
+@docs append, concat, concatMap, concatCustom
 
 
 ### Get either value
@@ -637,16 +637,26 @@ append =
 
 {-| `concat = List.foldl merge empty`
 -}
-concat : List (Get aspect (List html)) -> Get aspect (List html)
+concat : List (Get key (List a)) -> Get key (List a)
 concat =
     List.foldr append empty
 
 
 {-| Merge the results of `fu`
 -}
-concatMap : (a -> Get aspect (List html)) -> List a -> Get aspect (List html)
+concatMap : (a -> Get key (List a)) -> List a -> Get key (List a)
 concatMap fu =
     List.map fu >> concat
+
+
+{-| Concatenate the values of several `Get`s with a custom concatenator
+-}
+concatCustom : (List a -> a) -> List (Get key a) -> Get key a
+concatCustom concatenator list key =
+    List.map (get key) list
+        |> Maybe.values
+        |> concatenator
+        |> Just
 
 
 {-| Return the first value only if the second fails, using the same key. Lazy.

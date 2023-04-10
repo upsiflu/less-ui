@@ -49,9 +49,9 @@ type Region
 
 
 {-| -}
-allRegions : List Region
+allRegions : ( Region, List Region )
 allRegions =
-    [ Scene, Info, Control ]
+    ( Scene, [ Info, Control ] )
 
 
 {-| Work with a set of regions that can be "full".
@@ -74,9 +74,9 @@ type OrHeader region
     withHeader [ 1, 2 ] --> [Header, Region 1, Region 2]
 
 -}
-withHeader : List region -> List (OrHeader region)
-withHeader list =
-    Header :: List.map Region list
+withHeader : ( region, List region ) -> List (OrHeader region)
+withHeader regions =
+    Header :: List.map Region (cons regions)
 
 
 {-|
@@ -187,7 +187,12 @@ negate orAll =
 -}
 inverse : List Region -> List Region
 inverse comparison =
-    subtract_ comparison allRegions
+    subtract_ comparison (cons allRegions)
+
+
+cons : ( a, List a ) -> List a
+cons ( x, xs ) =
+    x :: xs
 
 
 {-|

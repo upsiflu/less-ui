@@ -86,7 +86,7 @@ type alias Document aspect wrapper html =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : model -> Document aspect wrapper ( String, Html modelMsg )
+    , view : model -> Document aspect wrapper (List ( String, Html modelMsg ))
     }
     -> Application model modelMsg
 application config =
@@ -191,41 +191,41 @@ type Msg modelMsg
 
 {-| As of now, will only attach an inline text link, not occlude any regions
 -}
-bounce : { here : ( Maybe Path, Fragment ), there : ( Maybe Path, Fragment ) } -> Ui aspect wrapper ( String, Html msg )
+bounce : { here : ( Maybe Path, Fragment ), there : ( Maybe Path, Fragment ) } -> Ui aspect wrapper (List ( String, Html msg ))
 bounce =
     State.bounce
         >> State.inlineLink
         >> (<<)
             (\{ linkHtml, occlude } ->
                 Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
-                    >> Get.append (Get.map Ui.foliage linkHtml)
+                    >> Get.append (Get.map Ui.singleton linkHtml)
             )
         >> Ui.custom
 
 
 {-| As of now, will only attach an inline text link, not occlude any regions
 -}
-goTo : ( Maybe Path, Fragment ) -> Ui aspect wrapper ( String, Html msg )
+goTo : ( Maybe Path, Fragment ) -> Ui aspect wrapper (List ( String, Html msg ))
 goTo =
     State.goTo
         >> State.inlineLink
         >> (<<)
             (\{ linkHtml, occlude } ->
                 Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
-                    >> Get.append (Get.map Ui.foliage linkHtml)
+                    >> Get.append (Get.map Ui.singleton linkHtml)
             )
         >> Ui.custom
 
 
 {-| As of now, will only attach an inline text link, not occlude any regions
 -}
-goTo_ : ( Maybe Path, Fragment ) -> List (Html Never) -> Ui aspect wrapper ( String, Html msg )
+goTo_ : ( Maybe Path, Fragment ) -> List (Html Never) -> Ui aspect wrapper (List ( String, Html msg ))
 goTo_ config contents =
     State.headerLink_ [] (always contents) (State.goTo config)
         |> (<<)
             (\{ linkHtml, occlude } ->
                 Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
-                    >> Get.append (Get.map Ui.foliage linkHtml)
+                    >> Get.append (Get.map Ui.singleton linkHtml)
             )
         |> Ui.custom
 
@@ -235,13 +235,13 @@ goTo_ config contents =
     a[role="switch"]:aria-checked {}
 
 -}
-toggle : Flag -> Ui aspect wrapper ( String, Html msg )
+toggle : Flag -> Ui aspect wrapper (List ( String, Html msg ))
 toggle =
     State.toggle
         >> State.inlineLink
         >> (<<)
             (\{ linkHtml, occlude } ->
                 Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
-                    >> Get.append (Get.map Ui.foliage linkHtml)
+                    >> Get.append (Get.map Ui.singleton linkHtml)
             )
         >> Ui.custom

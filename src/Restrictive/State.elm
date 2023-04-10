@@ -480,12 +480,7 @@ type alias Preset aspect =
     link |> view renderer
 
 -}
-preset :
-    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
-    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
-    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
-    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
-    }
+preset : Preset aspect
 preset =
     { global = \att con -> { empty | attributes = att, contents = con, position = always Header }
     , inline = \att con -> { empty | attributes = att, contents = con, position = identity }
