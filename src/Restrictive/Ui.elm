@@ -1,9 +1,9 @@
 module Restrictive.Ui exposing
     ( Ui, Descendant
-    , singleton, fromList
+    , singleton
     , wrap
     , with
-    , view, toHtml
+    , view
     , repeat
     , ol, ul, node
     , uncons
@@ -11,20 +11,20 @@ module Restrictive.Ui exposing
     , custom, page, byLocation
     , indexedMapList, mapList
     , mapEach
-    , ifJust, notIf, none
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
 and build accessible patterns orthogonal to the Dom tree.
 
 Ui is headless (like elm-widgets will be).
+Note that you can use `++`, `List.concatMap` and friends because `Ui`s are Lists.
 
 @docs Ui, Descendant
 
 
 # Create
 
-@docs singleton, fromList
+@docs singleton
 
 
 # Modify
@@ -32,16 +32,19 @@ Ui is headless (like elm-widgets will be).
 @docs wrap
 
 
+# Append
+
+**[`a ++ b`](https://package.elm-lang.org/packages/elm/core/latest/Basics#++)** appends _b_ to _a_.
+
+
 # Compose
 
 @docs with
 
-To merge two `Ui`s on the same level, use [`++`](https://package.elm-lang.org/packages/elm/core/latest/Basics#++) as in `ui1 ++ ui2`
-
 
 # View
 
-@docs view, toHtml
+@docs view
 
 ---
 
@@ -101,14 +104,8 @@ It is usually easier to build exactly the `Ui` you need instead of altering and 
 @docs indexedMapList, mapList
 @docs mapEach
 
-
-# Conditional helpers
-
-@docs ifJust, notIf, none
-
 -}
 
-import Bool.Extra as Bool
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Keyed
@@ -129,36 +126,11 @@ type alias Ui region wrapper html =
 {-| -}
 type Descendant region wrapper html
     = Leaf html
-    | Twig (Item region wrapper html)
+    | Twig
+        { get : Get region (Ui region wrapper html)
+        , mask : ( OrHeader region, Url ) -> Mask (OrHeader region) (Ui region wrapper html)
+        }
     | Wrap wrapper (Ui region wrapper html)
-
-
-{-| TODO: update this comment
-
-An Item logically nests `Ui`s and may dybamically react to the Url.
-Only `Dynamic` aspects produce `Header` content.
-
-For example,
-
-  - an inline toggle link will
-      - ask the Url whether the toggle is on or off
-      - if off, then hide all regions `Mask.occludeOrAll occlusions`
-      - place the toggle link itself `Get.append (Get.singleton inlineRegion (foliage link))`
-      - activate the Header region `Get.mapKey Region.justRegion`
-  - a page link will
-      - ask the Url whether the path includes the page path
-      - if yes, replace the item's `get` with the page `superimpose (Get.singleton inlineRegion pageUi)`
-      - activate the Header region `Get.mapKey Region.justRegion`
-      - place the page link itself `Get.append (Get.singleton Header (foliage link))`
-  - a constant header (`handle`) will
-      - activate the Header region `Get.mapKey Region.justRegion`
-      - place the handle content `Get.append (Get.singleton Header (foliage handle))`
-
--}
-type alias Item region wrapper html =
-    { get : Get region (Ui region wrapper html)
-    , mask : ( OrHeader region, Url ) -> Mask (OrHeader region) (Ui region wrapper html)
-    }
 
 
 
@@ -167,22 +139,17 @@ type alias Item region wrapper html =
 
 {-| -}
 singleton : html -> Ui region wrapper html
-singleton html_ =
-    [ Leaf html_ ]
-
-
-{-| `fromList = List.concatMap`
--}
-fromList : (a -> Ui region wrapper html) -> List a -> Ui region wrapper html
-fromList =
-    List.concatMap
+singleton =
+    Leaf >> List.singleton
 
 
 
 ---- MODIFY ----
 
 
-{-| Nest Foliage at the given `Aspect`.
+{-| TODO: Simplify this comment. Perhaps find a better way to illustrate (e.g. `: Ui () (String -> String) String)`
+
+    Nest Foliage at the given `Region`.
 
     a = ──◉◉●───◆◆◉──
         |> wrap ▒
@@ -254,6 +221,10 @@ with region subUi =
                 Wrap wrapper ui ->
                     [ Wrap wrapper (with region subUi ui) ]
         )
+
+
+
+---- Keyed Html ----
 
 
 type alias KeyedUi region msg =
@@ -430,46 +401,42 @@ view state layout =
                         Leaf html_ ->
                             Get.singleton region html_
 
-                        Twig item_ ->
-                            viewItem region item_
+                        Twig item ->
+                            -- Calculate the mutation between the states     -> Get (OrHeader region) (Mutation(List html))
+                            State.map
+                                (\url_ ->
+                                    item.mask ( region, url_ ) (Get.mapKey Region.justRegion item.get)
+                                        -- Render logically nested Uis
+                                        |> Get.mapByKey viewUi
+                                        |> Get.values (Region.withHeader layout.regions)
+                                        |> Get.concatCustom layout.concat
+                                )
+                                state
+                                |> Get.mutation
+                                -- Resolve the mutation                          -> Get (OrHeader region) (List html)
+                                |> Get.map
+                                    (\mutation ->
+                                        case mutation of
+                                            Get.Substitution m ->
+                                                layout.concat
+                                                    [ layout.wrap layout.substitute.current m.current
+                                                    , layout.wrap layout.substitute.previous m.previous
+                                                    ]
+
+                                            Get.Insertion a ->
+                                                a
+
+                                            Get.Deletion a ->
+                                                layout.wrap layout.forget a
+
+                                            Get.Protraction a ->
+                                                a
+                                    )
 
                         Wrap wrapper ui_ ->
                             Get.update region (layout.wrap wrapper) (viewUi region ui_)
                 )
                 >> Get.concatCustom layout.concat
-
-        viewItem : OrHeader region -> Item region wrapper html -> Get (OrHeader region) html
-        viewItem region item =
-            -- Calculate the mutation between the states     -> Get (OrHeader region) (Mutation(List html))
-            State.map
-                (\url_ ->
-                    item.mask ( region, url_ ) (Get.mapKey Region.justRegion item.get)
-                        -- Render logically nested Uis
-                        |> Get.mapByKey viewUi
-                        |> Get.values (Region.withHeader layout.regions)
-                        |> Get.concatCustom layout.concat
-                )
-                state
-                |> Get.mutation
-                -- Resolve the mutation                          -> Get (OrHeader region) (List html)
-                |> Get.map
-                    (\mutation ->
-                        case mutation of
-                            Get.Substitution m ->
-                                layout.concat
-                                    [ layout.wrap layout.substitute.current m.current
-                                    , layout.wrap layout.substitute.previous m.previous
-                                    ]
-
-                            Get.Insertion a ->
-                                a
-
-                            Get.Deletion a ->
-                                layout.wrap layout.forget a
-
-                            Get.Protraction a ->
-                                a
-                    )
     in
     viewUi (Region (Tuple.first layout.regions)) >> layout.view
 
@@ -481,12 +448,12 @@ view state layout =
 {-| Here you can add your own button, input, or indicator in the Header region.
 -}
 handle : html -> Ui region wrapper html
-handle foliage_ =
-    singleton foliage_
-        |> Get.singleton Header
-        |> Get.append
-        |> always
-        |> custom
+handle =
+    singleton
+        >> Get.singleton Header
+        >> Get.append
+        >> always
+        >> custom
 
 
 {-| Whatever you add to this item will only be visible . Use `bounce` and `goTo` links to navigate to the corresponding path.
@@ -636,34 +603,3 @@ custom mask =
         , mask = mask
         }
     ]
-
-
-
----- Conditional Views ----
-
-
-{-| -}
-ifJust : (a -> Html msg) -> Maybe a -> Html msg
-ifJust fu =
-    Maybe.map fu >> Maybe.withDefault (Html.text "")
-
-
-{-| -}
-notIf : Bool -> Html msg -> Html msg
-notIf =
-    Bool.ifElse
-        (\_ -> Html.text "")
-        identity
-
-
-{-| -}
-none : Html msg
-none =
-    Html.text ""
-
-
-{-| If you use the default Elm Html library, this is for you
--}
-toHtml : List ( String, Html msg ) -> Html msg
-toHtml =
-    Html.Keyed.node "div" []
