@@ -123,11 +123,12 @@ type alias Ui region wrapper html =
     List (Descendant region wrapper html)
 
 
-{-| -}
+{-| TODO: Defunc mask
+-}
 type Descendant region wrapper html
     = Leaf html
     | Twig
-        { get : Get region (Ui region wrapper html)
+        { get : List ( region, Ui region wrapper html )
         , mask : ( OrHeader region, Url ) -> Mask (OrHeader region) (Ui region wrapper html)
         }
     | Wrap wrapper (Ui region wrapper html)
@@ -213,10 +214,10 @@ with region subUi =
         (\original ->
             case original of
                 Leaf html_ ->
-                    [ Leaf html_, Twig { get = Get.singleton region subUi, mask = always identity } ]
+                    [ Leaf html_, Twig { get = [ ( region, subUi ) ], mask = always identity } ]
 
                 Twig item_ ->
-                    [ Twig { item_ | get = Get.addList region subUi item_.get } ]
+                    [ Twig { item_ | get = ( region, subUi ) :: item_.get } ]
 
                 Wrap wrapper ui ->
                     [ Wrap wrapper (with region subUi ui) ]
@@ -405,7 +406,10 @@ view state layout =
                             -- Calculate the mutation between the states     -> Get (OrHeader region) (Mutation(List html))
                             State.map
                                 (\url_ ->
-                                    item.mask ( region, url_ ) (Get.mapKey Region.justRegion item.get)
+                                    List.map (\( key, value ) -> Get.singleton key value) item.get
+                                        |> Get.concat
+                                        |> Get.mapKey Region.justRegion
+                                        |> item.mask ( region, url_ )
                                         -- Render logically nested Uis
                                         |> Get.mapByKey viewUi
                                         |> Get.values (Region.withHeader layout.regions)
@@ -599,7 +603,7 @@ byLocation fromPage =
 custom : (( OrHeader region, Url ) -> Mask (OrHeader region) (Ui region wrapper html)) -> Ui region wrapper html
 custom mask =
     [ Twig
-        { get = Get.empty
+        { get = []
         , mask = mask
         }
     ]
