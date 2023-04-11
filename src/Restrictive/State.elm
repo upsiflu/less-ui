@@ -10,7 +10,7 @@ module Restrictive.State exposing
     , Link, getLink
     , headerLink, headerLink_, inlineLink, inlineLink_, preset
     , relative
-    , view
+    , view, CustomHtml
     , toStateTransition
     )
 
@@ -66,17 +66,12 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
 
 # View
 
-@docs view
+@docs view, CustomHtml
 
 
 # Deconstruct
 
 @docs toStateTransition
-
-
-# Advanced
-
-The following functions are mostly here for testing
 
 -}
 
@@ -160,12 +155,6 @@ setPath path state =
 setFragment : Fragment -> Url -> Url
 setFragment fragment state =
     { state | fragment = fragment }
-
-
-{-| -}
-getLocation : Url -> ( Maybe String, Fragment )
-getLocation url =
-    ( String.nonEmpty (getPath url), getFragment url )
 
 
 {-|
@@ -371,6 +360,23 @@ getPath { path } =
 
 
 {-| -}
+getLocation : Url -> ( Maybe Path, Fragment )
+getLocation url =
+    ( String.nonEmpty (getPath url), getFragment url )
+
+
+{-| -}
+setLocation : ( Maybe Path, Fragment ) -> Url -> Url
+setLocation destination =
+    case destination of
+        ( Just path, fragment ) ->
+            setPath path >> setFragment fragment
+
+        ( Nothing, fragment ) ->
+            setFragment fragment
+
+
+{-| -}
 type alias Query =
     { flags : Set Flag, assignments : List ( String, String ) }
 
@@ -456,36 +462,18 @@ toggle =
 ---- View ----
 
 
-type alias Preset aspect =
-    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
-    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
-    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
-    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect
+{-| -}
+preset :
+    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect (Html msg) (Html.Attribute msg)
+    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect (Html msg) (Html.Attribute msg)
+    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect (Html msg) (Html.Attribute msg)
+    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect (Html msg) (Html.Attribute msg)
     }
-
-
-{-| A familiar syntax, similar to how you compose Html:
-
-    import Html
-
-    let
-        link =
-            goTo ("myPath", Nothing)
-
-        renderer =
-            preset.global []
-                [Html.text "go to my Path!"]
-
-    in
-    link |> view renderer
-
--}
-preset : Preset aspect
 preset =
-    { global = \att con -> { empty | attributes = att, contents = con, position = always Header }
-    , inline = \att con -> { empty | attributes = att, contents = con, position = identity }
-    , nav = \att con -> { empty | attributes = Attr.type_ "radio" :: att, contents = con, element = Html.input, position = always Header }
-    , tab = \att con -> { empty | attributes = Attr.type_ "radio" :: att, contents = con, element = Html.input, position = identity }
+    { global = \att con -> { emptyA | attributes = List.map (Attr.map never) att, contents = List.map (Html.map never) con, position = always Header }
+    , inline = \att con -> { emptyA | attributes = List.map (Attr.map never) att, contents = List.map (Html.map never) con, position = identity }
+    , nav = \att con -> { emptyA | attributes = Attr.type_ "radio" :: List.map (Attr.map never) att, contents = List.map (Html.map never) con, customHtml = { defaultHtml | element = Html.input }, position = always Header }
+    , tab = \att con -> { emptyA | attributes = Attr.type_ "radio" :: List.map (Attr.map never) att, contents = List.map (Html.map never) con, customHtml = { defaultHtml | element = Html.input }, position = identity }
     }
 
 
@@ -493,68 +481,80 @@ preset =
 -- NEED TO CHECK IF TRANSFORMATION CAN HAVE ALL!
 
 
-empty : Renderer region
-empty =
+empty : CustomHtml html attribute -> Renderer region html attribute
+empty customHtml =
     { attributes = []
     , contents = []
-    , element = Html.a
+    , customHtml = customHtml
     , occlusions = All
     , position = always Header
     }
 
 
+emptyA : Renderer region (Html msg) (Html.Attribute msg)
+emptyA =
+    empty defaultHtml
+
+
+defaultHtml : CustomHtml (Html msg) (Html.Attribute msg)
+defaultHtml =
+    { element = Html.a, href = Attr.href, attribute = Attr.attribute }
+
+
 {-| How to present a Link
 -}
-type alias Renderer region =
-    { attributes : List (Html.Attribute Never)
-    , contents : List (Html Never)
-    , element : List (Html.Attribute Never) -> List (Html Never) -> Html Never
+type alias Renderer region html attribute =
+    { attributes : List attribute
+    , contents : List html
+    , customHtml : CustomHtml html attribute
     , occlusions : OrAll region
     , position : OrHeader region -> OrHeader region
     }
 
 
-{-| Textual header link
+{-| textual header link
 -}
 headerLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
-headerLink =
-    headerLink_ [] (toId >> Html.text >> List.singleton)
+headerLink link =
+    view (preset.global [] [ Html.text (toId link) ]) link
 
 
-{-| Header with custom html
--}
-headerLink_ : List (Html.Attribute Never) -> (Link -> List (Html Never)) -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
-headerLink_ attributes makeContents link =
-    (makeContents link
-        |> preset.global attributes
-        |> view
-    )
-        link
-
-
-{-| Textual inline link
+{-| textual inline link
 -}
 inlineLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
 inlineLink link =
-    view (preset.inline [] [ Html.span [] [ Html.text (toId link) ] ]) link
+    view (preset.inline [] [ Html.text (toId link) ]) link
 
 
-{-| Inline link with custom html
+{-| Use this if you are working with `Styled Html`, `elm-ui` and friends
 -}
-inlineLink_ : List (Html.Attribute Never) -> (Link -> List (Html Never)) -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
-inlineLink_ attributes makeContents link =
-    (makeContents link
-        |> preset.global attributes
-        |> view
-    )
-        link
+type alias CustomHtml html attribute =
+    { element : List attribute -> List html -> html
+    , href : String -> attribute
+    , attribute : String -> String -> attribute
+    }
+
+
+{-| inline link with custom Html
+-}
+inlineLink_ : CustomHtml html attribute -> List attribute -> List html -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a })
+inlineLink_ customHtml att con =
+    empty customHtml
+        |> (\emptyB -> view { emptyB | attributes = att, contents = con, position = identity })
+
+
+{-| header link with custom Html
+-}
+headerLink_ : CustomHtml html attribute -> List attribute -> List html -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a })
+headerLink_ customHtml att con =
+    empty customHtml
+        |> (\emptyB -> view { emptyB | attributes = att, contents = con, position = identity })
 
 
 {-| -}
-a : Link -> List (Html.Attribute Never) -> List (Html Never) -> Html msg
-a link attrs contents =
-    Html.a (toHref link :: attrs) contents
-        |> Html.map never
+a : { renderer | customHtml : CustomHtml html attribute } -> Link -> List attribute -> List html -> html
+a { customHtml } link attrs =
+    customHtml.element (customHtml.href (linkToString link) :: attrs)
 
 
 {-|
@@ -570,13 +570,13 @@ a link attrs contents =
             }
 
 -}
-view : Renderer region -> Link -> ( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a }
+view : Renderer region html attribute -> Link -> ( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a }
 view config link =
     \( region, url ) ->
         let
-            linkWithAttributes : List (Html.Attribute Never) -> List ( String, Html msg )
+            linkWithAttributes : List attribute -> List ( String, html )
             linkWithAttributes additionalAttributes =
-                [ ( toId link, a link (config.attributes ++ additionalAttributes) config.contents ) ]
+                [ ( toId link, a config link (config.attributes ++ additionalAttributes) config.contents ) ]
         in
         case link of
             Toggle _ flag ->
@@ -590,8 +590,8 @@ view config link =
                 in
                 { linkHtml =
                     linkWithAttributes
-                        [ Attr.attribute "role" "switch"
-                        , Attr.attribute "aria-checked" isChecked
+                        [ config.customHtml.attribute "role" "switch"
+                        , config.customHtml.attribute "aria-checked" isChecked
                         ]
                         |> Get.singleton (config.position region)
                 , occlude = mask
@@ -625,7 +625,12 @@ codecs =
                                     ErrorMessage err
 
                                 Nothing ->
-                                    GoTo ( parsePath path_, fragment_ )
+                                    case ( parsePath path_, fragment_ ) of
+                                        ( Nothing, Nothing ) ->
+                                            GoTo ( Just "", Nothing )
+
+                                        eitherPathOrFragment ->
+                                            GoTo eitherPathOrFragment
 
         getAbsoluteFlag : Url.Codec.CodecInProgress Link (Bool -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
         getAbsoluteFlag =
@@ -849,16 +854,6 @@ getLink currentPath url =
 -}
 toStateTransition : Link -> Url -> Url
 toStateTransition link =
-    let
-        setLocation : ( Maybe Path, Fragment ) -> Url -> Url
-        setLocation destination =
-            case destination of
-                ( Just path, fragment ) ->
-                    setPath path >> setFragment fragment
-
-                ( Nothing, fragment ) ->
-                    setFragment fragment
-    in
     case link of
         GoTo destination ->
             setLocation destination
@@ -886,13 +881,6 @@ toStateTransition link =
 
         ErrorMessage err ->
             addAssignment "errorMessage" err
-
-
-{-| -}
-toHref : Link -> Html.Attribute Never
-toHref =
-    linkToString
-        >> Attr.href
 
 
 {-| Try to create an UrlString.

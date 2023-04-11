@@ -1,6 +1,8 @@
 module Restrictive exposing
     ( application, Application, Document, Msg
-    , toggle, goTo, goTo_, bounce
+    , toggle, toggle_
+    , goTo, goTo_
+    , bounce, bounce_
     )
 
 {-| In contrast to `Browser.Application`, this module maks the `Url` the
@@ -11,7 +13,9 @@ single source of truth for the state of your user interface.
 
 # Links
 
-@docs toggle, goTo, goTo_, bounce
+@docs toggle, toggle_
+@docs goTo, goTo_
+@docs bounce, bounce_
 
 ---
 
@@ -195,12 +199,7 @@ bounce : { here : ( Maybe Path, Fragment ), there : ( Maybe Path, Fragment ) } -
 bounce =
     State.bounce
         >> State.inlineLink
-        >> (<<)
-            (\{ linkHtml, occlude } ->
-                Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
-                    >> Get.append (Get.map Ui.singleton linkHtml)
-            )
-        >> Ui.custom
+        >> customLink
 
 
 {-| As of now, will only attach an inline text link, not occlude any regions
@@ -209,39 +208,81 @@ goTo : ( Maybe Path, Fragment ) -> Ui aspect wrapper (List ( String, Html msg ))
 goTo =
     State.goTo
         >> State.inlineLink
-        >> (<<)
-            (\{ linkHtml, occlude } ->
-                Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
-                    >> Get.append (Get.map Ui.singleton linkHtml)
-            )
-        >> Ui.custom
-
-
-{-| As of now, will only attach an inline text link, not occlude any regions
--}
-goTo_ : ( Maybe Path, Fragment ) -> List (Html Never) -> Ui aspect wrapper (List ( String, Html msg ))
-goTo_ config contents =
-    State.headerLink_ [] (always contents) (State.goTo config)
-        |> (<<)
-            (\{ linkHtml, occlude } ->
-                Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
-                    >> Get.append (Get.map Ui.singleton linkHtml)
-            )
-        |> Ui.custom
+        >> customLink
 
 
 {-| Will add an inline text link and occlude all regions while unchecked.
 
     a[role="switch"]:aria-checked {}
 
+Expected: `Flag -> Ui aspect wrapper (List (String, html))`
+Found: `Flag -> Ui aspect wrapper (List (String, Html msg))`
+
 -}
 toggle : Flag -> Ui aspect wrapper (List ( String, Html msg ))
 toggle =
     State.toggle
         >> State.inlineLink
-        >> (<<)
-            (\{ linkHtml, occlude } ->
-                Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
-                    >> Get.append (Get.map Ui.singleton linkHtml)
-            )
+        >> customLink
+
+
+{-| with custom `html`
+-}
+toggle_ :
+    State.CustomHtml html attribute
+    -> List attribute
+    ->
+        { flag : Flag
+        , label : List html
+        }
+    -> Ui aspect wrapper (List ( String, html ))
+toggle_ customHtml attributes { flag, label } =
+    State.toggle flag
+        |> State.inlineLink_ customHtml attributes label
+        |> customLink
+
+
+{-| with custom `html`
+
+Expected: `Ui aspect wrapper (String, html)`
+Found: `Ui aspect wrapper (List (String, html))`El
+
+-}
+bounce_ :
+    State.CustomHtml html attribute
+    -> List attribute
+    ->
+        { here : ( Maybe Path, Fragment )
+        , label : List html
+        , there : ( Maybe Path, Fragment )
+        }
+    -> Ui aspect wrapper (List ( String, html ))
+bounce_ customHtml attributes { here, label, there } =
+    State.bounce { here = here, there = there }
+        |> State.inlineLink_ customHtml attributes label
+        |> customLink
+
+
+{-| As of now, will only attach an inline text link, not occlude any regions
+-}
+goTo_ :
+    State.CustomHtml html attribute
+    -> List attribute
+    ->
+        { destination : ( Maybe Path, Fragment )
+        , label : List html
+        }
+    -> Ui aspect wrapper (List ( String, html ))
+goTo_ customHtml attributes { destination, label } =
+    State.goTo destination
+        |> State.headerLink_ customHtml attributes label
+        |> customLink
+
+
+customLink =
+    (<<)
+        (\{ linkHtml, occlude } ->
+            Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
+                >> Get.append (Get.map Ui.singleton linkHtml)
+        )
         >> Ui.custom
