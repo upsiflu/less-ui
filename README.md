@@ -1,12 +1,43 @@
 # Less power, less control? Less go for it!
 
-- No Url in your Model: The complete Ui state is resides in the Url, not in your Elm code
+**Let the Url store all the Ui state** - No more Ui messages in your application. Bonus: you can reproduce the current Ui state by copying the Url.
 
-(in other words: Get rid of user interface related `Msg`s
--> `Application`)
+**Explicitly model state transitions as a tree** - `a |> with b` displays `b` only when `a` is active (_Progressive disclosure_). 
+
+**Let your views appear in many places at once** - `a |> at Scene` moves `a` into the `Scene` `Region` of the screen without affecting its state transition relations:
+
+  ```elm
+  
+  trees = [
+    ("Elm", "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/East_Coker_elm%2C_2.jpg/440px-East_Coker_elm%2C_2.jpg", "Its planky wood makes the Elm tree a hikers' favorite.")
+    , ("Yggdrasill", "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Om_Yggdrasil_by_Fr%C3%B8lich.jpg/440px-Om_Yggdrasil_by_Fr%C3%B8lich.jpg", "You cannot sleep here but you may find fruit and feathers.")
+    ,("Trie","https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Trie_example.svg/500px-Trie_example.svg.png", "The Trie is a noble pine wihtout wheels.")]
+
+  makeTab (name, src, description) =
+    let
+      photo =
+        Ui.singleton (Html.img [Attr.src photo] [])
+
+      caption =
+        Ui.singleton (Html.text description)
+      
+    in
+    Ui.toggle []
+      { flag = name, isGlobal = True, label = Html.text name }
+        |> Ui.with
+          ( Ui.at Scene photo ++ Ui.at Info caption )
+
+  app =
+    Ui.singleton (Html.text "Look at these trees:")
+      ++ List.concatMap makeTab trees
+
+  
+  ```
+
 
 - No mingling of logic and presentation: Write a `view` for your type, then declare how the views are composed: 
-  - `with : aspect -> Ui -> Ui -> Ui` to nest elements semantically
+  - `with : Ui -> Ui -> Ui` to nest elements semantically
+  - `at`
   - `wrap : wrapper -> Ui -> Ui` to nest elements of one semantic aspect visually
   - `(++) : Ui -> Ui -> Ui` to concatenate Uis. 
 - No layout in your views: Define soft transitions, visual wrappers, and a global semantic Layout only once.
