@@ -6,7 +6,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout as Layout
-import Restrictive.Layout.Region exposing (Aspect(..))
+import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
 
 
@@ -103,12 +103,16 @@ userForm =
 ---- Application ----
 
 
+type alias KeyedHtmlWrapper =
+    List ( String, Html Msg ) -> List ( String, Html Msg )
+
+
 type alias Ui =
-    Ui.Ui Aspect ( String, Html Msg )
+    Ui.Ui Region KeyedHtmlWrapper ( String, Html Msg )
 
 
 type alias Document =
-    Restrictive.Document Aspect ( String, Html Msg )
+    Restrictive.Document Region KeyedHtmlWrapper ( String, Html Msg )
 
 
 main : Application Model Msg
@@ -130,7 +134,7 @@ main =
         , view =
             \model ->
                 { title = "Hello World"
-                , body = Ui.html ( "Form", userForm.view model.state )
+                , body = Ui.singleton [ ( "Form", userForm.view model.state ) ]
                 , layout = Layout.default
                 }
         }

@@ -1,7 +1,6 @@
 module Restrictive.Layout exposing
     ( Layout
-    , sceneOnly, list
-    , default, withClass
+    , list, textual
     )
 
 {-| Lay out the [`ViewModel`](Ui.Layout.ViewModel)
@@ -14,118 +13,103 @@ Note that `Restrictive` always assumes a `Header` region.
 @docs Layout
 
 
-# Defaults
+# General cases
 
-@docs sceneOnly, list
-
-
-## For Keyed Html
-
-@docs default, withClass
+@docs list, textual
 
 -}
 
-import Html exposing (Html)
-import Html.Attributes as Attr
-import Html.Keyed exposing (node)
-import Html.Lazy
+import Bool.Extra exposing (ifElse)
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
+import Restrictive.State as State
 
 
 {-| The layout is a rule for mapping a Ui to an html tree.
 -}
-type alias Layout region wrapper html =
-    { forget : wrapper
-    , substitute : { current : wrapper, previous : wrapper }
-    , regions : ( region, List region )
+type alias Layout region html attribute wrapper =
+    { remove : wrapper
+    , insert : wrapper
     , wrap : wrapper -> html -> html
+    , elements : State.Elements html attribute
     , concat : List html -> html
-    , view : Get (OrHeader region) html -> html
+    , arrange : Get (OrHeader region) html -> html
     }
 
 
 
----- Defaults ----
+---- Defaults ---
 
 
-{-| -}
-sceneOnly : Layout Region (List html -> List html) (List html)
-sceneOnly =
-    { forget = \_ -> []
-    , substitute = { current = identity, previous = \_ -> [] }
-    , regions = Region.allRegions
-    , wrap = identity
-    , concat = List.concat
-    , view =
-        Get.get (Region Scene)
-            >> Maybe.withDefault []
-    }
-
-
-{-| -}
-list : ( region, List region ) -> Layout region (List ( String, element ) -> List ( String, element )) (List ( String, element ))
+{-| Demonstrates removal and insertion operations
+-}
+list :
+    ( region, List region )
+    ->
+        Layout
+            region
+            (List ( String, element ))
+            attribute
+            (List ( String, element ) -> List ( String, element ))
 list regions =
-    { forget = List.map <| \( _, v ) -> ( "-", v )
-    , substitute = { current = identity, previous = \_ -> [] }
-    , regions = regions
+    { remove = List.map (\( _, v ) -> ( "-", v ))
+    , insert = List.map (\( _, v ) -> ( "+", v ))
     , wrap = identity
+    , elements =
+        { link = \_ { url, label } -> List.map (\( _, v ) -> ( url, v )) (List.concat label)
+        , switch = \_ { url, label } -> List.map (\( _, v ) -> ( url, v )) (List.concat label)
+        }
     , concat = List.concat
-    , view = Get.concatValues (Region.withHeader regions)
+    , arrange = Get.concatValues (Region.withHeader regions)
     }
 
 
 
----- Keyed Html ----
-
-
-type alias KeyedHtmlWrapper msg =
-    List ( String, Html msg ) -> List ( String, Html msg )
-
-
-poof : List ( String, Html html ) -> List ( String, Html html )
-poof =
-    List.indexedMap (\i a -> [ ( "poof" ++ String.fromInt i, Html.span [ Attr.class "poof" ] [ Html.text (String.fromInt i) ] ), a ])
-        >> List.concat
+---- Text ----
 
 
 {-| -}
-default : Layout Region (KeyedHtmlWrapper msg) (List ( String, Html msg ))
-default =
-    { forget = poof
-    , substitute = { current = identity, previous = \_ -> [] }
-    , regions = Region.allRegions
-    , wrap = identity
-    , concat = List.concat
-    , view =
-        withHeader Region.allRegions
-            |> Get.toListBy (niceLayout "")
+textual : Layout Region String String ()
+textual =
+    { remove = ()
+    , insert = ()
+    , wrap = \_ -> identity
+    , elements =
+        let
+            showElement : String -> List String -> List String -> String
+            showElement url label attrs =
+                "[" ++ url ++ "](" ++ String.join ", " label ++ " - " ++ String.join ", " attrs ++ ")"
+        in
+        { link = \attrs { url, label } -> showElement url label attrs
+        , switch =
+            \attrs { url, label, isChecked } ->
+                showElement
+                    url
+                    (ifElse "☑ " "☐ " isChecked :: label)
+                    attrs
+        }
+    , concat = String.join ", "
+    , arrange =
+        Get.toListBy
+            textLayout
+            (withHeader Region.allRegions)
+            >> String.join "\n\n\n"
     }
 
 
-{-| -}
-withClass : String -> Layout Region (KeyedHtmlWrapper msg) (List ( String, Html msg ))
-withClass prefix =
-    { default
-        | view =
-            withHeader Region.allRegions
-                |> Get.toListBy (niceLayout prefix)
-    }
-
-
-niceLayout : String -> Get (OrHeader Region) (List ( String, Html msg ) -> ( String, Html msg ))
-niceLayout prefix =
+textLayout : Get (OrHeader Region) (String -> String)
+textLayout =
     Get.fromList
         [ ( Header
-          , Html.Lazy.lazy3 node "nav" [ Attr.class prefix, Attr.class "handle" ] >> Tuple.pair "handle"
+          , (++) "handle: "
           )
         , ( Region Scene
-          , Html.Lazy.lazy3 node "main" [ Attr.class prefix, Attr.class "scene" ] >> Tuple.pair "scene"
+          , (++) "scene"
           )
         , ( Region Control
-          , Html.Lazy.lazy3 node "div" [ Attr.class prefix, Attr.class "control" ] >> Tuple.pair "control"
+          , (++) "control"
           )
         , ( Region Info
-          , Html.Lazy.lazy3 node "div" [ Attr.class prefix, Attr.class "info" ] >> Tuple.pair "info"
+          , (++) "info"
           )
         ]

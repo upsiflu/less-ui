@@ -1,19 +1,16 @@
 module Restrictive.Get exposing
     ( Get
-    , empty, full, singleton
-    , orAdd, insert, update, updateValue, updateWhere
+    , empty, singleton
+    , insert, updateAt, updateWhere
     , addValue, addWithDefault, maybeAdd
     , remove
     , consList, addList
-    , map, mapValue, map2, map2WithDefaults, map2Value, filter
-    , mapKey
-    , mapByKey, mapValueByKey, map2ByKey
-    , join, unlockInner, unlockOuter
-    , append, concat, concatMap, concatCustom
+    , map, map2, map2WithDefaults, map2Value, filter
+    , mapByKey
+    , append, concat, concatMap, concatBy
     , orElse, superimpose
-    , andThen, andThenFlat, andThenMaybe, andMap, andMapFlat
-    , union, intersect, diff
-    , member, andGet, withDefault
+    , andMap
+    , member, andGet
     , Mutation(..), mutation
     , toList, toListBy, keys, values, fromList, fromListBy
     , consLists, concatLists, concatValues
@@ -28,12 +25,12 @@ module Restrictive.Get exposing
 
 # Create
 
-@docs empty, full, singleton
+@docs empty, singleton
 
 
 # Associate values
 
-@docs orAdd, insert, update, updateValue, updateWhere
+@docs insert, updateAt, updateWhere
 @docs addValue, addWithDefault, maybeAdd
 @docs remove
 
@@ -45,22 +42,12 @@ module Restrictive.Get exposing
 
 # Modify
 
-@docs map, mapValue, map2, map2WithDefaults, map2Value, filter
-
-
-### Map the key parameter
-
-@docs mapKey
+@docs map, map2, map2WithDefaults, map2Value, filter
 
 
 ### Map with respect to the key
 
-@docs mapByKey, mapValueByKey, map2ByKey
-
-
-### Map `Get (Get a)`
-
-@docs join, unlockInner, unlockOuter
+@docs mapByKey
 
 
 # Compose
@@ -68,7 +55,7 @@ module Restrictive.Get exposing
 
 ### `Get (List a)`
 
-@docs append, concat, concatMap, concatCustom
+@docs append, concat, concatMap, concatBy
 
 
 ### Get either value
@@ -78,17 +65,12 @@ module Restrictive.Get exposing
 
 ### Chain
 
-@docs andThen, andThenFlat, andThenMaybe, andMap, andMapFlat
-
-
-### Set operations
-
-@docs union, intersect, diff
+@docs andMap
 
 
 # Query
 
-@docs member, andGet, withDefault
+@docs member, andGet
 
 
 ### Mutations
@@ -117,13 +99,14 @@ module Restrictive.Get exposing
 
 -}
 
+import AssocList as Dict exposing (Dict)
 import Bool.Extra as Bool
 import Maybe.Extra as Maybe
 
 
 {-| -}
 type alias Get key a =
-    key -> Maybe a
+    Dict key a
 
 
 
@@ -134,75 +117,22 @@ type alias Get key a =
 -}
 empty : Get key a
 empty =
-    always Nothing
-
-
-{-| in any case, return `a`
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    full 1
-        |> get Scene
-        --> Just 1
-
-Note that `Just` is an even more general `Get`.
-
--}
-full : a -> Get key a
-full =
-    Just >> always
+    Dict.empty
 
 
 {-| -}
 singleton : key -> a -> Get key a
-singleton key a =
-    (==) key >> Bool.toMaybe a
+singleton =
+    Dict.singleton
 
 
 
 ---- ASSOCIATE VALUES ----
 
 
-{-| insert at key if not yet populated
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    singleton Scene "a"
-        |> orAdd Scene "b"
-        |> orAdd Control "c"
-        |> orAdd Control "d" -- ignored because Control has been populated
-        |> get Control
-            --> Just "c"
-
--}
-orAdd : key -> a -> Get key a -> Get key a
-orAdd key =
-    Just >> Maybe.orElse >> updateValue key
-
-
-{-| insert at key, overwriting existing value
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    singleton Scene 1
-        |> insert Scene 2
-        |> get Scene
-            --> Just 2
-
-    singleton Control 1
-        |> insert Scene 2
-        |> get Scene
-            --> Just 2
-
--}
-insert : key -> a -> Get key a -> Get key a
-insert key =
-    Just >> always >> updateValue key
-
-
 {-| insert at key, combining with existing value
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
     singleton Control [3]
         |> maybeAdd (++) Scene [1, 2]
@@ -227,14 +157,12 @@ maybeAdd =
 
 {-| Define a default so that the composition can't fail
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    addWithDefault 0 (+) Scene 1 (full 2)
-        |> get Scene
+    addWithDefault 0 (+) () 1 (singleton () 2)
+        |> get ()
         --> Just 3
 
-    addWithDefault 0 (+) Scene 1 empty
-        |> get Scene
+    addWithDefault 0 (+) () 1 empty
+        |> get ()
         --> Just 1
 
 -}
@@ -246,7 +174,7 @@ addWithDefault default =
 
 {-| Consider `Nothing` in the `add` composer so that the composition can't fail
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
 
     mapLists : (List a -> List a -> List a) -> Maybe (List a) -> Maybe (List a) -> List a
@@ -270,11 +198,6 @@ addWithDefault default =
         |> get Scene
             --> Just [0, 1, 2]
 
-    full 1
-        |> addValue (Maybe.map2 (+)) Scene 1
-        |> get Scene
-            --> Just (Just 2)
-
     empty
         |> addValue (Maybe.map2 (+)) Scene 1
         |> get Scene
@@ -289,12 +212,8 @@ addValue =
 
 {-| -}
 remove : key -> Get key a -> Get key a
-remove a get_ aspect =
-    if aspect == a then
-        Nothing
-
-    else
-        get_ aspect
+remove =
+    Dict.remove
 
 
 mapLists : (List a -> List a -> List a) -> Maybe (List a) -> Maybe (List a) -> List a
@@ -304,49 +223,39 @@ mapLists fu ma mb =
 
 {-| Update the value associated with a specified key, if present
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
     singleton Scene "a"
-        |> update Scene String.toUpper
+        |> updateAt Scene String.toUpper
         |> get Scene
 
     --> Just "A"
 
     singleton Scene "a"
-        |> update Control String.toUpper
+        |> updateAt Control String.toUpper
         |> get Scene
 
     --> Just "a"
 
     empty
-        |> update Scene ((+) 1)
+        |> updateAt Scene ((+) 1)
         |> get Scene
 
     --> Nothing
 
 -}
-update :
+updateAt :
     key
     -> (a -> a)
     -> Get key a
     -> Get key a
-update key fu =
+updateAt key fu =
     mapByKey ((==) key >> Bool.ifElse fu identity)
-
-
-{-| -}
-updateValue :
-    key
-    -> (Maybe a -> Maybe a)
-    -> Get key a
-    -> Get key a
-updateValue key fu =
-    mapValueByKey ((==) key >> Bool.ifElse fu identity)
 
 
 {-|
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
     fromList [ (Scene, 1), (Control, 1)]
         |> updateWhere  ( (==) Control )
@@ -362,29 +271,27 @@ updateValue key fu =
 
 -}
 updateWhere : (key -> Bool) -> (a -> a) -> Get key a -> Get key a
-updateWhere condition fu getA key =
-    Maybe.map
-        (if condition key then
-            fu
+updateWhere predicate fu =
+    Dict.map
+        (\k a ->
+            if predicate k then
+                fu a
 
-         else
-            identity
+            else
+                a
         )
-        (getA key)
 
 
 {-|
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    consList Scene 1 (full [2, 3])
-        |> get Scene
+    consList () 1 (singleton () [2, 3])
+        |> get ()
         --> Just [1, 2, 3]
 
 Implicitly creates a list if key has no value yet:
 
-    consList Scene "a" empty
-        |> get Scene
+    consList () "a" empty
+        |> get ()
             --> Just ["a"]
 
 -}
@@ -399,17 +306,19 @@ consList =
 
 {-| `addWithDefault [] (++)`
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+Note that `fromList` only accepts the first input per key:
 
-    full [1, 2]
-        |> addList Scene [3, 4]
-        |> get Scene
-        --> Just [1, 2, 3, 4]
+    import Restrictive.Layout.Region exposing (Region(..))
 
-    full [1, 2]
+    fromList [(Control, [1]), (Control, [2])]
+        |> addList Control [3, 4]
+        |> get Control
+        --> Just [1, 3, 4]
+
+    fromList [(Control, [1]), (Control, [2])]
         |> addList Scene [3, 4]
         |> get Control
-        --> Just [1, 2]
+        --> Just [1]
 
 -}
 addList : key -> List a -> Get key (List a) -> Get key (List a)
@@ -423,39 +332,60 @@ addList =
 
 {-| compose a function behind the result
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    map negate (full 1)
-        |> get Scene
+    map negate (singleton () 1)
+        |> get ()
         --> Just (-1)
 
 -}
 map : (a -> b) -> Get key a -> Get key b
-map =
-    mapParameter Maybe.map
+map fu =
+    Dict.map (\_ -> fu)
 
 
-{-| Map to a more inclusive key
 
-    singleton 1 ()
-        |> mapKey identity
-        |> get (Just 1)
-        --> Just ()
-
-    singleton "1" ()
-        |> mapKey String.fromInt
-        |> get 1
-        --> Just ()
-
--}
-mapKey : (key2 -> Maybe key1) -> Get key1 a -> Get key2 a
-mapKey discard get1 =
-    discard >> Maybe.andThen get1
+-- {-| Maps to a potentially narrower key-space, preserving values
+--     singleton "1" "One"
+--         |> filterMapKey String.toInt
+--         |> get 1
+--         --> "One"
+-- -}
+-- filterMapKey : (k -> Maybe l) -> Get k a -> Get l a
+-- filterMapKey narrow =
+--     filterMap <|
+--         \k a -> narrow k |> Maybe.map (\l -> ( l, a ))
+-- {-| Maps to a potentially narrower value-space, preserving values
+-- -}
+-- filterMapValue : (a -> Maybe b) -> Get k a -> Get k b
+-- filterMapValue narrow =
+--     filterMap <|
+--         \k a -> narrow a |> Maybe.map (\b -> ( k, b ))
+-- {-| Maps to a potentially narrower key-value-space
+--     singleton 1 2
+--         |> insert 2 4
+--         |> filterMap
+--             (\key value ->
+--                 if key % 2 == 0 then
+--                     Just key
+--                 else
+--                     Nothing
+--             )
+-- -}
+-- filterMap : (k -> a -> Maybe ( l, b )) -> Get k a -> Get l b
+-- filterMap narrow =
+--     Dict.foldl
+--         (\k a ->
+--             case narrow k a of
+--                 Just ( l, b ) ->
+--                     Dict.insert l b
+--                 _ ->
+--                     identity
+--         )
+--         Dict.empty
 
 
 {-| Apply a sequence of operations on a `Get`:
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
     singleton Scene 1
         |> sequence
@@ -477,7 +407,7 @@ sequence operations getA =
 
 {-| only get a value if the condition holds
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
     singleton Scene 1
         |> insert Control 2
@@ -488,65 +418,68 @@ sequence operations getA =
 
 -}
 filter : (a -> Bool) -> Get key a -> Get key a
-filter =
-    mapParameter Maybe.filter
+filter predicate =
+    Dict.filter (\_ -> predicate)
 
 
-{-| compose a function behind the result, preserving the 'Maybe' value.
 
-`mapValue = (<<)`
-
-You can use this function to leverage mapping functions from the `Maybe` and `Maybe.Extra` library.
-
-    import Maybe
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    withDefault : a -> Maybe a -> Maybe a
-    withDefault a =
-        Maybe.withDefault a >> Just
-
-    fromList [ (Scene, 1), (Control, 2)]
-        |> mapValue (withDefault 4)
-        |> toList [Scene, Control, Info]
-        --> [ (Scene, 1), (Control, 2), (Info, 4) ]
-
--}
-mapValue : (Maybe a -> Maybe b) -> Get key a -> Get key b
-mapValue =
-    (<<)
+-- {-| compose a function behind the result, preserving the 'Maybe' value.
+--    `mapValue = (<<)`
+--    You can use this function to leverage mapping functions from the `Maybe` and `Maybe.Extra` library.
+--        import Maybe
+--        import Restrictive.Layout.Region exposing (Region(..))
+--        withDefault : a -> Maybe a -> Maybe a
+--        withDefault a =
+--            Maybe.withDefault a >> Just
+--        fromList [ (Scene, 1), (Control, 2)]
+--            |> mapValue (withDefault 4)
+--            |> toList [Scene, Control, Info]
+--            --> [ (Scene, 1), (Control, 2), (Info, 4) ]
+-- -}
+-- mapValue : (Maybe a -> Maybe b) -> Get key a -> Get key b
+-- mapValue =
+--     (<<)
 
 
-{-| Parametrize map over key.
+{-| parametrize map over key.
 Same as andMapFlat!
 -}
 mapByKey : (key -> a -> b) -> Get key a -> Get key b
-mapByKey fu getA key =
-    Maybe.map (fu key) (getA key)
+mapByKey =
+    Dict.map
 
 
-{-| -}
-mapValueByKey : (key -> Maybe a -> Maybe b) -> Get key a -> Get key b
-mapValueByKey fu getA key =
-    getA key
-        |> fu key
+
+{- -}
+-- mapValueByKey : (key -> Maybe a -> Maybe b) -> Get key a -> Get key b
+-- mapValueByKey fu getA =
+--     Dict.map
+--         (\k -> fu k)
+--     getA key
+--         |> fu key
 
 
 {-| Compose a function behind the results of two `Get`s,
 both with the identical key.
 Note that if any of the two values is Nothing, the other is ignored.
 
-Example:
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    map2 (::) (singleton Scene 1) (singleton Scene [2, 3])
-        |> get Scene
+    map2 (::) (singleton () 1) (singleton () [2, 3])
+        |> get ()
         --> Just [1, 2, 3]
 
 -}
 map2 : (a -> b -> c) -> Get key a -> Get key b -> Get key c
-map2 fu getA getB =
-    \key -> Maybe.map2 fu (getA key) (getB key)
+map2 fu =
+    merge
+        (\_ _ -> identity)
+        (\k a b -> insert k (fu a b))
+        (\_ _ -> identity)
+
+
+{-| -}
+insert : k -> a -> Get k a -> Get k a
+insert =
+    Dict.insert
 
 
 {-| -}
@@ -558,55 +491,22 @@ map2WithDefaults default composer =
 {-| Never fail
 -}
 map2Value : (Maybe a -> Maybe b -> c) -> Get key a -> Get key b -> Get key c
-map2Value fu getA getB =
-    \key ->
-        getB key
-            |> fu (getA key)
-            |> Just
-
-
-{-| `map2Maybe fu getA getB = \key -> fu (getA key) (getB key)`
--}
-map2Maybe : (Maybe a -> Maybe b -> Maybe c) -> Get key a -> Get key b -> Get key c
-map2Maybe fu getA getB =
-    \key -> fu (getA key) (getB key)
-
-
-{-| -}
-map2ByKey : (key -> a -> b -> c) -> Get key a -> Get key b -> Get key c
-map2ByKey fu getA getB =
-    \key -> Maybe.map2 (fu key) (getA key) (getB key)
-
-
-{-| Get either the inner `Get`, else `empty`.
--}
-flat : Get key (Get key a) -> key -> Get key a
-flat g =
-    g >> Maybe.withDefault empty
-
-
-{-| `get` the inner `Get` with the given key
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
--}
-unlockInner : key -> Get key (Get key a) -> Get key a
-unlockInner key =
-    map (get key) >> mapValue Maybe.join
-
-
-{-| `get` the outer `Get` with the given key
--}
-unlockOuter : key -> Get key (Get key a) -> Get key a
-unlockOuter key =
-    get key >> Maybe.withDefault empty
-
-
-{-| Apply the same key twice
--}
-join : Get key (Get key a) -> Get key a
-join get2 =
-    \aspect -> flat get2 aspect aspect
+map2Value fu =
+    merge
+        (\k a ->
+            fu (Just a) Nothing
+                |> insert k
+        )
+        (\k a b ->
+            Just b
+                |> fu (Just a)
+                |> insert k
+        )
+        (\k b ->
+            Just b
+                |> fu Nothing
+                |> insert k
+        )
 
 
 
@@ -617,17 +517,12 @@ join get2 =
 
 Difference to `addList`: Both lists to append can be Nothing.
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
     singleton Scene [1]
         |> append (singleton Scene [2, 3])
         |> get Scene
             --> Just [2, 3, 1]
-
-    full [1]
-        |> append (singleton Scene [2, 3])
-        |> get Control
-            --> Just [1]
 
 -}
 append : Get key (List a) -> Get key (List a) -> Get key (List a)
@@ -650,18 +545,46 @@ concatMap fu =
 
 
 {-| Concatenate the values of several `Get`s with a custom concatenator
+
+    [ singleton () "Hell",  singleton () "o" ]
+        |> concatBy ( String.join "; " )
+        |> get ()
+        --> Just "Hell; o"
+
 -}
-concatCustom : (List a -> a) -> List (Get key a) -> Get key a
-concatCustom concatenator list key =
-    List.map (get key) list
-        |> Maybe.values
-        |> concatenator
-        |> Just
+concatBy : (List a -> a) -> List (Get key a) -> Get key a
+concatBy concatenator =
+    List.foldr
+        (merge
+            insert
+            (\k a b -> insert k (concatenator [ a, b ]))
+            insert
+        )
+        empty
 
 
-{-| Return the first value only if the second fails, using the same key. Lazy.
+{-| -}
+merge :
+    (k -> a -> Get k c -> Get k c)
+    -> (k -> a -> b -> Get k c -> Get k c)
+    -> (k -> b -> Get k c -> Get k c)
+    -> Get k a
+    -> Get k b
+    -> Get k c
+merge ac abc bc getA getB =
+    Dict.merge ac abc bc getA getB Dict.empty
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+
+
+-- List.map (get key) list
+--     |> Maybe.values
+--     |> concatenator
+--     |> Just
+
+
+{-| Return the first value only if the second fails, using the same key.
+
+    import Restrictive.Layout.Region exposing (Region(..))
 
     let
         getMy =
@@ -670,60 +593,23 @@ concatCustom concatenator list key =
                 |> orElse (singleton Scene "a")
                 |> orElse (singleton Scene "c")
     in
-    (getMy Scene, getMy Control)
+    (get Scene getMy , get Control getMy )
     --> ( Just "a",  Nothing)
 
 -}
 orElse : Get key a -> Get key a -> Get key a
-orElse second first key =
-    first key
-        |> Maybe.orElseLazy (\() -> second key)
+orElse =
+    merge
+        insert
+        (\key _ first -> insert key first)
+        insert
 
 
-{-| \`override first second = orElse second first
+{-| This is `orElse` with the parameters flipped
 -}
 superimpose : Get key a -> Get key a -> Get key a
 superimpose first second =
     orElse second first
-
-
-
----- Set operations ----
-
-
-{-| -}
-union : (a -> a -> a) -> Get key a -> Get key a -> Get key a
-union handleCollision =
-    map2Maybe <|
-        \maybeA maybeB ->
-            case ( maybeA, maybeB ) of
-                ( Just a, Just b ) ->
-                    Just (handleCollision a b)
-
-                ( Just a, Nothing ) ->
-                    Just a
-
-                ( Nothing, Just b ) ->
-                    Just b
-
-                ( Nothing, Nothing ) ->
-                    Nothing
-
-
-{-| -}
-intersect : Get key a -> Get key b -> Get key ( a, b )
-intersect =
-    Maybe.map2 Tuple.pair
-        |> map2Maybe
-
-
-{-| `diff a b` is b - a in the sense that we "pair a to the set of b"
--}
-diff : Get key a -> Get key b -> Get key ( Maybe a, b )
-diff =
-    map2Maybe <|
-        \maybeB ->
-            Maybe.andThen (Tuple.pair maybeB >> Just)
 
 
 
@@ -736,67 +622,15 @@ andGet =
     get >> Maybe.andThen
 
 
-{-| get `get b` from the result of `get a`
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    full 2
-        |> andThen (negate >> singleton Scene)
-        |> get Control
-        |> andGet Scene
-        --> Just (-2)
-
+{-| Map the result of the first `get` to the next `get`.
+Nice for pipelining. Inspired by the Maybe.Extra package.
 -}
-andThen : (a -> Get key b) -> Get key a -> Get key (Get key b)
-andThen createGetB getA =
-    getA
-        >> Maybe.unwrap
-            empty
-            createGetB
-        >> Just
-
-
-{-| Applies the same key twice to unlock a nested `Get`
-
-`andThenFlat = andThen >> (<<) join`
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    full 2
-        |> andThenFlat (negate >> singleton Scene)
-        |> get Scene
-        --> Just (-2)
-
--}
-andThenFlat : (a -> Get key b) -> Get key a -> Get key b
-andThenFlat =
-    composeWithTwoParameters andThen join
-
-
-{-| Like `andThen`, but you supply a fallible creator function
--}
-andThenMaybe : (a -> Maybe (Get key b)) -> Get key a -> Get key (Get key b)
-andThenMaybe =
-    mapParameter Maybe.andThen
-
-
-{-| Map the result of the first `get` to the next `get`
--}
-andMap : Get key (a -> b) -> Get key a -> Get key (Get key b)
-andMap getAB getA =
-    getAB
-        >> Maybe.map
-            (\ab ->
-                map ab getA
-            )
-
-
-{-| Like `andMap`, but apply the same key twice.
-Same as `mapByKey`!
--}
-andMapFlat : Get key (a -> b) -> Get key a -> Get key b
-andMapFlat =
-    composeWithTwoParameters andMap join
+andMap : Get key a -> Get key (a -> b) -> Get key b
+andMap =
+    merge
+        (\_ _ -> identity)
+        (\k a ab -> insert k (ab a))
+        (\_ _ -> identity)
 
 
 
@@ -805,7 +639,7 @@ andMapFlat =
 
 {-| Example:
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
     singleton Scene 1
         |> member Scene --> True
@@ -819,26 +653,10 @@ member =
     composeWithTwoParameters get Maybe.isJust
 
 
-{-| `get = (|>)`
--}
-get : key -> (key -> value) -> value
+{-| -}
+get : key -> Get key value -> Maybe value
 get =
-    (|>)
-
-
-{-| Note that, strictly speaking, you no longer have a `Get` after applying `withDefault`.
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    empty
-        |> withDefault "default"
-        |> get Scene
-        --> "default"
-
--}
-withDefault : a -> Get key a -> (key -> a)
-withDefault =
-    mapParameter Maybe.withDefault
+    Dict.get
 
 
 {-| `Substitution a b`: b was substituted by a
@@ -850,68 +668,114 @@ type Mutation a
     | Protraction a
 
 
-{-| Compare the current with an optional previous `Get` at each key and return the [`Mutation`s](Mutation)
+{-| Compare the current with an optional previous `Get` at each key and return the [`Mutation`s](Mutation).
 
-    mutation {current = full 1, previous = Just (singleton () 2)} ()
+    mutation (==) {current = singleton () 1, previous = Just (singleton () 2)}
+        |> get ()
         --> Just (Substitution { current = 1, previous = 2})
 
-    mutation {current = full 2, previous = Just (empty)}
-        --> Just (Insertion 12)
+    mutation (==) {current = singleton () 1, previous = Just (empty)}
+        |> get ()
+        --> Just (Insertion 1)
 
-    mutation {current = empty, previous = Just (full 3)} ()
+    mutation (==) {current = empty, previous = Just (singleton () 3)}
+        |> get ()
         --> Just (Deletion 3)
 
-    mutation {current = full 4, previous = Just (full 4)} ()
+    mutation (==) {current = singleton () 4, previous = Just (singleton () 4)}
+        |> get ()
         --> Just (Protraction 4)
 
 Note that in this implementation `previous` implicitly defaults to `empty`:
 
-    mutation {current = singleton () 5, previous = Nothing} ()
+    mutation (==) {current = singleton () 5, previous = Nothing}
+        |> get ()
         --> Just (Insertion 5)
 
 
-    mutation {current = empty, previous = Nothing} ()
+    mutation (==) {current = empty, previous = Nothing}
+        |> get ()
         --> Nothing
 
+To avoid comparing functions, please supply a `predicate` for safe equality. It will be used to discern Protraction and Substitution.
+For example, if you are comparing lists of functions, you can supply `(\l0 l1 -> List.length l0 == List.length l1)`
+
+    {current = singleton () [(+), (*)], previous = Just (singleton () [(+), (-)])}
+        |> mutation (\l0 l1 -> List.length l0 == List.length l1)
+        |> get ()
+         -> Just (Protraction ...)
+
 -}
-mutation : { current : Get key a, previous : Maybe (Get key a) } -> Get key (Mutation a)
-mutation { current, previous } key =
-    case ( current key, Maybe.andThen (get key) previous ) of
-        ( Just current_, Just previous_ ) ->
-            if current_ == previous_ then
-                Just (Protraction previous_)
+mutation : (a -> a -> Bool) -> { current : Get key a, previous : Maybe (Get key a) } -> Get key (Mutation a)
+mutation predicate { current, previous } =
+    -- (k -> a -> result -> result)
+    -- -> (k -> a -> b -> result -> result)
+    -- -> (k -> b -> result -> result)
+    -- -> Dict k a
+    -- -> Dict k b
+    -- -> result
+    -- -> result
+    merge
+        (\k currentValue -> insert k (Insertion currentValue))
+        (\k currentValue previousValue ->
+            insert k <|
+                if predicate currentValue previousValue then
+                    Protraction previousValue
 
-            else
-                Just (Substitution { current = current_, previous = previous_ })
-
-        ( Just a, Nothing ) ->
-            Just (Insertion a)
-
-        ( Nothing, Just a ) ->
-            Just (Deletion a)
-
-        ( Nothing, Nothing ) ->
-            Nothing
+                else
+                    Substitution { current = currentValue, previous = previousValue }
+        )
+        (\k previousValue -> insert k (Deletion previousValue))
+        current
+        (Maybe.withDefault empty previous)
 
 
 
+-- {-| -}
+-- listMutation : { current : Get key (List a), previous : Maybe (Get key (List a)) } -> Get key (Mutation (List a))
+-- listMutation { current, previous } =
+--     -- (k -> a -> result -> result)
+--     -- -> (k -> a -> b -> result -> result)
+--     -- -> (k -> b -> result -> result)
+--     -- -> Dict k a
+--     -- -> Dict k b
+--     -- -> result
+--     -- -> result
+--     merge
+--         (\k currentValue -> insert k (Insertion currentValue))
+--         (\k currentValue previousValue ->
+--             insert k <|
+--                 if List.length currentValue == List.length previousValue then
+--                     Protraction previousValue
+--                 else
+--                     Substitution { current = currentValue, previous = previousValue }
+--         )
+--         (\k previousValue -> insert k (Deletion previousValue))
+--         current
+--         (Maybe.withDefault empty previous)
+-- {-| Omits equality checks for `Protraction`s
+-- (Useful if you `get` objects with functions)
+-- -}
+-- simpleMutation : { current : Get key a, previous : Maybe (Get key a) } -> Get key (Mutation a)
+-- simpleMutation =
+--     mutation (\_ _ -> False)
 ---- SERIALISE TO LIST ----
 
 
 {-|
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
-    full "Hello"
-        |> toList [Scene, Control]
-        --> [(Scene, "Hello"), (Control, "Hello")]
+    singleton Scene "Hello"
+        |> toList [Scene, Scene]
+        --> [(Scene, "Hello"), (Scene, "Hello")]
 
 -}
 toList : List key -> Get key a -> List ( key, a )
 toList list getA =
     List.foldr
         (\key ->
-            getA key
+            get key getA
                 |> Maybe.map (Tuple.pair key)
                 |> Maybe.cons
         )
@@ -925,7 +789,7 @@ toList list getA =
 If you want to modify the behavior on duplicate keys, use `fromListWith`
 or `consList`.
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+    import Restrictive.Layout.Region exposing (Region(..))
 
     fromList [(Scene, "Scene 1"), (Scene, "Scene 2"), (Control, "C")]
         |> toList [Scene, Control]
@@ -934,26 +798,46 @@ or `consList`.
 -}
 fromList : List ( key, a ) -> Get key a
 fromList =
-    --fromListWith : (Aspect -> a -> Get b -> Get b) -> List ( Aspect, a ) -> Get b
-    fromListBy orAdd
+    --fromListWith : (Region -> a -> Get b -> Get b) -> List ( Region, a ) -> Get b
+    fromListBy orInsert
+
+
+{-| avoids collisions
+-}
+orInsert : key -> a -> Get key a -> Get key a
+orInsert key a get1 =
+    case get key get1 of
+        Just _ ->
+            get1
+
+        Nothing ->
+            insert key a get1
 
 
 {-| -}
 toListBy : Get key (a -> b) -> List key -> Get key a -> List b
-toListBy getAB aspects =
-    andMapFlat getAB >> values aspects
+toListBy getAB keys_ getA =
+    getAB
+        |> andMap getA
+        |> Dict.toList
+        |> List.filterMap
+            (\( key, value ) ->
+                if List.member key keys_ then
+                    Just value
+
+                else
+                    Nothing
+            )
 
 
 {-|
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
-
-    values [Scene, Control] (full 2) --> [2, 2]
+    values [ 0, 1 ] (singleton 1 ()) --> [()]
 
 -}
 values : List key -> Get key a -> List a
 values list getA =
-    List.foldr (getA >> Maybe.cons) [] list
+    List.foldr (\k -> Maybe.cons (get k getA)) [] list
 
 
 {-| -}
@@ -967,7 +851,7 @@ keys : List key -> Get key a -> List key
 keys list getA =
     List.foldr
         (\key ->
-            getA key
+            get key getA
                 |> Maybe.unwrap identity (\_ -> (::) key)
         )
         []
@@ -998,31 +882,27 @@ fromListBy fu =
 
 
 ---- Helpers ----
-
-
-{-| This is a strangely important function that deserves an important name.
-
-`mapParameter a = a >> (<<)`
-`mapParameter a b = (|>) >> (a b)`
-`mapParameter a b c = c >> (a b)`
-`mapParameter a b c d = (a b (c d))`
-
--}
-mapParameter :
-    (a
-     -> (b -> c)
-    )
-    ->
-        (a
-         -> ((input -> b) -> (input -> c))
-        )
-mapParameter function =
-    let
-        composeRightToLeft : (b -> c) -> (input -> b) -> (input -> c)
-        composeRightToLeft =
-            (<<)
-    in
-    function >> composeRightToLeft
+-- {-| This is a strangely important function that deserves an important name.
+-- `mapParameter a = a >> (<<)`
+-- `mapParameter a b = (|>) >> (a b)`
+-- `mapParameter a b c = c >> (a b)`
+-- `mapParameter a b c d = (a b (c d))`
+-- -}
+-- mapParameter :
+--     (a
+--      -> (b -> c)
+--     )
+--     ->
+--         (a
+--          -> ((input -> b) -> (input -> c))
+--         )
+-- mapParameter function =
+--     let
+--         composeRightToLeft : (b -> c) -> (input -> b) -> (input -> c)
+--         composeRightToLeft =
+--             (<<)
+--     in
+--     function >> composeRightToLeft
 
 
 composeWithTwoParameters : (a -> b -> c) -> (c -> d) -> a -> b -> d

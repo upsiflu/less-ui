@@ -1,14 +1,13 @@
 module Restrictive.Ui exposing
     ( Ui, Descendant
     , singleton
+    , at, bounce, goTo, toggle, customLink
     , wrap
     , with
-    , view
+    , view, toString
     , repeat
     , ol, ul, node
     , uncons
-    , handle
-    , custom, page, byLocation
     , indexedMapList, mapList
     , mapEach
     )
@@ -25,6 +24,7 @@ Note that you can use `++`, `List.concatMap` and friends because `Ui`s are Lists
 # Create
 
 @docs singleton
+@docs at, bounce, goTo, toggle, customLink
 
 
 # Modify
@@ -44,7 +44,7 @@ Note that you can use `++`, `List.concatMap` and friends because `Ui`s are Lists
 
 # View
 
-@docs view
+@docs view, toString
 
 ---
 
@@ -68,15 +68,6 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 
 
 # Advanced Usage
-
-
-## Add handles and other contingent transformations
-
-For convenient functions and inspiration, check out the [Link](Ui.Link) module which uses [`Ui.custom`](#custom) to
-interface with the Ui context.
-
-@docs handle
-@docs custom, page, byLocation
 
 
 ## Map
@@ -111,27 +102,27 @@ import Html.Attributes as Attr
 import Html.Keyed
 import List.Extra as List
 import Restrictive.Get as Get exposing (Get)
-import Restrictive.Layout exposing (Layout)
-import Restrictive.Layout.Region as Region exposing (OrHeader(..))
-import Restrictive.Mask as Mask exposing (Mask)
+import Restrictive.Layout as Layout exposing (Layout)
+import Restrictive.Layout.Region exposing (OrHeader(..), Region)
 import Restrictive.State as State exposing (State)
-import Url exposing (Url)
 
 
 {-| -}
-type alias Ui region wrapper html =
-    List (Descendant region wrapper html)
+type alias Ui region html attribute wrapper =
+    List (Descendant region html attribute wrapper)
 
 
-{-| TODO: Defunc mask
+{-|
+
+    Logical bifurcation (link*state active/inactive): `Twig`
+    Visual bifurcation (screen regions): `At`
+
 -}
-type Descendant region wrapper html
+type Descendant region html attribute wrapper
     = Leaf html
-    | Twig
-        { get : List ( region, Ui region wrapper html )
-        , mask : ( OrHeader region, Url ) -> Mask (OrHeader region) (Ui region wrapper html)
-        }
-    | Wrap wrapper (Ui region wrapper html)
+    | Twig (List attribute) (State.LinkStyle html) State.Link (Ui region html attribute wrapper)
+    | At region (Ui region html attribute wrapper)
+    | Wrap wrapper (Ui region html attribute wrapper)
 
 
 
@@ -139,7 +130,7 @@ type Descendant region wrapper html
 
 
 {-| -}
-singleton : html -> Ui region wrapper html
+singleton : html -> Ui region html attribute wrapper
 singleton =
     Leaf >> List.singleton
 
@@ -185,7 +176,7 @@ This will output:
 `Info -> "I am wrapped" []`
 
 -}
-wrap : wrapper -> Ui region wrapper html -> Ui region wrapper html
+wrap : wrapper -> Ui region html attribute wrapper -> Ui region html attribute wrapper
 wrap wrapper =
     Wrap wrapper >> List.singleton
 
@@ -194,34 +185,49 @@ wrap wrapper =
 ---- COMPOSE ----
 
 
-{-| Nest a sub-Ui to each descendant, via a [semantic region](Ui.Layout.Aspect):
+{-| Logically nest sub-Ui to each descendant.
 
-Note that an empty list will stay an empty list:
+If any logical parent is a link pointing away from the current state, this sub-Ui will be hidden.
 
-    import Ui.Layout.Aspect exposing (Aspect(..))
+Note that only links will receive members! Simple `singleton` Html nodes will be unaffected.
 
-    [] |> with Scene (textLabel "I want to be a scene")
-        --> []
+(Later, we can add a phantom type to make sure we can only call `with` on Uis that contain a Twig)
 
-    singleton ++ singleton
-        |> with Scene (textLabel "I want to be a scene")
-        -> ???
+    singleton 1 |> with (singleton 2)
+        -> [Leaf 1]
 
 -}
-with : region -> Ui region wrapper html -> Ui region wrapper html -> Ui region wrapper html
-with region subUi =
-    List.concatMap
+with : Ui region html attribute wrapper -> Ui region html attribute wrapper -> Ui region html attribute wrapper
+with members_ =
+    List.map
         (\original ->
             case original of
-                Leaf html_ ->
-                    [ Leaf html_, Twig { get = [ ( region, subUi ) ], mask = always identity } ]
+                Leaf html ->
+                    Leaf html
 
-                Twig item_ ->
-                    [ Twig { item_ | get = ( region, subUi ) :: item_.get } ]
+                Twig attrs linkStyle link members ->
+                    Twig attrs linkStyle link (members ++ members_)
+
+                At region ui ->
+                    At region (with members_ ui)
 
                 Wrap wrapper ui ->
-                    [ Wrap wrapper (with region subUi ui) ]
+                    Wrap wrapper (with members_ ui)
         )
+
+
+{-| Designate a region for each descendant.
+
+Note that the last designation "wins".
+
+Use `ui0 |> (with << at Region0) ui1` to logically nest ui1 under ui0 and designate ui1 to Region0.
+
+Todo: once designated, `Ui`s can't be redesignated
+
+-}
+at : region -> Ui region html attribute wrapper -> Ui region html attribute wrapper
+at region =
+    At region >> List.singleton
 
 
 
@@ -229,7 +235,7 @@ with region subUi =
 
 
 type alias KeyedUi region msg =
-    Ui region (List ( String, Html msg ) -> List ( String, Html msg )) (List ( String, Html msg ))
+    Ui region (List ( String, Html msg )) (Html.Attribute msg) (List ( String, Html msg ) -> List ( String, Html msg ))
 
 
 {-| convenience function to wrap a Ui into an unordered list and give it an id
@@ -262,7 +268,7 @@ node nodeType idString =
     indexedMapList (\i -> addTextLabel (String.fromInt i)) (textLabel "I am a labeled label")
 
 -}
-indexedMapList : (Int -> Ui region wrapper html -> Ui region wrapper html) -> Ui region wrapper html -> Ui region wrapper html
+indexedMapList : (Int -> Ui region html attribute wrapper -> Ui region html attribute wrapper) -> Ui region html attribute wrapper -> Ui region html attribute wrapper
 indexedMapList fu =
     List.indexedMap (\i -> List.singleton >> fu i) >> List.concat
 
@@ -273,7 +279,7 @@ indexedMapList fu =
         List.repeat n >> List.concat
 
 -}
-repeat : Int -> Ui region wrapper html -> Ui region wrapper html
+repeat : Int -> Ui region html attribute wrapper -> Ui region html attribute wrapper
 repeat n =
     List.repeat n >> List.concat
 
@@ -299,19 +305,19 @@ or to remove a descendant:
         |> mapList (List.remove 1)
 
 -}
-mapList : (List (Ui region wrapper html) -> List (Ui region2 wrapper2 html2)) -> Ui region wrapper html -> Ui region2 wrapper2 html2
+mapList : (List (Ui region html attribute wrapper) -> List (Ui region2 html2 attribute2 wrapper2)) -> Ui region html attribute wrapper -> Ui region2 html2 attribute2 wrapper2
 mapList fu =
     List.map List.singleton >> fu >> List.concat
 
 
 {-| Modify each descendent as a separate Ui and then recombine them.
 
-    region wrapper html   "A" ++ region wrapper html   "B" ++ region wrapper html   "C"
+    region html attribute wrapper   "A" ++ region html attribute wrapper   "B" ++ region html attribute wrapper   "C"
         |> mapEach ((++) (html ", "))
         ---> something like A, B, C
 
 -}
-mapEach : (Ui region wrapper html -> Ui region2 wrapper2 html2) -> Ui region wrapper html -> Ui region2 wrapper2 html2
+mapEach : (Ui region html attribute wrapper -> Ui region2 html2 attribute2 wrapper2) -> Ui region html attribute wrapper -> Ui region2 html2 attribute2 wrapper2
 mapEach fu =
     List.concatMap (List.singleton >> fu)
 
@@ -321,37 +327,8 @@ mapEach fu =
 
 
 {-| Attempt to separate the first descendant in the Ui
-
-    import Ui.Layout.ViewModel exposing (Foliage)
-    import Ui.Layout
-    import Url
-
-    view_ :  (Ui html, Ui html) -> Foliage html
-    view_ =
-        Url.fromString "http://a/"
-            |> Maybe.map
-                (\url ->
-                    Tuple.first >> view { current = url, previous = Nothing } Ui.Layout.list
-                )
-            |> Maybe.withDefault (\_-> [])
-
-    keyed "1" () ++ keyed "2" () ++ keyed "3" ()
-        |> uncons
-        |> Maybe.map view_
-        --> Just [ ("1", ())]
-
-    singleton
-        |> uncons
-        |> Maybe.map view_
-        --> Just []
-
-    []
-        |> uncons
-        |> Maybe.map view_
-        --> Nothing
-
 -}
-uncons : Ui region wrapper html -> Maybe ( Ui region wrapper html, Ui region wrapper html )
+uncons : Ui region html attribute wrapper -> Maybe ( Ui region html attribute wrapper, Ui region html attribute wrapper )
 uncons =
     List.uncons >> Maybe.map (Tuple.mapFirst List.singleton)
 
@@ -360,41 +337,11 @@ uncons =
 ---- VIEW ----
 
 
-{-| Generate [keyed Html (Foliage)](Ui.Layout.ViewModel#Foliage) `[(key:String, Html)]` for use with `Html.Keyed`
-
-As the following example shows, you can substitute Html by any other type:
-
-    import Ui.Layout.Aspect exposing (Aspect(..))
-    import Ui.Layout.ViewModel exposing (Foliage)
-    import Url exposing (Url)
-    import Ui.Layout
-
-    view_ : String -> Ui region wrapper html   -> Maybe (Foliage html)
-    view_ urlString ui_=
-        Url.fromString urlString
-            |> Maybe.map
-                (\url -> view { current = url, previous = Nothing } Ui.Layout.list ui_)
-
-
-    myUi : Ui Int
-    myUi =
-        singleton
-            |> with Scene ( keyed "Scene" 1 )
-            |> with Info ( keyed "Info" 200 )
-            |> with Control ( keyed "Control" 3 )
-            |> with Info ( keyed "Info" 201 )
-
-    view_ "http://a/" myUi
-        --> Just [ ("Scene", 1), ("Info", 200), ("Info", 201), ("Control", 3) ]
-
--}
-view : State -> Layout region wrapper html -> Ui region wrapper html -> html
+{-| -}
+view : State -> Layout region html attribute wrapper -> Ui region html attribute wrapper -> html
 view state layout =
     let
-        {- Expected:     `Ui region wrapper html -> OrHeader region -> Maybe html`
-           Found:                  `Ui region wrapper html -> List (OrHeader region -> Maybe html)`Elm
-        -}
-        viewUi : OrHeader region -> Ui region wrapper html -> Get (OrHeader region) html
+        viewUi : OrHeader region -> Ui region html attribute wrapper -> Get (OrHeader region) html
         viewUi region =
             List.map
                 (\descendant ->
@@ -402,208 +349,106 @@ view state layout =
                         Leaf html_ ->
                             Get.singleton region html_
 
-                        Twig item ->
-                            -- Calculate the mutation between the states     -> Get (OrHeader region) (Mutation(List html))
-                            State.map
-                                (\url_ ->
-                                    List.map (\( key, value ) -> Get.singleton key value) item.get
-                                        |> Get.concat
-                                        |> Get.mapKey Region.justRegion
-                                        |> item.mask ( region, url_ )
-                                        -- Render logically nested Uis
-                                        |> Get.mapByKey viewUi
-                                        |> Get.values (Region.withHeader layout.regions)
-                                        |> Get.concatCustom layout.concat
-                                )
-                                state
-                                |> Get.mutation
-                                -- Resolve the mutation                          -> Get (OrHeader region) (List html)
-                                |> Get.map
-                                    (\mutation ->
-                                        case mutation of
-                                            Get.Substitution m ->
-                                                layout.concat
-                                                    [ layout.wrap layout.substitute.current m.current
-                                                    , layout.wrap layout.substitute.previous m.previous
-                                                    ]
+                        Twig attrs linkStyle link elements ->
+                            [ case State.toTuple (State.linkIsActive link state) of
+                                ( True, Just False ) ->
+                                    viewUi region elements
+                                        |> Get.map (layout.wrap layout.insert)
 
-                                            Get.Insertion a ->
-                                                a
+                                ( True, _ ) ->
+                                    viewUi region elements
 
-                                            Get.Deletion a ->
-                                                layout.wrap layout.forget a
+                                ( False, Just False ) ->
+                                    Get.empty
 
-                                            Get.Protraction a ->
-                                                a
-                                    )
+                                ( False, _ ) ->
+                                    viewUi region elements
+                                        |> Get.map (layout.wrap layout.remove)
+                            , State.view region state.current layout.elements linkStyle attrs link
+                            ]
+                                |> Get.concatBy layout.concat
 
-                        Wrap wrapper ui_ ->
-                            Get.update region (layout.wrap wrapper) (viewUi region ui_)
+                        At innerRegion elements ->
+                            viewUi (Region innerRegion) elements
+
+                        Wrap wrapper elements ->
+                            viewUi region elements
+                                |> Get.updateAt region (layout.wrap wrapper)
                 )
-                >> Get.concatCustom layout.concat
+                >> Get.concatBy layout.concat
     in
-    viewUi (Region (Tuple.first layout.regions)) >> layout.view
+    viewUi Header >> layout.arrange
+
+
+{-| For testing
+-}
+toString : Ui Region String String () -> String
+toString =
+    State.fromString "http://x/path_query"
+        |> Maybe.map
+            (\state ->
+                view state Layout.textual
+             -- Ui->String
+            )
+        |> Maybe.withDefault (\_ -> "Failed to generate mock state")
 
 
 
 ---- Working with contingent transformations ----
 
 
-{-| Here you can add your own button, input, or indicator in the Header region.
--}
-handle : html -> Ui region wrapper html
-handle =
-    singleton
-        >> Get.singleton Header
-        >> Get.append
-        >> always
-        >> custom
-
-
-{-| Whatever you add to this item will only be visible . Use `bounce` and `goTo` links to navigate to the corresponding path.
--}
-page : State.Path -> Ui region wrapper html -> Ui region wrapper html
-page path_ ui_ =
-    custom <|
-        \( region, url ) ->
-            Get.singleton region ui_
-                |> Get.append
-                |> Mask.filter (\_ -> State.getPath url == path_)
+{-| -}
+customLink : List attribute -> State.LinkStyle html -> State.Link -> Ui region html attribute wrapper
+customLink attrs linkStyle link =
+    [ Twig attrs linkStyle link [] ]
 
 
 {-| -}
-byLocation : (( Maybe State.Path, State.Fragment ) -> Ui region wrapper html) -> Ui region wrapper html
-byLocation fromPage =
-    custom <|
-        \( region, url ) ->
-            fromPage (State.getLocation url)
-                |> Get.singleton region
-                |> Get.append
-
-
-{-| This interface is mostly interesting for library authors.
-
-    import Ui.Layout.Aspect as Aspect exposing (Aspect(..))
-    import Url exposing (Url)
-    import Ui.Layout
-    import Ui.Transformation exposing (Transformation)
-    import Ui.State exposing (State)
-
-    -- Custom handles --
-
-    noControl : Ui ()
-    noControl =
-      custom
-        (\(region, url) ->
-            { occlude = [Control]
-            , appendWhere = Nothing
-            , appendWhat = [("Handle", ())]
-            }
-        )
-
-    page : String -> Ui ()
-    page route =
-      custom
-        (\(region, { path }) ->
-            { occlude = if path == route then [] else Aspect.all
-            , appendWhere = Nothing
-            , appendWhat = [(route, ())]
-            }
-        )
-
-    toggle : String -> Ui ()
-    toggle flag =
-      custom
-        (\(region, { query }) ->
-            { occlude = if Maybe.map (String.contains flag) query |> Maybe.withDefault False
-                            then []
-                            else Aspect.all
-            , appendWhere = Nothing
-            , appendWhat = [(flag, ())]
-            }
-        )
-
-    -- Test --
-
-    viewWithState : {current : String, previous : String } -> Ui region wrapper html   -> List String
-    viewWithState state ui =
-        case Url.fromString state.current of
-            Nothing ->
-                ["Invalid `current` Url: "++state.current]
-            Just justCurrent ->
-                ui
-                    |> view {current = justCurrent, previous = Url.fromString state.previous} Ui.Layout.list
-                    |> List.map Tuple.first
-
-    -- Scenarios --
-
-    noControl
-        |> with Scene ( keyed "Scene" () )
-        |> with Info ( keyed "Info" () )
-        |> with Control ( keyed "Control" () )
-        |> viewWithState { current = "http://a/", previous = "http://a/" }
-        -->  [ "Handle" ,"Scene", "Info" ]
-
-    singleton
-        |> with Scene ( noControl )
-        |> with Info ( keyed "Info" () )
-        |> with Control ( keyed "Control" () )
-        |> viewWithState { current = "http://a/", previous = "http://a/" }
-        -->  [ "Handle" ,"Info", "Control" ]
-
-    singleton
-        |> with Scene
-            ( noControl
-                |> with Control (keyed "Control" ())
-            )
-        |> viewWithState { current = "http://a/", previous = "http://a/" }
-        -->  [ "Handle" ]
-
-    singleton
-        |> with Scene
-            ( noControl
-                |> with Control
-                ( keyed "Control" ()
-                    |> with Info ( keyed "Info" () )
-                )
-            )
-        |> viewWithState { current = "http://a/", previous = "http://a/" }
-        -->  [ "Handle" ]
-
-    noControl
-        |> with Scene
-            ( page "/Cool"
-                |> with Info (keyed "Cool page is open" ())
-            )
-        |> viewWithState { current = "http://a/", previous = "http://a/" }
-        -->  [ "Handle", "/Cool" ]
-
-    [ page "/Cool" |> with Info (keyed "Cool page is open" ())
-    , page "/Hot" |> with Info (keyed "Hot page is open" ())
-    ]
-        |> List.concat
-        |> viewWithState { current = "http://a/", previous = "http://a/" }
-        -->  [ "/Cool", "/Hot" ]
-
-    [ page "/Cool" |> with Info (keyed "Cool page is open" ())
-    , page "/Hot" |> with Info (keyed "Hot page is open" ())
-    ]
-        |> List.concat
-        |> viewWithState { current = "http://a.a/Cool", previous = "http://a/" }
-        -->  [ "/Cool", "/Hot", "Cool page is open" ]
-
-    [ page "/Cool" |> with Info (keyed "Cool page is open" ())
-    , page "/Hot" |> with Info (keyed "Hot page is open" ())
-    ]
-        |> List.concat
-        |> viewWithState { current = "http://a.a/Cool", previous = "http://a/Hot" }
-        -->  [ "/Cool", "/Hot", "Cool page is open", "-" ]
-
--}
-custom : (( OrHeader region, Url ) -> Mask (OrHeader region) (Ui region wrapper html)) -> Ui region wrapper html
-custom mask =
-    [ Twig
-        { get = []
-        , mask = mask
+toggle :
+    List attribute
+    ->
+        { flag : State.Flag
+        , isInline : Bool
+        , label : List html
         }
-    ]
+    -> Ui aspect html attribute wrapper
+toggle attrs { flag, isInline, label } =
+    State.toggle flag
+        |> customLink attrs
+            { isInline = isInline
+            , label = label
+            }
+
+
+{-| -}
+goTo :
+    List attribute
+    ->
+        { destination : ( Maybe State.Path, State.Fragment )
+        , isInline : Bool
+        , label : List html
+        }
+    -> Ui aspect html attribute wrapper
+goTo attrs { destination, isInline, label } =
+    State.goTo destination
+        |> customLink attrs
+            { isInline = isInline
+            , label = label
+            }
+
+
+{-| -}
+bounce :
+    List attribute
+    ->
+        { here : ( Maybe State.Path, State.Fragment )
+        , label : List html
+        , there : ( Maybe State.Path, State.Fragment )
+        }
+    -> Ui aspect html attribute wrapper
+bounce attrs { here, label, there } =
+    State.bounce { here = here, there = there }
+        |> customLink attrs
+            { isInline = True
+            , label = label
+            }

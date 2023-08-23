@@ -3,12 +3,9 @@
   "tests": [
     "Restrictive",
     "Restrictive.Ui",
-    "Restrictive.Mask",
     "Restrictive.Get",
     "Restrictive.State",
     "Restrictive.Layout",
-    "Restrictive.Layout.Aspect",
-    "Restrictive.Layout.ViewModel",
-    "Restrictive.Transformation"
+    "Restrictive.Layout.Region"
   ]
 }

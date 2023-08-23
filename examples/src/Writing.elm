@@ -12,7 +12,7 @@ import Html.Events as Events
 import Ui
 import Ui.Application exposing (Application, application)
 import Ui.Layout as Layout
-import Ui.Layout.Aspect exposing (Aspect(..))
+import Restrictive.Layout.Region exposing (Region(..))
 import Ui.State
 
 
@@ -72,11 +72,11 @@ update () model =
 
 
 type alias Ui =
-    Ui.Ui Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
+    Ui.Ui Region ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
 
 
 type alias Document =
-    Ui.Application.Document Aspect ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
+    Ui.Application.Document Region ( String, Html () ) (List ( String, Html () ) -> List ( String, Html () ))
 
 
 view : ( Ui.State.Path, Ui.State.Fragment ) -> Model -> Document

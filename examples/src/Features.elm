@@ -10,7 +10,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout
-import Restrictive.Layout.Region exposing (Aspect(..))
+import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.State
 import Restrictive.Ui as Ui
 
@@ -41,17 +41,22 @@ update () features =
 -- whereas all the others continue to be drawn.
 --
 -- The reason is that we implement hiding as `wrap`, which only
--- affects the `current Aspect`!
+-- affects the `current Region`!
 
 
 type alias Ui =
     Ui.Ui
-        Aspect
-        ( String, Html () )
+        Region
+        KeyedHtmlWrapper
+        (List ( String, Html () ))
+
+
+type alias KeyedHtmlWrapper =
+    List ( String, Html () ) -> List ( String, Html () )
 
 
 type alias Document =
-    Restrictive.Document Aspect ( String, Html () )
+    Restrictive.Document Region KeyedHtmlWrapper (List ( String, Html () ))
 
 
 view : Features -> Document
@@ -63,7 +68,7 @@ view _ =
                 |> Ui.with Scene contents
     in
     { body =
-        Ui.with Info (Ui.textLabel "Toggle the features on top of the page! ") Ui.singleton
+        Ui.with Info (Ui.singleton "Toggle the features on top of the page! ")
             ++ showTab "Flat Ui Layout"
                 ui
             ++ showTab "Global Navbar"
@@ -100,7 +105,7 @@ paths path =
 
 
 globalNav : Ui
-globalNav =
+globalNav = 
     [ "Introduction", "First Steps", "Last Steps" ]
         |> List.concatMap (\title -> Restrictive.goTo ( Just title, Nothing ))
 

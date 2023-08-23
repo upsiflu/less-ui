@@ -64,7 +64,7 @@ edp
 
 Now check out [localhost:8000](http://localhost:8000/)
 
-You can verify the examples given in the docs by running
+**Verify the doc snippets:**
 
 ```shell
 npm install -g elm-verify-examples
@@ -80,7 +80,7 @@ elm-verify-examples && elm-test && rm -r ./tests/VerifyExamples
 
 ## [Ui](Ui): Flat layout instead of nested components
 
-First construct a semantic tree, tagging all your Ui elements with [semantic Aspect](Ui.Layout.Aspect)s. 
+First construct a semantic tree, tagging all your Ui elements with [semantic Region](Restrictive.Layout.Region)s. 
 
 ```elm
     Ui.constant [Html.text "Handle"]
@@ -127,5 +127,5 @@ a [`Link`](Ui.Link#Link) represents a relative change to it.
 This is inspired by TEA: `State` is the Model, `Link` is a Msg, and `State.update` is the update function. 
 
   - [`GoTo`](Ui.Link#toggle) a path and/or fragment (which you handle in your `view`)
-  - [`Toggle`](Ui.Link#toggle) some [Controls](Ui.Layout.Aspect), for example user preferences or a toolbar
+  - [`Toggle`](Ui.Link#toggle) some [Controls](Restrictive.Layout.Region), for example user preferences or a toolbar
   - [`Bounce`](Ui.Link#bounce) between expanded and collapsed states inside an interactive tree view, accordion, or nested diagram

@@ -1,17 +1,19 @@
 module Restrictive.State exposing
     ( State, Path, Flag, Fragment, Query
-    , init
+    , init, fromString
     , map, setPath, setFragment
     , addAssignment, removeAssignments, toggleFlag, turnOnFlag
-    , hasFlag
+    , hasFlag, linkIsActive
     , toUrlString
     , getLocation, getFragment, getPath
     , goTo, bounce, toggle
     , Link, getLink
-    , headerLink, headerLink_, inlineLink, inlineLink_, preset
+    , Elements, LinkStyle
     , relative
-    , view, CustomHtml
-    , toStateTransition
+    , view
+    , toStateTransition, toTuple
+    , upTo, querySerialiseLocation, queryParseLocation, linkToString
+    , err
     )
 
 {-| We use the Url query to keep track of the Ui state. This makes sharing a Ui state as easy as copying the Url.
@@ -21,7 +23,7 @@ module Restrictive.State exposing
 
 # Create
 
-@docs init
+@docs init, fromString
 
 
 # Map
@@ -33,7 +35,7 @@ module Restrictive.State exposing
 
 # Query
 
-@docs hasFlag
+@docs hasFlag, linkIsActive
 
 
 # Deconstruct
@@ -56,7 +58,7 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
 
 @docs Link, getLink
 
-@docs headerLink, headerLink_, inlineLink, inlineLink_, preset
+@docs Elements, LinkStyle
 
 
 # Map
@@ -66,21 +68,25 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
 
 # View
 
-@docs view, CustomHtml
+@docs view
 
 
 # Deconstruct
 
-@docs toStateTransition
+@docs toStateTransition, toTuple
+
+
+# Internals
+
+Test these functions with `elm-verify-examples` (see the Readme)
+
+@docs upTo, querySerialiseLocation, queryParseLocation, linkToString
 
 -}
 
-import Html exposing (Html)
-import Html.Attributes as Attr
 import Maybe.Extra as Maybe
 import Restrictive.Get as Get exposing (Get)
-import Restrictive.Layout.Region exposing (OrAll(..), OrHeader(..))
-import Restrictive.Mask as Mask exposing (Mask)
+import Restrictive.Layout.Region exposing (OrHeader(..))
 import Set exposing (Set)
 import Set.Extra as Set
 import String.Extra as String
@@ -94,12 +100,40 @@ type alias State =
 
 
 {-| -}
+linkIsActive : Link -> State -> { current : Bool, previous : Maybe Bool }
+linkIsActive =
+    let
+        compareUrl : Link -> Url -> Bool
+        compareUrl l url =
+            case l of
+                GoTo ( maybePath, _ ) ->
+                    Maybe.unwrap False ((==) url.path) maybePath
+
+                Bounce _ { there } ->
+                    compareUrl (GoTo there) url
+
+                Toggle _ f ->
+                    hasFlag f url
+
+                ErrorMessage _ ->
+                    True
+    in
+    compareUrl >> map
+
+
+{-| -}
 map : (a -> b) -> { current : a, previous : Maybe a } -> { current : b, previous : Maybe b }
 map fu state_ =
     { current = fu state_.current, previous = Maybe.map fu state_.previous }
 
 
-{-| Turning off a `Flag` renders invisible the corresponding [Aspects](Ui.Layout.Aspect) in the corresponding [toggle Link](Ui.Link#toggle).
+{-| -}
+toTuple : { current : a, previous : Maybe a } -> ( a, Maybe a )
+toTuple state_ =
+    ( state_.current, state_.previous )
+
+
+{-| Turning off a `Flag` renders invisible the corresponding [Region](Restrictive.Layout.Region) in the corresponding [toggle Link](Ui.Link#toggle).
 
 Assignments such as `?a=b` may represent currently active Tabs or a search string.
 
@@ -141,6 +175,13 @@ init state =
     { current = state, previous = Nothing }
 
 
+{-| Only use for testing!
+-}
+fromString : String -> Maybe State
+fromString =
+    Url.fromString >> Maybe.map init
+
+
 
 ---- Map ----
 
@@ -157,39 +198,7 @@ setFragment fragment state =
     { state | fragment = fragment }
 
 
-{-|
-
-    import Url
-
-    testQuery : (State -> State) -> String -> String
-    testQuery fu =
-        (++) "http://localhost/?"
-            >> Url.fromString
-            >> Maybe.andThen (fu >> .query)
-            >> Maybe.withDefault "Url.fromString or .query failed"
-
-    testQuery (turnOnFlag "g")
-        "f&g&h&a=b&c=d=e"
-    --> "f&g&h&a=b&c=d=e"
-
-    testQuery (turnOnFlag "h")
-        "a=b&c=d=e&f&g"
-    --> "f&g&h&a=b&c=d=e"
-
-    testQuery (turnOnFlag "")
-        "f"
-    --> "f"
-
-
-    testQuery (turnOnFlag "h")
-        ""
-    --> "h"
-
-    testQuery (turnOnFlag "")
-        ""
-    --> ""
-
--}
+{-| -}
 turnOnFlag : Flag -> Url -> Url
 turnOnFlag flag =
     if flag == "" then
@@ -201,9 +210,9 @@ turnOnFlag flag =
 
 {-|
 
-    import Url
+    import Url exposing (Url)
 
-    testQuery : (State -> State) -> String -> String
+    testQuery : (Url -> Url) -> String -> String
     testQuery fu =
         (++) "http://localhost/?"
             >> Url.fromString
@@ -230,35 +239,7 @@ toggleFlag flag =
         mapQuery <| \q -> { q | flags = Set.toggle flag q.flags }
 
 
-{-|
-
-    import Url
-
-    testQuery : (State -> State) -> String -> String
-    testQuery fu =
-        (++) "http://./?"
-            >> Url.fromString
-            >> Maybe.andThen (fu >> .query)
-            >> Maybe.withDefault "Url.fromString or .query failed"
-
-    testQuery (addAssignment "c" "x")
-        "f&g&h&a=b&c=d=e"
-    --> "f&g&h&c=x&a=b&c=d=e"
-
-
-    testQuery (addAssignment "" "x")
-        ""
-    --> "=x"
-
-    testQuery (addAssignment "" "y")
-        "=x"
-    --> "=y&=x"
-
-    testQuery (addAssignment "" "")
-        "=y&=x"
-    --> "=&=y&=x"
-
--}
+{-| -}
 addAssignment : String -> String -> Url -> Url
 addAssignment key value =
     mapQuery <| \q -> { q | assignments = ( key, value ) :: q.assignments }
@@ -458,151 +439,120 @@ toggle =
     Toggle { isAbsolute = True }
 
 
+{-| -}
+err : String -> Link
+err =
+    ErrorMessage
+
+
 
 ---- View ----
+-- {-| -}
+-- preset :
+--     { global : List (Html.Attribute Never) -> List (Html Never) -> ( CustomHtml (Html msg) (Html.Attribute msg), Renderer aspect (Html msg) (Html.Attribute msg) )
+--     , inline : List (Html.Attribute Never) -> List (Html Never) -> ( CustomHtml (Html msg) (Html.Attribute msg), Renderer aspect (Html msg) (Html.Attribute msg) )
+--     , nav : List (Html.Attribute Never) -> List (Html Never) -> ( CustomHtml (Html msg) (Html.Attribute msg), Renderer aspect (Html msg) (Html.Attribute msg) )
+--     , tab : List (Html.Attribute Never) -> List (Html Never) -> ( CustomHtml (Html msg) (Html.Attribute msg), Renderer aspect (Html msg) (Html.Attribute msg) )
+--     }
+-- preset =
+--     { global = \att con -> ( defaultHtml, { empty | attributes = List.map (Attr.map never) att, label = List.map (Html.map never) con, isInline = False } )
+--     , inline = \att con -> ( defaultHtml, { empty | attributes = List.map (Attr.map never) att, label = List.map (Html.map never) con, isInline = True } )
+--     , nav = \att con -> ( { defaultHtml | element = Html.input }, { empty | attributes = Attr.type_ "radio" :: List.map (Attr.map never) att, label = List.map (Html.map never) con, isInline = False } )
+--     , tab = \att con -> ( { defaultHtml | element = Html.input }, { empty | attributes = Attr.type_ "radio" :: List.map (Attr.map never) att, label = List.map (Html.map never) con, isInline = True } )
+--     }
 
 
-{-| -}
-preset :
-    { global : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect (Html msg) (Html.Attribute msg)
-    , inline : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect (Html msg) (Html.Attribute msg)
-    , nav : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect (Html msg) (Html.Attribute msg)
-    , tab : List (Html.Attribute Never) -> List (Html Never) -> Renderer aspect (Html msg) (Html.Attribute msg)
-    }
-preset =
-    { global = \att con -> { emptyA | attributes = List.map (Attr.map never) att, contents = List.map (Html.map never) con, position = always Header }
-    , inline = \att con -> { emptyA | attributes = List.map (Attr.map never) att, contents = List.map (Html.map never) con, position = identity }
-    , nav = \att con -> { emptyA | attributes = Attr.type_ "radio" :: List.map (Attr.map never) att, contents = List.map (Html.map never) con, customHtml = { defaultHtml | element = Html.input }, position = always Header }
-    , tab = \att con -> { emptyA | attributes = Attr.type_ "radio" :: List.map (Attr.map never) att, contents = List.map (Html.map never) con, customHtml = { defaultHtml | element = Html.input }, position = identity }
-    }
-
-
-
--- NEED TO CHECK IF TRANSFORMATION CAN HAVE ALL!
-
-
-empty : CustomHtml html attribute -> Renderer region html attribute
-empty customHtml =
-    { attributes = []
-    , contents = []
-    , customHtml = customHtml
-    , occlusions = All
-    , position = always Header
-    }
-
-
-emptyA : Renderer region (Html msg) (Html.Attribute msg)
-emptyA =
-    empty defaultHtml
-
-
-defaultHtml : CustomHtml (Html msg) (Html.Attribute msg)
-defaultHtml =
-    { element = Html.a, href = Attr.href, attribute = Attr.attribute }
-
-
-{-| How to present a Link
+{-| Draw a link either inline or in the `Header` region
 -}
-type alias Renderer region html attribute =
-    { attributes : List attribute
-    , contents : List html
-    , customHtml : CustomHtml html attribute
-    , occlusions : OrAll region
-    , position : OrHeader region -> OrHeader region
+type alias LinkStyle html =
+    { isInline : Bool
+    , label : List html
     }
-
-
-{-| textual header link
--}
-headerLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
-headerLink link =
-    view (preset.global [] [ Html.text (toId link) ]) link
-
-
-{-| textual inline link
--}
-inlineLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
-inlineLink link =
-    view (preset.inline [] [ Html.text (toId link) ]) link
 
 
 {-| Use this if you are working with `Styled Html`, `elm-ui` and friends
+
+(Future: Add radio for tabs and exclusive ViewMode toggles)
+
 -}
-type alias CustomHtml html attribute =
-    { element : List attribute -> List html -> html
-    , href : String -> attribute
-    , attribute : String -> String -> attribute
+type alias Elements html attribute =
+    { link :
+        List attribute
+        -> { url : String, label : List html }
+        -> html
+    , switch :
+        List attribute
+        -> { url : String, label : List html, isChecked : Bool }
+        -> html
     }
 
 
-{-| inline link with custom Html
+
+-- Reformulate link and switch as Wrapper? No because then one could `wrap` in a link or a switch.
+-- {-| textual header link
+-- -}
+-- headerLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
+-- headerLink link =
+--     let
+--         ( customHtml, renderer ) =
+--             preset.global [] [ Html.text (toId link) ]
+--     in
+--     view customHtml renderer link
+-- {-| textual inline link
+-- -}
+-- inlineLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
+-- inlineLink link =
+--     let
+--         ( customHtml, renderer ) =
+--             preset.inline [] [ Html.text (toId link) ]
+--     in
+--     view customHtml renderer link
+-- {-| inline link with custom Html
+-- -}
+-- inlineLink_ : CustomHtml html attribute -> List attribute -> List html -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a })
+-- inlineLink_ customHtml att con =
+--     view customHtml { empty | attributes = att, label = con, isInline = True }
+-- {-| header link with custom Html
+-- -}
+-- headerLink_ : CustomHtml html attribute -> List attribute -> List html -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a })
+-- headerLink_ customHtml att con =
+--     view customHtml { empty | attributes = att, label = con, isInline = True }
+
+
+{-| Accepts a Renderer and a Link and the current region and url
 -}
-inlineLink_ : CustomHtml html attribute -> List attribute -> List html -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a })
-inlineLink_ customHtml att con =
-    empty customHtml
-        |> (\emptyB -> view { emptyB | attributes = att, contents = con, position = identity })
+view :
+    OrHeader region
+    -> Url
+    -> Elements html attribute
+    -> LinkStyle html
+    -> List attribute
+    -> Link
+    -> Get (OrHeader region) html
+view region url customHtml { isInline, label } attributes link =
+    Get.singleton
+        (if isInline then
+            region
 
-
-{-| header link with custom Html
--}
-headerLink_ : CustomHtml html attribute -> List attribute -> List html -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a })
-headerLink_ customHtml att con =
-    empty customHtml
-        |> (\emptyB -> view { emptyB | attributes = att, contents = con, position = identity })
-
-
-{-| -}
-a : { renderer | customHtml : CustomHtml html attribute } -> Link -> List attribute -> List html -> html
-a { customHtml } link attrs =
-    customHtml.element (customHtml.href (linkToString link) :: attrs)
-
-
-{-|
-
-    import Html
-
-    toggle "mainMenu"
-        |> view
-            { attributes = []
-            , contents = [ Html.text "☰" ]
-            , occlusions = []
-            , position = Global
-            }
-
--}
-view : Renderer region html attribute -> Link -> ( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a }
-view config link =
-    \( region, url ) ->
-        let
-            linkWithAttributes : List attribute -> List ( String, html )
-            linkWithAttributes additionalAttributes =
-                [ ( toId link, a config link (config.attributes ++ additionalAttributes) config.contents ) ]
-        in
+         else
+            Header
+        )
+    <|
         case link of
             Toggle _ flag ->
-                let
-                    ( isChecked, mask ) =
-                        if hasFlag flag url then
-                            ( "true", Mask.transparent )
-
-                        else
-                            ( "false", Mask.occludeOrAll config.occlusions )
-                in
-                { linkHtml =
-                    linkWithAttributes
-                        [ config.customHtml.attribute "role" "switch"
-                        , config.customHtml.attribute "aria-checked" isChecked
-                        ]
-                        |> Get.singleton (config.position region)
-                , occlude = mask
-                }
+                customHtml.switch
+                    attributes
+                    { url = linkToString link
+                    , label = label
+                    , isChecked = hasFlag flag url
+                    }
 
             _ ->
-                { linkHtml =
-                    linkWithAttributes []
-                        |> Get.singleton (config.position region)
-                , occlude = Mask.transparent
-                }
+                customHtml.link
+                    attributes
+                    { url = linkToString link
+                    , label = label
+                    }
 
 
 codecs : List (Codec Link)
@@ -621,8 +571,8 @@ codecs =
 
                         Nothing ->
                             case errorMessage_ of
-                                Just err ->
-                                    ErrorMessage err
+                                Just e ->
+                                    err e
 
                                 Nothing ->
                                     case ( parsePath path_, fragment_ ) of
@@ -734,64 +684,70 @@ In the following tests, we assume a previous path of "/"
 
     import Url
 
-    testFromUrl :  String -> Link
+    testFromUrl : String -> Link
     testFromUrl =
         (++) "http://localhost"
             >> Url.fromString
-            >> Maybe.map (fromUrl "/")
-            >> Maybe.withDefault (ErrorMessage "Url.fromString failed")
+            >> Maybe.map (getLink "/")
+            >> Maybe.withDefault (err "Url.fromString failed")
+
 
 
     --Bounce
 
-    testFromUrl "/there?reroute=here~f2#f1"
-        --> Bounce { isAbsolute = False } { there = (Just "there", Just "f1"), here = (Just "here", Just "f2") }
+    (testFromUrl) "/there?reroute=here~f2#f1"
+        -->  bounce { there = (Just "there", Just "f1"), here = (Just "here", Just "f2") } |> relative
 
-    testFromUrl "/there?reroute=/~f2#f1"
-        --> Bounce { isAbsolute = False } { there = (Just "there", Just "f1"), here = (Just "", Just "f2") }
 
-    testFromUrl "/there?reroute=~f2#f1"
-        --> Bounce { isAbsolute = False } { there = (Just "there", Just "f1"), here = (Nothing, Just "f2") }
+    (testFromUrl) "/there?reroute=/~f2#f1"
+        -->  bounce { there = (Just "there", Just "f1"), here = (Just "", Just "f2") } |> relative
 
-    testFromUrl "/there?reroute=#f1"
-        --> Bounce { isAbsolute = False } { there = (Just "there", Just "f1"), here = (Nothing, Nothing) }
+    (testFromUrl) "/there?reroute=~f2#f1"
+        -->  bounce { there = (Just "there", Just "f1"), here = (Nothing, Just "f2") } |> relative
 
-    testFromUrl "/?reroute=here~f2#f1"
-        --> Bounce { isAbsolute = False } { there = (Nothing, Just "f1"), here = (Just "here", Just "f2") }
 
-    testFromUrl "/?reroute=here~f2"
-        --> Bounce { isAbsolute = False } { there = (Nothing, Nothing), here = (Just "here", Just "f2") }
+    (testFromUrl) "/there?reroute=#f1"
+        -->  bounce  { there = (Just "there", Just "f1"), here = (Nothing, Nothing) } |> relative
 
-    testFromUrl "/?reroute=~"
-        --> Bounce { isAbsolute = False } { there = (Nothing, Nothing), here = (Nothing, Nothing) }
+
+    (testFromUrl) "/?reroute=here~f2#f1"
+        --> bounce { there = (Nothing, Just "f1"), here = (Just "here", Just "f2") } |> relative
+
+
+    (testFromUrl) "/?reroute=here~f2"
+        --> bounce  { there = (Nothing, Nothing), here = (Just "here", Just "f2") } |> relative
+
+
+    (testFromUrl) "/?reroute=~"
+        --> bounce { there = (Nothing, Nothing), here = (Nothing, Nothing) } |> relative
+
 
 
     --Toggle
 
-    testFromUrl "?toggle=flag"
-        --> Toggle {isAbsolute = False} "flag"
+    (testFromUrl) "?toggle=flag"
+        --> toggle "flag" |> relative
 
-    testFromUrl "?toggle=flag&!"
-        --> Toggle {isAbsolute = True} "flag"
+    (testFromUrl) "?toggle=flag&!"
+        --> toggle "flag"
 
 
     --GoTo
 
     testFromUrl "/path#fragment"
-        --> GoTo (Just "path", Just "fragment")
+        --> goTo (Just "path", Just "fragment")
 
     testFromUrl "/path"
-        --> GoTo (Just "path", Nothing)
+        --> goTo (Just "path", Nothing)
 
     testFromUrl "/path/"
-        --> GoTo (Just "path", Nothing)
+        --> goTo (Just "path", Nothing)
 
     testFromUrl "/#fragment"
-        --> GoTo (Nothing, Just "fragment")
-
+        --> goTo (Nothing, Just "fragment")
 
     testFromUrl "/#?fragment"
-        --> GoTo (Nothing, Just "?fragment")
+        --> goTo (Nothing, Just "?fragment")
 
 -}
 getLink : Path -> Url -> Link
@@ -879,94 +835,102 @@ toStateTransition link =
                         toggleFlag f
                    )
 
-        ErrorMessage err ->
-            addAssignment "errorMessage" err
+        ErrorMessage e ->
+            addAssignment "errorMessage" e
 
 
 {-| Try to create an UrlString.
 
     --Bounce
 
-    Bounce { isAbsolute = False }
+    bounce
         { there = (Just "there", Just "f1")
         , here = (Just "here", Just "f2")
         }
+        |> relative
         |> linkToString
         --> "/there?reroute=here~f2#f1"
 
-    Bounce { isAbsolute = False }
+    bounce
         { there = (Just "there", Just "f1")
         , here = (Just "", Just "f2")
         }
+        |> relative
         |> linkToString
         --> "/there?reroute=/~f2#f1"
 
-    Bounce { isAbsolute = False }
+    bounce
         { there = (Just "there", Just "f1")
         , here = (Just "", Nothing)
         }
+        |> relative
         |> linkToString
         --> "/there?reroute=/#f1"
 
-    Bounce { isAbsolute = False }
+    bounce
         { there = (Just "", Just "f1")
         , here = (Just "here", Just "f2")
         }
+        |> relative
         |> linkToString
         --> "/?reroute=here~f2#f1"
 
-    Bounce { isAbsolute = False }
+    bounce
         { there = (Just "", Nothing)
         , here = (Just "here", Just "f2")
         }
+        |> relative
         |> linkToString
         --> "/?reroute=here~f2"
 
-    Bounce { isAbsolute = False }
+    bounce
         { there = (Nothing, Just "f1")
         , here = (Just "here", Just "f2")
         }
+        |> relative
         |> linkToString
         --> "?reroute=here~f2#f1"
 
-    Bounce { isAbsolute = False }
+    bounce
         { there = (Nothing, Nothing)
         , here = (Just "here", Just "f2")
         }
+        |> relative
         |> linkToString
         --> "?reroute=here~f2"
 
 
     --Toggle
 
-    Toggle {isAbsolute = False} "flag"
+    toggle "flag"
+        |> relative
         |> linkToString
         --> "?toggle=flag"
 
-    Toggle {isAbsolute = True} "flag"
+    toggle "flag"
         |> linkToString
         --> "?toggle=flag&!"
 
 
     --GoTo
 
-    GoTo (Just "path", Just "fragment")
+    goTo (Just "path", Just "fragment")
         |> linkToString
         --> "/path#fragment"
 
-    GoTo (Just "path", Nothing)
+    goTo (Just "path", Nothing)
         |> linkToString
         --> "/path"
 
-    GoTo (Nothing, Just "fragment")
+    goTo (Nothing, Just "fragment")
         |> linkToString
         --> "#fragment"
 
-    GoTo (Nothing, Nothing)
+    goTo (Nothing, Nothing)
         |> linkToString
         --> ""
 
-    GoTo (Nothing, Just "")
+    goTo (Nothing, Just "")
         |> linkToString
         --> "#"
 
@@ -1000,32 +964,6 @@ relative link =
 
         _ ->
             link
-
-
-{-| -}
-toId : Link -> String
-toId link =
-    let
-        encodeState : Bool -> String
-        encodeState isAbsolute =
-            if isAbsolute then
-                "!"
-
-            else
-                ""
-    in
-    case link of
-        GoTo location ->
-            querySerialiseLocation location
-
-        Bounce { isAbsolute } { there, here } ->
-            querySerialiseLocation there ++ "<>" ++ querySerialiseLocation here ++ encodeState isAbsolute
-
-        Toggle { isAbsolute } flag ->
-            flag ++ encodeState isAbsolute
-
-        ErrorMessage e ->
-            e
 
 
 {-| Use in encoding a query assignment for contextual linking.

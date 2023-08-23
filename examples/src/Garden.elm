@@ -11,7 +11,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout as Layout
-import Restrictive.Layout.Region exposing (Aspect(..))
+import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
 
 
@@ -40,11 +40,11 @@ update msg garden =
 
 
 type alias Ui =
-    Ui.Ui Aspect ( String, Html Msg )
+    Ui.Ui Region ( String, Html Msg )
 
 
 type alias Document =
-    Restrictive.Document Aspect ( String, Html Msg )
+    Restrictive.Document Region ( String, Html Msg )
 
 
 view : Garden -> Document

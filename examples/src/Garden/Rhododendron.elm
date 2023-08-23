@@ -10,7 +10,7 @@ import Html exposing (Html, button, input, text)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed
-import Restrictive.Layout.Region exposing (Aspect(..))
+import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
 
 
@@ -81,7 +81,7 @@ map toPath ((Rhododendron label descendants) as rhodo) =
 
 
 type alias Ui msg =
-    Ui.Ui Aspect ( String, Html msg )
+    Ui.Ui Region ( String, Html msg )
 
 
 {-| -}

@@ -1,21 +1,9 @@
-module Restrictive exposing
-    ( application, Application, Document, Msg
-    , toggle, toggle_
-    , goTo, goTo_
-    , bounce, bounce_
-    )
+module Restrictive exposing (application, Application, Document, Msg)
 
 {-| In contrast to `Browser.Application`, this module maks the `Url` the
 single source of truth for the state of your user interface.
 
 @docs application, Application, Document, Msg
-
-
-# Links
-
-@docs toggle, toggle_
-@docs goTo, goTo_
-@docs bounce, bounce_
 
 ---
 
@@ -53,11 +41,8 @@ This opens two possible pitfalls:
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (Html)
-import Restrictive.Get as Get
 import Restrictive.Layout exposing (Layout)
-import Restrictive.Layout.Region as Region
-import Restrictive.Mask as Mask
-import Restrictive.State as State exposing (Flag, Fragment, Path, State)
+import Restrictive.State as State exposing (State)
 import Restrictive.Ui as Ui exposing (Ui)
 import Url exposing (Url)
 
@@ -68,8 +53,8 @@ type alias Application model modelMsg =
 
 
 {-| -}
-type alias Document aspect wrapper html =
-    { body : Ui aspect wrapper html, layout : Layout aspect wrapper html, title : String }
+type alias Document region html attribute wrapper =
+    { body : Ui region html attribute wrapper, layout : Layout region html attribute wrapper, title : String }
 
 
 {-| Separate Url update from Model update
@@ -90,7 +75,7 @@ type alias Document aspect wrapper html =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : model -> Document aspect wrapper (List ( String, Html modelMsg ))
+    , view : model -> Document region (List ( String, Html modelMsg )) attribute wrapper
     }
     -> Application model modelMsg
 application config =
@@ -191,98 +176,3 @@ type Msg modelMsg
     = UrlChanged Url
     | LinkClicked Browser.UrlRequest
     | ModelMsg modelMsg
-
-
-{-| As of now, will only attach an inline text link, not occlude any regions
--}
-bounce : { here : ( Maybe Path, Fragment ), there : ( Maybe Path, Fragment ) } -> Ui aspect wrapper (List ( String, Html msg ))
-bounce =
-    State.bounce
-        >> State.inlineLink
-        >> customLink
-
-
-{-| As of now, will only attach an inline text link, not occlude any regions
--}
-goTo : ( Maybe Path, Fragment ) -> Ui aspect wrapper (List ( String, Html msg ))
-goTo =
-    State.goTo
-        >> State.inlineLink
-        >> customLink
-
-
-{-| Will add an inline text link and occlude all regions while unchecked.
-
-    a[role="switch"]:aria-checked {}
-
-Expected: `Flag -> Ui aspect wrapper (List (String, html))`
-Found: `Flag -> Ui aspect wrapper (List (String, Html msg))`
-
--}
-toggle : Flag -> Ui aspect wrapper (List ( String, Html msg ))
-toggle =
-    State.toggle
-        >> State.inlineLink
-        >> customLink
-
-
-{-| with custom `html`
--}
-toggle_ :
-    State.CustomHtml html attribute
-    -> List attribute
-    ->
-        { flag : Flag
-        , label : List html
-        }
-    -> Ui aspect wrapper (List ( String, html ))
-toggle_ customHtml attributes { flag, label } =
-    State.toggle flag
-        |> State.inlineLink_ customHtml attributes label
-        |> customLink
-
-
-{-| with custom `html`
-
-Expected: `Ui aspect wrapper (String, html)`
-Found: `Ui aspect wrapper (List (String, html))`El
-
--}
-bounce_ :
-    State.CustomHtml html attribute
-    -> List attribute
-    ->
-        { here : ( Maybe Path, Fragment )
-        , label : List html
-        , there : ( Maybe Path, Fragment )
-        }
-    -> Ui aspect wrapper (List ( String, html ))
-bounce_ customHtml attributes { here, label, there } =
-    State.bounce { here = here, there = there }
-        |> State.inlineLink_ customHtml attributes label
-        |> customLink
-
-
-{-| As of now, will only attach an inline text link, not occlude any regions
--}
-goTo_ :
-    State.CustomHtml html attribute
-    -> List attribute
-    ->
-        { destination : ( Maybe Path, Fragment )
-        , label : List html
-        }
-    -> Ui aspect wrapper (List ( String, html ))
-goTo_ customHtml attributes { destination, label } =
-    State.goTo destination
-        |> State.headerLink_ customHtml attributes label
-        |> customLink
-
-
-customLink =
-    (<<)
-        (\{ linkHtml, occlude } ->
-            Mask.mapKey ( Region.justRegion, Region.Region >> Just ) occlude
-                >> Get.append (Get.map Ui.singleton linkHtml)
-        )
-        >> Ui.custom

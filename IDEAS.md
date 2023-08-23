@@ -3,7 +3,7 @@
 ### Patterns in version one:
 
 - [x] **Flat Layout**.
-  - `with` _`Aspect`_: compose `Ui`s into regions.
+  - `with` _`Region`_: compose `Ui`s into regions.
 - [x] [**Progressive disclosure**. Mask interface elements hierarchically](README.md#relations-across-the-tree)
   - `toggle`: create a `Ui` that can be disclosed.
 - [x] [**Sharable View**. Separate `Route` (source of truth: URL) from `Model`/`update` (source of truth: Elm application)](README.md#separate-the-route-from-your-model)
@@ -94,7 +94,7 @@ The above implementation cannot enforce uniqueness.
 
 We have two options now for enforcing uniqueness:
 
-(a) implementing a function `radio` that allows exactly one choice among a list. This would break the current `Item` model where one `Item` has one `Handle`, one `Scene`, etc: Would the radio be a single `Handle`, with states beyond on and off? How would it interfere with the `Get` in the Item? Would it break the convention that Aspects in an Item are completely orthogonal? Or would the Item itself be a multitude of parallel implementations?
+(a) implementing a function `radio` that allows exactly one choice among a list. This would break the current `Item` model where one `Item` has one `Handle`, one `Scene`, etc: Would the radio be a single `Handle`, with states beyond on and off? How would it interfere with the `Get` in the Item? Would it break the convention that Regions in an Item are completely orthogonal? Or would the Item itself be a multitude of parallel implementations?
 
 ```elm
 Ui.either
@@ -155,19 +155,19 @@ So we can reformulate `Leaf : Foliage -> List Item -> Descendant` where the item
 
 How are Leaves generated?
 (1) ZERO ITEMS: by Html, which generates empty item-lists
-(2) ONE ITEM: `with : Aspect -> Ui -> Ui -> Ui`: each descendant (or wrapped) `Leaf`
+(2) ONE ITEM: `with : Region -> Ui -> Ui -> Ui`: each descendant (or wrapped) `Leaf`
     - becomes a singleton `Get` item if no item was present, with an auto-generated `Constant` item
     - otherwise gets the sub-Ui appended into the single item's `Get`.
 (3) ONE ITEM: with `toggle`: creates just a single Item and no foliage.
 
 Now how do we build exclusive items?
 
-(a) implement a function `merge : Aspect -> Ui -> Ui` that compresses several leaves into one, and then defining a default view for more-than-one items
+(a) implement a function `merge : Region -> Ui -> Ui` that compresses several leaves into one, and then defining a default view for more-than-one items
 (b) implement a builder-function `either` that generates a `Leaf` with several items
 (c) implement a builder-function `orWith` that `cons`es to the list of items
 (d) simply define that multiple `Control` Items are always tabbed
 
-Both (b) and (c) have serious issues: `either` is inconvenient because it requires the builder to follow the `view` instead of the logical structure of the app type. (a) makes tabs explicit, which is against the idea of the library that Ui patterns should be implicit. (d) is nice if we can produce a great algorithm, for example respecting the viewport width. This means, we hook a global, declarative view-rule into the `Aspect` system such as
+Both (b) and (c) have serious issues: `either` is inconvenient because it requires the builder to follow the `view` instead of the logical structure of the app type. (a) makes tabs explicit, which is against the idea of the library that Ui patterns should be implicit. (d) is nice if we can produce a great algorithm, for example respecting the viewport width. This means, we hook a global, declarative view-rule into the `Region` system such as
 
 ```elm
 tabControlItems : ViewRule

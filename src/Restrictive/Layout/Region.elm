@@ -1,11 +1,11 @@
 module Restrictive.Layout.Region exposing
     ( Region(..)
     , allRegions
-    , inverse, subtract
+    , subtract
     , OrHeader(..)
     , isMember, justRegion, orHeader
     , OrAll(..)
-    , intersect, isMemberOf, negate, subtract_, withHeader
+    , intersect, isMemberOf, negate, withHeader
     )
 
 {-| Categorise the parts of your [Ui item](Ui)
@@ -30,7 +30,7 @@ This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#togg
 
 @docs OrAll
 
-@docs intersect, isMemberOf, negate, subtract_, withHeader
+@docs intersect, isMemberOf, negate, subtract, withHeader
 
 -}
 
@@ -71,7 +71,7 @@ type OrHeader region
 
 {-|
 
-    withHeader [ 1, 2 ] --> [Header, Region 1, Region 2]
+    withHeader ( 0, [ 1, 2 ] ) --> [Header, Region 0, Region 1, Region 2]
 
 -}
 withHeader : ( region, List region ) -> List (OrHeader region)
@@ -83,7 +83,7 @@ withHeader regions =
 
     orHeader Nothing --> Header
 
-    OrHeader (Just r) --> Region r
+    orHeader (Just Scene) --> Region Scene
 
 -}
 orHeader : Maybe a -> OrHeader a
@@ -100,7 +100,7 @@ orHeader maybeA =
 
     justRegion Header --> Nothing
 
-    justRegion (Region r) --> Just r
+    justRegion (Region Scene) --> Just Scene
 
 -}
 justRegion : OrHeader a -> Maybe a
@@ -178,38 +178,6 @@ negate orAll =
             Some list
 
 
-{-|
-
-    [ Scene, Control ]
-        |> inverse
-        --> [Info]
-
--}
-inverse : List Region -> List Region
-inverse comparison =
-    subtract_ comparison (cons allRegions)
-
-
 cons : ( a, List a ) -> List a
 cons ( x, xs ) =
     x :: xs
-
-
-{-|
-
-    [ Scene, Control ]
-        |> subtract [ Control ]
-        --> [Scene]
-
-    [ Scene ]
-        |> subtract [ Control, Info ]
-        --> [Scene]
-
-    subtract all all
-        --> []
-
--}
-subtract_ : List Region -> List Region -> List Region
-subtract_ whatToSubstract =
-    List.filter
-        (\a -> not <| List.member a whatToSubstract)
