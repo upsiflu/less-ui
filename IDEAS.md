@@ -14,7 +14,7 @@
     , view : Path -> model -> { body : Ui modelMsg, layout : Maybe Layout, title : String }
     }
 ```
-- [ ] **Relative links**. A link may act differently, depending on the previous Route.
+- [x] **Relative links**. A link may act differently, depending on the previous Route.
   - `bounce` _`Path p`_ _`Path q`_: Links to _p_, unless you are already there, in which case it links to _q_.
   - on LinkClicked, the incoming urlRequest is interpreted as relative: an incoming urlRequest `abc` on top of `xyz?f&q=r` will yield `abc?f&q=r`. This will enable manual relative links in precomposed Html.
 
