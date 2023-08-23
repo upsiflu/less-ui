@@ -56,8 +56,8 @@ list regions =
     , insert = List.map (\( _, v ) -> ( "+", v ))
     , wrap = identity
     , elements =
-        { link = \_ { url, label } -> List.map (\( _, v ) -> ( url, v )) (List.concat label)
-        , switch = \_ { url, label } -> List.map (\( _, v ) -> ( url, v )) (List.concat label)
+        { link = \_ { url, label } -> List.map (\( _, v ) -> ( url, v )) label
+        , switch = \_ { url, label } -> List.map (\( _, v ) -> ( url, v )) label
         }
     , concat = List.concat
     , arrange = Get.concatValues (Region.withHeader regions)
@@ -76,16 +76,16 @@ textual =
     , wrap = \_ -> identity
     , elements =
         let
-            showElement : String -> List String -> List String -> String
+            showElement : String -> String -> List String -> String
             showElement url label attrs =
-                "[" ++ url ++ "](" ++ String.join ", " label ++ " - " ++ String.join ", " attrs ++ ")"
+                "[" ++ url ++ "](" ++ label ++ " - " ++ String.join ", " attrs ++ ")"
         in
         { link = \attrs { url, label } -> showElement url label attrs
         , switch =
             \attrs { url, label, isChecked } ->
                 showElement
                     url
-                    (ifElse "☑ " "☐ " isChecked :: label)
+                    (ifElse "☑ " "☐ " isChecked ++ label)
                     attrs
         }
     , concat = String.join ", "

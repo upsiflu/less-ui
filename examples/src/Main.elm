@@ -1,52 +1,19 @@
-module Main exposing (Model, Msg, main)
+module Main exposing (Msg)
 
 import Browser
-import Control
+import Control exposing (Control)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout as Layout
+import Restrictive.Layout.Html.Keyed exposing (Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
-import Restrictive.Ui as Ui
+import Restrictive.Ui as Ui exposing (at, with, wrap)
 
 
-{-| Using [edkelly303/elm-any-type-forms]()
--}
-type alias Model =
-    { state :
-        Control.State
-            ( Control.State String
-            , ( Control.State String
-              , ( Control.State
-                    ( Control.State ()
-                    , ( Control.State
-                            ( Control.State String, Control.End )
-                      , Control.End
-                      )
-                    )
-                , Control.End
-                )
-              )
-            )
-    }
-
-
-type Msg
-    = FormUpdated
-        (Control.Delta
-            ( Control.Delta String
-            , ( Control.Delta String
-              , ( Control.Delta
-                    ( Control.Delta ()
-                    , ( Control.Delta ( Control.Delta String, Control.End )
-                      , Control.End
-                      )
-                    )
-                , Control.End
-                )
-              )
-            )
-        )
+type Msg delta0 delta1
+    = Form0Updated delta0
+    | Form1Updated delta1
     | FormSubmitted
 
 
@@ -58,22 +25,16 @@ type alias User =
 
 
 userControl =
-    Control.record
-        (\name age role ->
-            { name = name
-            , age = age
-            , role = role
-            }
-        )
-        |> Control.field "Name" .name Control.string
-        |> Control.field "Age" .age Control.int
-        |> Control.field "Role" .role roleControl
-        |> Control.end
+    Control.record User
+        |> Control.field .name Control.string
+        |> Control.field .age Control.int
+        |> Control.field .role roleControl
+        |> Control.endRecord
 
 
 type Role
     = Regular
-    | AdminLevel Int
+    | AdminLevel Int String
 
 
 roleControl =
@@ -83,58 +44,76 @@ roleControl =
                 Regular ->
                     regular
 
-                AdminLevel level ->
-                    adminLevel level
+                AdminLevel level string ->
+                    adminLevel level string
         )
         |> Control.tag0 "Regular" Regular
-        |> Control.tag1 "Admin Level" AdminLevel Control.int
-        |> Control.end
+        |> Control.tag2 "Admin Level" AdminLevel Control.int Control.string
+        |> Control.endCustomType
+        |> Control.label "User"
 
 
 userForm =
-    Control.toForm
-        "Let's make a User"
-        FormUpdated
-        FormSubmitted
-        userControl
+    Control.form
+        { control = userControl
+        , onUpdate = Form0Updated
+        , view = \children -> Html.fieldset [] children
+        }
+
+
+funForm =
+    Control.simpleForm
+        { control = Control.tuple Control.int Control.string
+        , onSubmit = FormSubmitted
+        , onUpdate = Form1Updated
+        }
 
 
 
 ---- Application ----
 
 
-type alias KeyedHtmlWrapper =
-    List ( String, Html Msg ) -> List ( String, Html Msg )
+textLabel : String -> Ui.Ui region (List ( String, Html msg )) attribute wrapper
+textLabel str =
+    Ui.singleton [ ( str, Html.text str ) ]
 
 
-type alias Ui =
-    Ui.Ui Region KeyedHtmlWrapper ( String, Html Msg )
-
-
-type alias Document =
-    Restrictive.Document Region KeyedHtmlWrapper ( String, Html Msg )
-
-
-main : Application Model Msg
 main =
     application
-        { init = ( { state = userForm.init }, Cmd.none )
+        { init = ( { funState = funForm.init |> Tuple.first, state = userForm.init |> Tuple.first }, Cmd.none )
         , update =
             \msg model ->
                 case msg of
-                    FormUpdated delta ->
+                    Form0Updated delta ->
                         let
                             ( state, cmd ) =
                                 userForm.update delta model.state
                         in
                         ( { model | state = state }, cmd )
 
+                    Form1Updated delta ->
+                        let
+                            ( state, cmd ) =
+                                funForm.update delta model.funState
+                        in
+                        ( { model | funState = state }, cmd )
+
                     _ ->
                         ( model, Cmd.none )
         , view =
             \model ->
-                { title = "Hello World"
-                , body = Ui.singleton [ ( "Form", userForm.view model.state ) ]
-                , layout = Layout.default
+                { body =
+                    at Scene
+                        (textLabel "Scene!")
+                        ++ at
+                            Control
+                            (Ui.singleton
+                                [ ( "Form", userForm.view model.state )
+                                , ( "Fun", funForm.view model.funState )
+                                ]
+                            )
+                        ++ at Info (textLabel "Info!")
+                , layout = Restrictive.Layout.Html.Keyed.default
+                , title = "Hello World"
                 }
         }

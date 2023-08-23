@@ -409,7 +409,7 @@ toggle :
     ->
         { flag : State.Flag
         , isInline : Bool
-        , label : List html
+        , label : html
         }
     -> Ui aspect html attribute wrapper
 toggle attrs { flag, isInline, label } =
@@ -426,7 +426,7 @@ goTo :
     ->
         { destination : ( Maybe State.Path, State.Fragment )
         , isInline : Bool
-        , label : List html
+        , label : html
         }
     -> Ui aspect html attribute wrapper
 goTo attrs { destination, isInline, label } =
@@ -442,7 +442,7 @@ bounce :
     List attribute
     ->
         { here : ( Maybe State.Path, State.Fragment )
-        , label : List html
+        , label : html
         , there : ( Maybe State.Path, State.Fragment )
         }
     -> Ui aspect html attribute wrapper

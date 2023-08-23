@@ -10,6 +10,7 @@ import Html exposing (Html, button, input, text)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed
+import Restrictive.Layout.Html.Keyed exposing (Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
 
@@ -81,7 +82,7 @@ map toPath ((Rhododendron label descendants) as rhodo) =
 
 
 type alias Ui msg =
-    Ui.Ui Region ( String, Html msg )
+    Restrictive.Layout.Html.Keyed.Ui msg
 
 
 {-| -}
@@ -90,17 +91,19 @@ view howToMessage ((Rhododendron label _) as rhododendron) =
     let
         controls : Ui msg
         controls =
-            [ ( "edit", input [ onInput (Edit label >> howToMessage) ] [ Html.text label ] ), ( "button", button [ onClick (Grow |> howToMessage) ] [ text "append" ] ) ]
-                |> Ui.foliage
-                |> Ui.addTextLabel "Edit"
-                |> Ui.wrap ((::) ( "legend", Html.legend [] [ Html.text "Rododendron" ] ) >> Html.Keyed.node "fieldset" [] >> Tuple.pair "rhodo" >> List.singleton)
+            Ui.singleton
+                [ ( "label", text "Edit" )
+                , ( "edit", input [ onInput (Edit label >> howToMessage) ] [ Html.text label ] )
+                , ( "button", button [ onClick (Grow |> howToMessage) ] [ text "append" ] )
+                ]
+                |> Ui.wrap (Node "fieldset" [])
+                |> Ui.at Control
 
         scene : Rhododendron -> Ui msg
         scene (Rhododendron s descendants) =
-            Ui.singleton
-                |> Ui.with Scene (Ui.textLabel s)
-                |> Ui.with Scene (List.concatMap scene descendants)
-                |> Ui.wrap (Html.Keyed.ul [ Attr.class "rhododendron" ] >> Tuple.pair s >> List.singleton)
+            Ui.singleton [ ( "Hello", text s ) ]
+                |> Ui.with (List.concatMap scene descendants)
+                |> Ui.wrap (Ul [])
     in
     scene rhododendron
-        |> Ui.with Control controls
+        |> Ui.with controls

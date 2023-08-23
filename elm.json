@@ -7,10 +7,10 @@
     "exposed-modules": [
         "Restrictive",
         "Restrictive.Ui",
-        "Restrictive.Mask",
         "Restrictive.Get",
         "Restrictive.State",
         "Restrictive.Layout",
+        "Restrictive.Layout.Html.Keyed",
         "Restrictive.Layout.Region"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",

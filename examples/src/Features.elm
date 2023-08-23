@@ -10,6 +10,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout
+import Restrictive.Layout.Html.Keyed exposing (Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.State
 import Restrictive.Ui as Ui
@@ -45,18 +46,16 @@ update () features =
 
 
 type alias Ui =
-    Ui.Ui
-        Region
-        KeyedHtmlWrapper
-        (List ( String, Html () ))
-
-
-type alias KeyedHtmlWrapper =
-    List ( String, Html () ) -> List ( String, Html () )
+    Restrictive.Layout.Html.Keyed.Ui Msg
 
 
 type alias Document =
-    Restrictive.Document Region KeyedHtmlWrapper (List ( String, Html () ))
+    Restrictive.Layout.Html.Keyed.Document Msg
+
+
+textLabel : String -> Ui
+textLabel str =
+    Ui.singleton [ ( str, Html.text str ) ]
 
 
 view : Features -> Document
@@ -64,19 +63,20 @@ view _ =
     let
         showTab : String -> Ui -> Ui
         showTab str contents =
-            Restrictive.toggle (String.replace " " "-" str)
-                |> Ui.with Scene contents
+            Ui.toggle []
+                { flag = str
+                , isInline = False
+                , label = [ ( str, Html.text str ) ]
+                }
+                |> Ui.with contents
     in
     { body =
-        Ui.with Info (Ui.singleton "Toggle the features on top of the page! ")
+        textLabel "Toggle the features on top of the page! "
             ++ showTab "Flat Ui Layout"
                 ui
             ++ showTab "Global Navbar"
                 globalNav
-            ++ (Ui.handle [ ( "constant", Html.label [] [ Html.text "ConStAnt" ] ) ]
-                    |> Ui.with Scene (Ui.textLabel "ConsScene")
-               )
-    , layout = Restrictive.Layout.withClass "Features"
+    , layout = Restrictive.Layout.Html.Keyed.default
     , title = "Restrictive Ui feature test"
     }
 
@@ -85,29 +85,44 @@ view _ =
 -}
 ui : Ui
 ui =
-    Ui.handle [ ( "handle", Html.label [] [ Html.text "Handle" ] ) ]
-        |> Ui.with Scene (Ui.textLabel "Scene")
-        |> Ui.with Control (Ui.textLabel "Control")
-        |> Ui.with Info (Ui.textLabel "Info")
+    textLabel "--Handle--"
+        |> Ui.with (Ui.at Scene (textLabel "--Scene--"))
+        |> Ui.with (Ui.at Control (textLabel "--Control--"))
+        |> Ui.with (Ui.at Info (textLabel "--Info--"))
 
 
 {-| [Application](Ui.Application): Sever Route from Model
 -}
-paths : Restrictive.State.Path -> Ui
-paths path =
-    Ui.singleton
-        |> Ui.with Scene (Ui.textLabel ("Path: " ++ path))
-        |> Ui.with Control (Restrictive.goTo ( Just "Path-1", Nothing ))
-        |> Ui.with Control (Restrictive.goTo ( Just "Path-2", Nothing ))
-        |> Ui.with Control (Restrictive.goTo ( Just "", Nothing ))
-        |> Ui.with Control (Restrictive.goTo ( Nothing, Nothing ))
-        |> Ui.with Control (Restrictive.goTo ( Nothing, Just "99" ))
+paths : Ui
+paths =
+    Ui.goTo []
+        { destination = ( Just "Path-1", Nothing )
+        , isInline = True
+        , label = [ ( "label", Html.text "Path-1" ) ]
+        }
+        ++ Ui.goTo []
+            { destination = ( Just "Path-2", Nothing )
+            , isInline = True
+            , label = [ ( "label", Html.text "Path-2" ) ]
+            }
+        ++ Ui.goTo []
+            { destination = ( Nothing, Nothing )
+            , isInline = True
+            , label = [ ( "label", Html.text "Nothing" ) ]
+            }
 
 
 globalNav : Ui
-globalNav = 
+globalNav =
     [ "Introduction", "First Steps", "Last Steps" ]
-        |> List.concatMap (\title -> Restrictive.goTo ( Just title, Nothing ))
+        |> List.concatMap
+            (\title ->
+                Ui.goTo []
+                    { destination = ( Just title, Nothing )
+                    , isInline = False
+                    , label = [ ( title, Html.text title ) ]
+                    }
+            )
 
 
 {-| [Link](Ui.Link): Manage the Ui State as a URL
@@ -115,7 +130,7 @@ globalNav =
 fragments : Restrictive.State.Fragment -> Ui
 fragments fr =
     let
-        articles : List (Html msg)
+        articles : List ( String, Html msg )
         articles =
             [ Html.article [ Attr.id "1", Attr.tabindex 1 ]
                 [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
@@ -124,15 +139,18 @@ fragments fr =
             , Html.article [ Attr.id "3", Attr.tabindex 1 ]
                 [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
             ]
+                |> List.indexedMap (String.fromInt >> Tuple.pair)
     in
-    Ui.singleton
-        |> Ui.with Control
-            (Restrictive.bounce
-                { here = ( Nothing, Just "1" ), there = ( Nothing, Just "3" ) }
+    Ui.singleton articles
+        |> Ui.with
+            (Ui.bounce []
+                { here = ( Nothing, Just "1" )
+                , there = ( Nothing, Just "3" )
+                , label = [ ( "label", Html.text "Bounce between 1 and 3" ) ]
+                }
+                |> Ui.at Control
+                |> Ui.with (textLabel "Number Three - this is visible only when `there` is active!")
             )
-        |> Ui.with Scene
-            (Ui.html ( "articles", Html.section [] articles ))
-        |> Ui.with Info (Ui.textLabel (Maybe.withDefault "(No fragment)" fr))
 
 
 {-| -}

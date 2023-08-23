@@ -11,6 +11,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout as Layout
+import Restrictive.Layout.Html.Keyed exposing (Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
 
@@ -40,34 +41,38 @@ update msg garden =
 
 
 type alias Ui =
-    Ui.Ui Region ( String, Html Msg )
+    Restrictive.Layout.Html.Keyed.Ui Msg
 
 
 type alias Document =
-    Restrictive.Document Region ( String, Html Msg )
+    Restrictive.Layout.Html.Keyed.Document Msg
 
 
 view : Garden -> Document
 view garden =
     { body =
         page
-            |> Ui.with Scene
-                (Restrictive.toggle "rhododendron"
-                    |> Ui.with Control
-                        (Rhododendron.view RhododendronMsg garden.rhododendron)
+            |> Ui.with
+                (Ui.toggle []
+                    { flag = "rhododendron"
+                    , isInline = True
+                    , label = [ ( "Label", Html.text "Toggle Rhododendron" ) ]
+                    }
+                    |> Ui.at Scene
+                    |> Ui.with (Rhododendron.view RhododendronMsg garden.rhododendron)
                 )
-    , layout = Layout.default
+    , layout = Restrictive.Layout.Html.Keyed.default
     , title = "Welcome to the Garden!"
     }
 
 
 page : Ui
 page =
-    Ui.handle [ ( "constant", Html.text "Handle" ) ]
-        |> Ui.with Scene (myScene "Scene 1")
-        |> Ui.with Scene (myScene "Scene 2")
-        |> Ui.with Control myControl
-        |> Ui.with Info myInfo
+    Ui.singleton [ ( "constant", Html.text "Handle" ) ]
+        |> Ui.with (myScene "Scene 1")
+        |> Ui.with (myScene "Scene 2")
+        |> Ui.with (Ui.at Control myControl)
+        |> Ui.with (Ui.at Info myInfo)
 
 
 square : String -> ( String, Html msg )
@@ -82,22 +87,27 @@ square color =
     )
 
 
+textLabel : String -> Ui
+textLabel str =
+    Ui.singleton [ ( str, Html.text str ) ]
+
+
 myScene : String -> Ui
 myScene sId =
-    Ui.html (square "red")
-        ++ Ui.html (square "blue")
-        |> Ui.addTextLabel sId
-        |> Ui.node "section" sId
+    Ui.singleton [ square "red" ]
+        ++ Ui.singleton [ square "blue" ]
+        |> Ui.wrap (Node "section" [ Attr.id sId ])
+        |> Ui.at Scene
 
 
 myControl : Ui
 myControl =
-    Ui.textLabel "Control"
+    textLabel "Control"
 
 
 myInfo : Ui
 myInfo =
-    Ui.textLabel "Info"
+    textLabel "Info"
 
 
 

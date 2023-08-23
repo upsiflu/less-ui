@@ -1,4 +1,4 @@
-module Restrictive.Layout.Html.Keyed exposing (Ui, default)
+module Restrictive.Layout.Html.Keyed exposing (default, Ui, Document, Wrapper(..))
 
 {-| Layout functions specific to the Ui library
 
@@ -6,12 +6,15 @@ module Restrictive.Layout.Html.Keyed exposing (Ui, default)
 
 Use the `default` Layout or override any of its fields.
 
+@docs default, Ui, Document, Wrapper
+
 -}
 
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Keyed exposing (node)
 import Html.Lazy
+import Restrictive
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout exposing (Layout)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
@@ -20,7 +23,7 @@ import Restrictive.Ui
 
 
 {-| -}
-default : Layout Region (List ( String, Html msg )) (Html.Attribute Never) (KeyedHtmlWrapper msg)
+default : Layout Region (List ( String, Html msg )) (Html.Attribute Never) (Wrapper msg)
 default =
     { remove = Poof
     , insert = Identity
@@ -29,6 +32,12 @@ default =
             case wrapper of
                 Node str attrs ->
                     [ ( str, node str attrs children ) ]
+
+                Ul attrs ->
+                    [ ( "ul", Html.Keyed.ul attrs children ) ]
+
+                Ol attrs ->
+                    [ ( "ul", Html.Keyed.ol attrs children ) ]
 
                 Poof ->
                     poof children
@@ -50,12 +59,23 @@ type alias Ui msg =
         Region
         (List ( String, Html msg ))
         (Html.Attribute Never)
-        (KeyedHtmlWrapper msg)
+        (Wrapper msg)
 
 
 {-| -}
-type KeyedHtmlWrapper msg
+type alias Document msg =
+    Restrictive.Document
+        Region
+        (List ( String, Html msg ))
+        (Html.Attribute Never)
+        (Wrapper msg)
+
+
+{-| -}
+type Wrapper msg
     = Node String (List (Html.Attribute msg))
+    | Ol (List (Html.Attribute msg))
+    | Ul (List (Html.Attribute msg))
     | Poof
     | Identity
 
@@ -88,7 +108,7 @@ elements : Restrictive.State.Elements (List ( String, Html msg )) (Html.Attribut
 elements =
     { link =
         \attr { url, label } ->
-            [ ( url, node "a" (Attr.href url :: List.map (Attr.map never) attr) (List.concat label) ) ]
+            [ ( url, node "a" (Attr.href url :: List.map (Attr.map never) attr) label ) ]
     , switch =
         \attr { url, label, isChecked } ->
             [ ( url
@@ -104,7 +124,7 @@ elements =
                             )
                         :: List.map (Attr.map never) attr
                     )
-                    (List.concat label)
+                    label
               )
             ]
     }

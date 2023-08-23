@@ -1,6 +1,6 @@
 module Restrictive.State exposing
     ( State, Path, Flag, Fragment, Query
-    , init, fromString
+    , init, fromString, err
     , map, setPath, setFragment
     , addAssignment, removeAssignments, toggleFlag, turnOnFlag
     , hasFlag, linkIsActive
@@ -13,7 +13,6 @@ module Restrictive.State exposing
     , view
     , toStateTransition, toTuple
     , upTo, querySerialiseLocation, queryParseLocation, linkToString
-    , err
     )
 
 {-| We use the Url query to keep track of the Ui state. This makes sharing a Ui state as easy as copying the Url.
@@ -23,7 +22,7 @@ module Restrictive.State exposing
 
 # Create
 
-@docs init, fromString
+@docs init, fromString, err
 
 
 # Map
@@ -466,7 +465,7 @@ err =
 -}
 type alias LinkStyle html =
     { isInline : Bool
-    , label : List html
+    , label : html
     }
 
 
@@ -478,11 +477,11 @@ type alias LinkStyle html =
 type alias Elements html attribute =
     { link :
         List attribute
-        -> { url : String, label : List html }
+        -> { url : String, label : html }
         -> html
     , switch :
         List attribute
-        -> { url : String, label : List html, isChecked : Bool }
+        -> { url : String, label : html, isChecked : Bool }
         -> html
     }
 

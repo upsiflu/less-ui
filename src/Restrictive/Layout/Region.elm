@@ -16,7 +16,7 @@ This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#togg
 
 @docs allRegions
 
-@docs inverse, subtract
+@docs subtract
 
 
 # Can be some region or the Header
@@ -30,7 +30,7 @@ This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#togg
 
 @docs OrAll
 
-@docs intersect, isMemberOf, negate, subtract, withHeader
+@docs intersect, isMemberOf, negate, withHeader
 
 -}
 

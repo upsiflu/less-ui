@@ -129,13 +129,16 @@ input,
 fieldset {
     background: #bbb;
     padding   : 2px 4px;
-    border    : 4px #ddd outset;
+    border    : 3px #ddd outset;
     outline   : 4px solid transparent;
     margin    : 2px;
 }
 
-input {
+input:not([type="checkbox"]):not([type="radio"]) {
     border-style: inset;
+    background  : white;
+    border-width: 1px;
+    box-shadow  : inset 1px 1px 0 black;
 }
 
 label>span+input,
@@ -152,9 +155,8 @@ button:active {
     border: 4px #ccc inset;
 }
 
-button:focus,
-input:focus {
-    outline: 4px solid #00ffb7;
+button:focus {
+    outline: 4px solid #00b8b5;
 }
 
 
@@ -334,21 +336,71 @@ article {
 
 /***** Forms ****/
 
-li:has(label) {
+:is(li, .control-container):has(label) {
     display    : flex;
     align-items: baseline;
 }
 
-li>label {
-    width: 5rem;
+
+
+:is(li, .control-container)>label {
+    width    : 5rem;
+    min-width: min-content;
 }
 
-fieldset,
-form {
+.control-container:focus-within,
+div:has(>[type="radio"]:focus) {
+    background: rgba(0, 155, 155, 0.2);
+}
+
+fieldset:has(>*>[type="radio"]) {
+    display       : flex;
+    flex-direction: row;
+    flex-grow     : 2;
+}
+
+div:has(>[type="radio"]) {
+    flex-grow: 2;
+
+}
+
+
+
+fieldset {
     border-style: groove;
+}
+
+
+form {
+    border-style: outset;
+    box-shadow  : 1px 1px 0 black;
 }
 
 form>button {
     margin-left: auto;
     display    : block;
+}
+
+form:has(>button:hover) {
+    box-shadow: 6px 6px 0 black;
+}
+
+:has(>.control-feedback-container) {
+    position: relative;
+}
+
+.control-feedback-container {
+    position  : absolute;
+    top       : -5px;
+    right     : -8px;
+    box-shadow: 2px 2px 0 black;
+    background: pink;
+    padding   : 2px 5px;
+
+
+}
+
+.control-feedback-container>p {
+    padding: 0;
+    margin : 0;
 }
