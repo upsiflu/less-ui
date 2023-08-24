@@ -102,8 +102,8 @@ view howToMessage ((Rhododendron label _) as rhododendron) =
         scene : Rhododendron -> Ui msg
         scene (Rhododendron s descendants) =
             Ui.singleton [ ( "Hello", text s ) ]
-                |> Ui.with (List.concatMap scene descendants)
+                ++ List.concatMap scene descendants
                 |> Ui.wrap (Ul [])
     in
     scene rhododendron
-        |> Ui.with controls
+        ++ controls

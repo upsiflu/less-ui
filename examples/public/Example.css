@@ -1,16 +1,13 @@
-/* .poof+* {
-    animation          : poof .3s;
-    animation-fill-mode: forwards;
-    pointer-events     : none;
-} */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Sans+Condensed:ital,wght@0,400;0,700;1,400&display=swap');
 
-/* .poof {
-    display: inline-block;
-    outline: 2px solid red;
-} */
+* {
+    font-family: 'Fira Sans Condensed', sans-serif;
+}
 
-.control>* {
-    transition: flex 1s
+form,
+fieldset,
+input {
+    font-size: 0.9rem;
 }
 
 @keyframes poof {
@@ -99,6 +96,8 @@ body {
 .control {
     flex-basis: 10rem;
     background: silver;
+    max-width : 36rem;
+    box-shadow: 0 0 0 8px rgba(0, 0, 0, .6);
 }
 
 
@@ -129,31 +128,90 @@ a:link[href] {
 }
 
 button,
-input,
+input:not([type="radio"]),
 fieldset {
     background: #bbb;
-    padding   : 2px 4px;
+    padding   : 0;
     border    : 3px #ddd outset;
     outline   : 4px solid transparent;
     margin    : 2px;
 }
 
+legend {
+    height     : 0;
+    transform  : translateY(-1.75ch);
+    font-size  : 0.8em;
+    font-weight: bolder;
+}
+
 input:not([type="checkbox"]):not([type="radio"]) {
     border-style: inset;
     background  : white;
-    border-width: 1px;
-    box-shadow  : inset 1px 1px 0 black;
+    border-width: 0px;
+    box-shadow  : -1px -1px 0 1px black;
+    padding     : 2.5px;
+    flex-grow   : 1;
+    margin-right: 0.4em;
 }
+
+input[type="date"],
+input[type="number"] {
+    max-width: 6.4em;
+}
+
+:has(>[type="radio"]) {
+    position  : relative;
+    padding   : 1ch 0.8ch;
+    min-width : 2.8ch;
+    text-align: center;
+}
+
+input[type="radio"] {
+    appearance         : none;
+    -webkit-appearance : none;
+    margin             : -1.5px;
+    position           : absolute;
+    bottom             : 0;
+    top                : 0;
+    left               : 0;
+    right              : 0;
+    mix-blend-mode     : color-burn;
+    border             : 0 solid transparent;
+    border-bottom-width: 0.5ch;
+}
+
+input[type="radio"]:checked {
+    border-bottom-color: currentColor;
+}
+
+input[type="radio"]:focus-visible {
+    outline       : 1px dashed rgba(0, 0, 0, .1);
+    outline-offset: 0px;
+}
+
+input[type="radio"]:focus-visible:before,
+input[type="radio"]:focus-visible:after {
+    position: absolute;
+    top     : calc(50% - 0.5ch);
+}
+
+:not(:first-of-type)>[type="radio"]:focus-visible:before {
+    content: "❮";
+    right  : calc(100% - 1px);
+}
+
+:not(:last-of-type)>[type="radio"]:focus-visible:after {
+    content: "❯";
+    left   : calc(100% - 1px);
+}
+
+
 
 label>span+input,
 label+button {
     margin-left: 8px;
 }
 
-input:focus,
-input:hover {
-    background: white;
-}
 
 button:active {
     border: 4px #ccc inset;
@@ -345,39 +403,62 @@ article {
     align-items: baseline;
 }
 
-
-
 :is(li, .control-container)>label {
     width    : 5rem;
     min-width: min-content;
+    padding  : 0.5ch;
+    margin   : -0.6ch 0;
 }
 
-.control-container:focus-within,
+.control-container:has(>input:focus),
 div:has(>[type="radio"]:focus) {
-    background: rgba(0, 155, 155, 0.2);
+    background: rgb(123, 195, 189);
 }
+
 
 fieldset:has(>*>[type="radio"]) {
     display       : flex;
     flex-direction: row;
     flex-grow     : 2;
+    gap           : 4px;
+    width         : fit-content;
 }
 
-div:has(>[type="radio"]) {
-    flex-grow: 2;
 
+
+fieldset,
+form {
+    margin: 1.2ch 1px;
 }
 
+fieldset:has(>legend) {
+    margin-top: 2.7ch;
+}
+
+fieldset:not(:has(>legend)) {
+    padding-top: 1.7ch;
+}
 
 
 fieldset {
     border-style: groove;
 }
 
+fieldset>.control-container:last-child {
+    margin-bottom: 1ch;
+}
+
+fieldset>.control-container:first-child,
+fieldset>legend+.control-container {
+    margin-top: 1ch;
+}
+
+
 
 form {
     border-style: outset;
-    box-shadow  : 1px 1px 0 black;
+    box-shadow  : 10px 10px 0 rgba(100, 98, 0, 0.5);
+    border-width: 0.1px;
 }
 
 form>button {
@@ -407,4 +488,77 @@ form:has(>button:hover) {
 .control-feedback-container>p {
     padding: 0;
     margin : 0;
+}
+
+
+input {
+    text-overflow: ellipsis;
+}
+
+.control {
+    padding: 0;
+}
+
+.control>fieldset {
+    margin: 0;
+}
+
+.control>fieldset {
+    border-left-width : 0;
+    border-right-width: 0;
+}
+
+.control>fieldset:first-child :not(:has(legend)) {
+    border-top-width: 0;
+}
+
+.control>fieldset:last-child {
+    border-bottom-width: 0;
+}
+
+form {
+    position    : relative;
+    margin-left : 1em;
+    margin-right: 1em;
+    outline     : 0.5px solid black;
+}
+
+form:after {
+    content       : " ";
+    position      : absolute;
+    left          : 0;
+    right         : 0;
+    bottom        : 0;
+    top           : 0;
+    display       : block;
+    background    : #e5d200;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+}
+
+form fieldset {
+    border       : 3px double black;
+    border-radius: 4px;
+}
+
+.control-container>ol {
+    margin        : 0;
+    padding       : 0;
+    border        : 1.5px inset #ccc;
+    background    : #aaa;
+    max-height    : 12em;
+    overflow      : scroll;
+    display       : flex;
+    flex-direction: column;
+}
+
+.control-container>ol>li {
+    outline       : 1px solid black;
+    outline-offset: 0.5px;
+    margin        : 3px;
+}
+
+.control-container>ol fieldset {
+    border-color: transparent;
+    background  : transparent;
 }

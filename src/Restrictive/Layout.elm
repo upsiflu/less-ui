@@ -21,7 +21,6 @@ Note that `Restrictive` always assumes a `Header` region.
 -}
 
 import Bool.Extra exposing (ifElse)
-import Dict
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
 import Restrictive.State as State
@@ -30,8 +29,9 @@ import Restrictive.State as State
 {-| The layout is a rule for mapping a Ui to an html tree.
 -}
 type alias Layout region html attribute wrapper =
-    { remove : wrapper
-    , insert : wrapper
+    { removed : wrapper
+    , removable : wrapper
+    , inserted : wrapper
     , wrap : wrapper -> html -> html
     , elements : State.Elements html attribute
     , concat : List html -> html
@@ -54,8 +54,9 @@ list :
             attribute
             (List ( String, element ) -> List ( String, element ))
 list regions =
-    { remove = List.map (\( _, v ) -> ( "-", v ))
-    , insert = List.map (\( _, v ) -> ( "+", v ))
+    { removed = List.map (\( _, v ) -> ( "-", v ))
+    , removable = List.map (\( _, v ) -> ( "=", v ))
+    , inserted = List.map (\( _, v ) -> ( "+", v ))
     , wrap = identity
     , elements =
         { link = \_ { url, label } -> List.map (\( _, v ) -> ( url, v )) label
@@ -72,8 +73,9 @@ list_ :
     (List element -> element)
     -> Layout region element attribute ()
 list_ concat =
-    { remove = ()
-    , insert = ()
+    { removed = ()
+    , removable = ()
+    , inserted = ()
     , wrap = \_ -> identity
     , elements =
         { link = \_ { url, label } -> label
@@ -91,8 +93,9 @@ list_ concat =
 {-| -}
 textual : Layout Region String String ()
 textual =
-    { remove = ()
-    , insert = ()
+    { removed = ()
+    , removable = ()
+    , inserted = ()
     , wrap = \_ -> identity
     , elements =
         let

@@ -68,7 +68,7 @@ view _ =
                 , isInline = False
                 , label = [ ( str, Html.text str ) ]
                 }
-                |> Ui.with contents
+                contents
     in
     { body =
         textLabel "Toggle the features on top of the page! "
@@ -86,9 +86,9 @@ view _ =
 ui : Ui
 ui =
     textLabel "--Handle--"
-        |> Ui.with (Ui.at Scene (textLabel "--Scene--"))
-        |> Ui.with (Ui.at Control (textLabel "--Control--"))
-        |> Ui.with (Ui.at Info (textLabel "--Info--"))
+        ++ Ui.at Scene (textLabel "--Scene--")
+        ++ Ui.at Control (textLabel "--Control--")
+        ++ Ui.at Info (textLabel "--Info--")
 
 
 {-| [Application](Ui.Application): Sever Route from Model
@@ -100,16 +100,19 @@ paths =
         , isInline = True
         , label = [ ( "label", Html.text "Path-1" ) ]
         }
+        []
         ++ Ui.goTo []
             { destination = ( Just "Path-2", Nothing )
             , isInline = True
             , label = [ ( "label", Html.text "Path-2" ) ]
             }
+            []
         ++ Ui.goTo []
             { destination = ( Nothing, Nothing )
             , isInline = True
             , label = [ ( "label", Html.text "Nothing" ) ]
             }
+            []
 
 
 globalNav : Ui
@@ -122,6 +125,7 @@ globalNav =
                     , isInline = False
                     , label = [ ( title, Html.text title ) ]
                     }
+                    (textLabel title)
             )
 
 
@@ -142,15 +146,14 @@ fragments fr =
                 |> List.indexedMap (String.fromInt >> Tuple.pair)
     in
     Ui.singleton articles
-        |> Ui.with
-            (Ui.bounce []
+        ++ (Ui.bounce []
                 { here = ( Nothing, Just "1" )
                 , there = ( Nothing, Just "3" )
                 , label = [ ( "label", Html.text "Bounce between 1 and 3" ) ]
                 }
+                (textLabel "Number Three - this is visible only when `there` is active!")
                 |> Ui.at Control
-                |> Ui.with (textLabel "Number Three - this is visible only when `there` is active!")
-            )
+           )
 
 
 {-| -}

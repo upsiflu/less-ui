@@ -1,0 +1,43 @@
+/***
+
+Transitions between Ui states
+
+*/
+
+
+@keyframes hide {
+    to {
+        opacity   : 0;
+        visibility: hidden;
+    }
+}
+
+.removed * {
+    text-overflow : clip !important;
+    pointer-events: none !important;
+    transition    : all .5s;
+    height        : 0 !important;
+    width         : 0 !important;
+    min-height    : 0 !important;
+    min-width     : 0 !important;
+    margin        : 0 !important;
+    padding       : 0 !important;
+    border-width  : 0 !important;
+    outline       : 0.5px dashed orangered;
+}
+
+.removed {
+    animation: .05s hide .05s forwards;
+}
+
+.removable {
+    /* outline: 0.5px dashed orangered; */
+}
+
+.inserted {
+    /* outline: 0.5px dashed yellowgreen; */
+}
+
+.inserted * {
+    transition: all .2s cubic-bezier(0, 1.7, .69, 1.02);
+}

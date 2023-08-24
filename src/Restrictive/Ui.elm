@@ -3,14 +3,13 @@ module Restrictive.Ui exposing
     , singleton
     , bounce, goTo, toggle, customLink
     , wrap, at
-    , with
-    , view, toString
+    , view, toString, toList, toListString
     , repeat
     , ol, ul, node
     , uncons
+    , stateful
     , indexedMapList, mapList
     , mapEach
-    , toList, toListString
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
@@ -41,14 +40,9 @@ Create a **Link**, then `attach` dependent views:
 **[`a ++ b`](https://package.elm-lang.org/packages/elm/core/latest/Basics#++)**
 
 
-# Compose
-
-@docs with
-
-
 # View
 
-@docs view, toString
+@docs view, toString, toList, toListString
 
 ---
 
@@ -72,6 +66,11 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 
 
 # Advanced Usage
+
+
+## Mix with Html
+
+@docs stateful
 
 
 ## Map
@@ -127,6 +126,7 @@ type Item region html attribute wrapper
     | Twig (List attribute) (State.LinkStyle html) State.Link (Ui region html attribute wrapper)
     | At region (Ui region html attribute wrapper)
     | Wrap wrapper (Ui region html attribute wrapper)
+    | Stateful (State -> html)
 
 
 
@@ -181,6 +181,9 @@ with members_ =
 
                 Wrap wrapper ui ->
                     Wrap wrapper (with members_ ui)
+
+                Stateful fu ->
+                    Stateful fu
         )
 
 
@@ -305,6 +308,10 @@ uncons =
 
 
 
+--idea: we want to create custom views for our forms (elm-any-type-form).
+--they only accept Html msg as a type.
+--so we have to render the custom view with a given state, then render the form with it, and then `singleton` the whole thing into a Ui again.
+--Should be possible.
 ---- VIEW ----
 
 
@@ -321,21 +328,22 @@ view state layout =
                             Get.singleton region html_
 
                         Twig attrs linkStyle link elements ->
-                            [ case State.toTuple (State.linkIsActive link state) of
+                            [ State.view region state.current layout.elements linkStyle attrs link
+                            , case State.toTuple (State.linkIsActive link state) of
                                 ( True, Just False ) ->
                                     viewUi region elements
-                                        |> Get.map (layout.wrap layout.insert)
+                                        |> Get.map (layout.wrap layout.inserted)
 
                                 ( True, _ ) ->
                                     viewUi region elements
+                                        |> Get.map (layout.wrap layout.removable)
 
                                 ( False, Just False ) ->
                                     Get.empty
 
                                 ( False, _ ) ->
                                     viewUi region elements
-                                        |> Get.map (layout.wrap layout.remove)
-                            , State.view region state.current layout.elements linkStyle attrs link
+                                        |> Get.map (layout.wrap layout.removed)
                             ]
                                 |> Get.concatBy layout.concat
 
@@ -345,6 +353,9 @@ view state layout =
                         Wrap wrapper elements ->
                             viewUi region elements
                                 |> Get.updateAt region (layout.wrap wrapper)
+
+                        Stateful fu ->
+                            Get.singleton region (fu state)
                 )
                 >> Get.concatBy layout.concat
     in
@@ -359,7 +370,6 @@ toString =
         |> Maybe.map
             (\state ->
                 view state Layout.textual
-             -- Ui->String
             )
         |> Maybe.withDefault (\_ -> "Failed to generate mock state")
 
@@ -372,7 +382,6 @@ toList =
         |> Maybe.map
             (\state ->
                 view state (Layout.list_ List.concat)
-             -- Ui->String
             )
         |> Maybe.withDefault (\_ -> [])
 
@@ -384,8 +393,9 @@ toListString =
     State.fromString "http://x/path_query"
         |> Maybe.map
             (\state ->
-                view state (Layout.list_ (String.join "; "))
-             -- Ui->String
+                String.join "; "
+                    |> Layout.list_
+                    |> view state
             )
         |> Maybe.withDefault (\_ -> "Failed to generate mock state")
 
@@ -409,12 +419,14 @@ toggle :
         , label : html
         }
     -> Ui aspect html attribute wrapper
-toggle attrs { flag, isInline, label } =
+    -> Ui aspect html attribute wrapper
+toggle attrs { flag, isInline, label } dependentUi =
     State.toggle flag
         |> customLink attrs
             { isInline = isInline
             , label = label
             }
+        |> with dependentUi
 
 
 {-| -}
@@ -426,12 +438,14 @@ goTo :
         , label : html
         }
     -> Ui aspect html attribute wrapper
-goTo attrs { destination, isInline, label } =
+    -> Ui aspect html attribute wrapper
+goTo attrs { destination, isInline, label } dependentUi =
     State.goTo destination
         |> customLink attrs
             { isInline = isInline
             , label = label
             }
+        |> with dependentUi
 
 
 {-| -}
@@ -443,9 +457,37 @@ bounce :
         , there : ( Maybe State.Path, State.Fragment )
         }
     -> Ui aspect html attribute wrapper
-bounce attrs { here, label, there } =
+    -> Ui aspect html attribute wrapper
+bounce attrs { here, label, there } dependentUi =
     State.bounce { here = here, there = there }
         |> customLink attrs
             { isInline = True
             , label = label
             }
+        |> with dependentUi
+
+
+{-| Gives your Html widgets access to state information.
+
+For example, if you want to extend a widget or form generator (`elm-any-type-forms`) that can only output Html
+with `Ui` elements that alter and respond to the Url, then you need
+
+  - a way to convert from `Ui` to `html` -> `view`
+  - a way to convert from `html` to `Ui` -> `singleton`
+  - a way to forward the current state to the nested `Ui`
+
+Here is how you use this function:
+
+1.  Write the `Ui` code for your widget extension.
+2.  Convert it to `html` using the `view` function. It will need a `Layout` which you can choose freely, and a State, which for now remains
+    your additional function parameter.
+3.  You will end up with a `Restrictive.State -> widget` function. Using your widget library's Html renderer, you can `>>` compose it with
+    `widget -> html` and thus get the parameter for `stateful`.
+4.  Now you have a `Ui` you can freely combine with the rest of your app.
+
+Caution: If you use this functionality, the `Ui` will contain functions and will no longer support equality checks and serialisation.
+
+-}
+stateful : (State -> html) -> Ui region html attribute wrapper
+stateful fu =
+    [ Stateful fu ]

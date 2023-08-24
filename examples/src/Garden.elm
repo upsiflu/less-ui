@@ -52,14 +52,13 @@ view : Garden -> Document
 view garden =
     { body =
         page
-            |> Ui.with
+            ++ Ui.at Scene
                 (Ui.toggle []
                     { flag = "rhododendron"
                     , isInline = True
                     , label = [ ( "Label", Html.text "Toggle Rhododendron" ) ]
                     }
-                    |> Ui.at Scene
-                    |> Ui.with (Rhododendron.view RhododendronMsg garden.rhododendron)
+                    (Rhododendron.view RhododendronMsg garden.rhododendron)
                 )
     , layout = Restrictive.Layout.Html.Keyed.default
     , title = "Welcome to the Garden!"
@@ -69,10 +68,10 @@ view garden =
 page : Ui
 page =
     Ui.singleton [ ( "constant", Html.text "Handle" ) ]
-        |> Ui.with (myScene "Scene 1")
-        |> Ui.with (myScene "Scene 2")
-        |> Ui.with (Ui.at Control myControl)
-        |> Ui.with (Ui.at Info myInfo)
+        ++ myScene "Scene 1"
+        ++ myScene "Scene 2"
+        ++ Ui.at Control myControl
+        ++ Ui.at Info myInfo
 
 
 square : String -> ( String, Html msg )

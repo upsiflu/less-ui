@@ -2,14 +2,15 @@ module Main exposing (Msg)
 
 import Browser
 import Control exposing (Control)
+import Date
 import Html exposing (Html)
 import Html.Attributes as Attr
 import MultiTool
 import Restrictive exposing (Application, application)
 import Restrictive.Layout as Layout
-import Restrictive.Layout.Html.Keyed exposing (Wrapper(..))
+import Restrictive.Layout.Html.Keyed exposing (Ui, Wrapper(..), default)
 import Restrictive.Layout.Region exposing (Region(..))
-import Restrictive.Ui as Ui exposing (at, with, wrap)
+import Restrictive.Ui as Ui
 import Tools.Control
 
 
@@ -35,13 +36,6 @@ type Shape
     | Rectangle Int Int
 
 
-shapes =
-    [ Circle 1
-    , Rectangle 1 2
-    , Triangle 4 5 6
-    ]
-
-
 shapeSpec =
     let
         match circle triangle rectangle tag =
@@ -58,9 +52,9 @@ shapeSpec =
     tools.custom
         { control = match
         }
-        |> tools.tag1 "Circle" Circle tools.int
-        |> tools.tag3 "Triangle" Triangle tools.int tools.int tools.int
-        |> tools.tag2 "Rectangle" Rectangle tools.int tools.int
+        |> tools.tag1 "●" Circle tools.int
+        |> tools.tag3 "▲" Triangle tools.int tools.int tools.int
+        |> tools.tag2 "▬" Rectangle tools.int tools.int
         |> tools.endCustom
 
 
@@ -70,9 +64,129 @@ shapeTools =
 
 newForm =
     Control.simpleForm
-        { onUpdate = Form2Updated
+        { control = shapeTools.control
         , onSubmit = FormSubmitted
-        , control = shapeTools.control
+        , onUpdate = Form2Updated
+        }
+
+
+dateControl =
+    Control.create
+        { label = "Date of birth"
+        , initEmpty = ( "1970-01-01", Cmd.none )
+        , initWith = \date -> ( Date.format "yyyy-MM-dd" date, Cmd.none )
+        , update = \delta state -> ( delta, Cmd.none )
+        , view =
+            \{ state, id, label, name, class } ->
+                [ Html.label [ Attr.for id ] [ Html.text label ]
+                , Html.input
+                    [ Attr.type_ "date"
+                    , Attr.value state
+                    , Attr.id id
+                    , Attr.class class
+                    , Attr.name name
+                    ]
+                    []
+                , Html.label [ Attr.for id ] [ Html.text "in\u{00A0}your\u{00A0}timezone" ]
+                ]
+        , subscriptions = \state -> Sub.none
+        , parse =
+            \state ->
+                case Date.fromIsoString state of
+                    Ok date ->
+                        Ok date
+
+                    Err error ->
+                        Err [ error ]
+        }
+
+
+passwordControl =
+    Control.create
+        { label = "Password"
+        , initEmpty = ( "", Cmd.none )
+        , initWith = \pw -> ( pw, Cmd.none )
+        , update = \pw state -> ( pw, Cmd.none )
+        , view =
+            \{ state, id, label, name, class } ->
+                [ Html.label [ Attr.for id ] [ Html.text label ]
+                , Html.input
+                    [ Attr.type_ "password"
+                    , Attr.value state
+                    , Attr.id id
+                    , Attr.class class
+                    , Attr.name name
+                    ]
+                    []
+                ]
+        , subscriptions = \state -> Sub.none
+        , parse =
+            \state ->
+                case Date.fromIsoString state of
+                    Ok date ->
+                        Ok state
+
+                    Err error ->
+                        Err [ error ]
+        }
+
+
+headerForm formState =
+    let
+        makeHeaderControl uiState =
+            Control.create
+                { label = "Password"
+                , initEmpty = ( "", Cmd.none )
+                , initWith = \pw -> ( pw, Cmd.none )
+                , update = \pw state -> ( pw, Cmd.none )
+                , view =
+                    \{ state, id, label, name, class } ->
+                        Ui.toggle []
+                            { flag = id
+                            , isInline = False
+                            , label = [ ( id, Html.label [ Attr.for id ] [ Html.text label ] ) ]
+                            }
+                            (Ui.singleton
+                                [ ( "-"
+                                  , Html.input
+                                        [ Attr.type_ "password"
+                                        , Attr.value state
+                                        , Attr.id id
+                                        , Attr.class class
+                                        , Attr.name name
+                                        ]
+                                        []
+                                  )
+                                ]
+                            )
+                            |> Ui.view uiState default
+                            |> List.map Tuple.second
+                , subscriptions = \state -> Sub.none
+                , parse =
+                    \state ->
+                        case Date.fromIsoString state of
+                            Ok date ->
+                                Ok state
+
+                            Err error ->
+                                Err [ error ]
+                }
+
+        myHeaderForm uiState =
+            Control.form
+                { control = makeHeaderControl uiState
+                , onUpdate = StringUpdated
+                , view = Html.fieldset []
+                }
+    in
+    Ui.stateful (\uiState -> [ ( "headerControl", (myHeaderForm uiState).view formState ) ])
+
+
+stringForm =
+    Control.form
+        { control = Control.string
+        , onUpdate = StringUpdated
+        , view = Html.fieldset []
         }
 
 
@@ -80,31 +194,34 @@ newForm =
 ----
 
 
-type Msg delta0 delta1 delta2
+type Msg delta0 delta1 delta2 deltaString
     = Form0Updated delta0
     | Form1Updated delta1
     | Form2Updated delta2
+    | StringUpdated deltaString
     | FormSubmitted
 
 
 type alias User =
     { name : String
-    , age : Int
+    , birth : Date.Date
     , role : Role
+    , shapes : List Shape
     }
 
 
 userControl =
     Control.record User
-        |> Control.field .name Control.string
-        |> Control.field .age Control.int
+        |> Control.field .name (Control.string |> Control.label "Name")
+        |> Control.field .birth dateControl
         |> Control.field .role roleControl
+        |> Control.field .shapes (Control.list (shapeTools.control |> Control.label "") |> Control.label "Shapes")
         |> Control.endRecord
 
 
 type Role
     = Regular
-    | AdminLevel Int String
+    | AdminLevel Int String String
 
 
 roleControl =
@@ -114,11 +231,11 @@ roleControl =
                 Regular ->
                     regular
 
-                AdminLevel level string ->
-                    adminLevel level string
+                AdminLevel level string2 string3 ->
+                    adminLevel level string2 string3
         )
         |> Control.tag0 "Regular" Regular
-        |> Control.tag2 "Admin Level" AdminLevel Control.int Control.string
+        |> Control.tag3 "Admin..." AdminLevel (Control.int |> Control.label "Level") (passwordControl |> Control.label "Admin\u{00A0}Password") (Control.string |> Control.label "Admin Password\u{00A0}Hint")
         |> Control.endCustomType
         |> Control.label "User"
 
@@ -127,7 +244,7 @@ userForm =
     Control.form
         { control = userControl
         , onUpdate = Form0Updated
-        , view = \children -> Html.fieldset [] children
+        , view = Html.fieldset []
         }
 
 
@@ -143,14 +260,21 @@ funForm =
 ---- Application ----
 
 
-textLabel : String -> Ui.Ui region (List ( String, Html msg )) attribute wrapper
+textLabel : String -> Ui msg
 textLabel str =
     Ui.singleton [ ( str, Html.text str ) ]
 
 
 main =
     application
-        { init = ( { funState = funForm.init |> Tuple.first, state = userForm.init |> Tuple.first, newState = newForm.init |> Tuple.first }, Cmd.none )
+        { init =
+            ( { funState = funForm.init |> Tuple.first
+              , state = userForm.init |> Tuple.first
+              , newState = newForm.init |> Tuple.first
+              , stringState = stringForm.init |> Tuple.first
+              }
+            , Cmd.none
+            )
         , update =
             \msg model ->
                 case msg of
@@ -180,22 +304,33 @@ main =
         , view =
             \model ->
                 { body =
-                    at Scene
+                    let
+                        moreFun int =
+                            Ui.toggle []
+                                { flag = "Fun" ++ String.fromInt int
+                                , isInline = True
+                                , label = [ ( "button", Html.label [] [ Html.text " + " ] ) ]
+                                }
+                                (Ui.singleton [ ( "Fun", funForm.view model.funState ) ]
+                                    ++ (if int > 0 then
+                                            moreFun (int - 1)
+
+                                        else
+                                            []
+                                       )
+                                )
+                                |> Ui.wrap (Ul [])
+                    in
+                    Ui.at Scene
                         (textLabel "Scene!")
-                        ++ at
+                        ++ Ui.at
                             Control
                             (Ui.singleton
                                 [ ( "Form", userForm.view model.state ) ]
-                                ++ (Ui.toggle []
-                                        { flag = "Fun"
-                                        , isInline = True
-                                        , label = [ ( "button", Html.label [] [ Html.text "Fun..." ] ) ]
-                                        }
-                                        |> with (Ui.singleton [ ( "Fun", funForm.view model.funState ) ])
-                                   )
                                 ++ Ui.singleton [ ( "New", newForm.view model.newState ) ]
                             )
-                        ++ at Info (textLabel "Info!")
+                        ++ Ui.at Scene (moreFun 10 ++ headerForm model.stringState)
+                        ++ Ui.at Info (textLabel "Info!")
                 , layout = Restrictive.Layout.Html.Keyed.default
                 , title = "Hello World"
                 }

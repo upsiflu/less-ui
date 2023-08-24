@@ -13,10 +13,10 @@ module Restrictive.Get exposing
     , member, andGet
     , Mutation(..), mutation
     , toList, toListBy, keys, values, fromList, fromListBy
+    , listPairs
     , consLists, concatLists, concatValues
     , sequence
     , get
-    , listPairs
     )
 
 {-| Fallible mapping from `key` to `value`
@@ -81,7 +81,13 @@ module Restrictive.Get exposing
 
 # Lists
 
+Known keys:
+
 @docs toList, toListBy, keys, values, fromList, fromListBy
+
+All keys:
+
+@docs listPairs
 
 
 ### Convenience functions for `Get (List a)`
