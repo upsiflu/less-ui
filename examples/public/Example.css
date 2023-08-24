@@ -1,12 +1,16 @@
-.poof+* {
+/* .poof+* {
     animation          : poof .3s;
     animation-fill-mode: forwards;
     pointer-events     : none;
-}
+} */
 
-.poof {
+/* .poof {
     display: inline-block;
     outline: 2px solid red;
+} */
+
+.control>* {
+    transition: flex 1s
 }
 
 @keyframes poof {

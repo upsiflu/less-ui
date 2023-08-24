@@ -40,7 +40,7 @@ default =
                     [ ( "ul", Html.Keyed.ol attrs children ) ]
 
                 Poof ->
-                    poof children
+                    poof2 children
 
                 Identity ->
                     children
@@ -82,7 +82,13 @@ type Wrapper msg
 
 poof : List ( String, Html msg ) -> List ( String, Html msg )
 poof =
-    List.indexedMap (\i a -> [ ( "poof" ++ String.fromInt i, Html.span [ Attr.class "poof" ] [ Html.text (String.fromInt i) ] ), a ])
+    List.indexedMap (\i ( s, _ ) -> [ ( s, Html.span [ Attr.class "poof" ] [ Html.text (String.fromInt i) ] ) ])
+        >> List.concat
+
+
+poof2 : List ( String, Html msg ) -> List ( String, Html msg )
+poof2 =
+    List.indexedMap (\i ( s, _ ) -> [ ( s, Html.span [ Attr.class "poof" ] [ Html.img [ Attr.src "https://i.gifer.com/3klP.gif" ] [] ] ) ])
         >> List.concat
 
 

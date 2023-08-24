@@ -1,8 +1,8 @@
 module Restrictive.Ui exposing
-    ( Ui, Descendant
+    ( Ui, Item
     , singleton
-    , at, bounce, goTo, toggle, customLink
-    , wrap
+    , bounce, goTo, toggle, customLink
+    , wrap, at
     , with
     , view, toString
     , repeat
@@ -10,6 +10,7 @@ module Restrictive.Ui exposing
     , uncons
     , indexedMapList, mapList
     , mapEach
+    , toList, toListString
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
@@ -18,23 +19,26 @@ and build accessible patterns orthogonal to the Dom tree.
 Ui is headless (like elm-widgets will be).
 Note that you can use `++`, `List.concatMap` and friends because `Ui`s are Lists.
 
-@docs Ui, Descendant
+@docs Ui, Item
 
 
 # Create
 
 @docs singleton
-@docs at, bounce, goTo, toggle, customLink
+
+Create a **Link**, then `attach` dependent views:
+
+@docs bounce, goTo, toggle, customLink
 
 
 # Modify
 
-@docs wrap
+@docs wrap, at
 
 
 # Append
 
-**[`a ++ b`](https://package.elm-lang.org/packages/elm/core/latest/Basics#++)** appends _b_ to _a_.
+**[`a ++ b`](https://package.elm-lang.org/packages/elm/core/latest/Basics#++)**
 
 
 # Compose
@@ -75,7 +79,7 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 Since `Ui`s are `List`s, it is easy to use the library functions from the `List` and `List.Extra` packages.
 However, I recommend against it.
 
-    {-| Combines descendents from two `Ui`s. If one `Ui` is longer, its excessive elements are dropped.
+    {-| Combines items from two `Ui`s. If one `Ui` is longer, its excessive elements are dropped.
     -}
     map2 fu a b =
         List.map2 fu (List.map List.singleton a) (List.map List.singleton b)
@@ -89,7 +93,7 @@ However, I recommend against it.
             |> List.concat
 
 The big drawback when using `Ui`s as `List`s is that you cannot inspect (compare, filter, sort) them because
-the `Descendant` type is opaque.
+the `Item` type is opaque.
 It is usually easier to build exactly the `Ui` you need instead of altering and recombining them after the fact.
 
 @docs indexedMapList, mapList
@@ -109,7 +113,7 @@ import Restrictive.State as State exposing (State)
 
 {-| -}
 type alias Ui region html attribute wrapper =
-    List (Descendant region html attribute wrapper)
+    List (Item region html attribute wrapper)
 
 
 {-|
@@ -118,7 +122,7 @@ type alias Ui region html attribute wrapper =
     Visual bifurcation (screen regions): `At`
 
 -}
-type Descendant region html attribute wrapper
+type Item region html attribute wrapper
     = Leaf html
     | Twig (List attribute) (State.LinkStyle html) State.Link (Ui region html attribute wrapper)
     | At region (Ui region html attribute wrapper)
@@ -139,43 +143,7 @@ singleton =
 ---- MODIFY ----
 
 
-{-| TODO: Simplify this comment. Perhaps find a better way to illustrate (e.g. `: Ui () (String -> String) String)`
-
-    Nest Foliage at the given `Region`.
-
-    a = ──◉◉●───◆◆◉──
-        |> wrap ▒
-
-        -> ▒──◉◉●───◆◆◉──
-
-    singleton
-        |> with  ◉  ▒──◉◉●───◆◆◉──
-
-        ->
-                       ╭▒▒╮       ╭▒╮
-                     ──┘◉◉└●────◆◆┘◉└──
-
-If you wrap, and then define the contextual region,
-the will wrap all descendants that constitute this region.
-
-    example : Ui msg
-    example =
-        singleton
-            |> with Scene []
-            |> wrap ((++) ( "message", Html.text "I am wrapped" ))
-            |> with Control []
-
-Now, let's see what happens if we define a contextual region.
-
-    singleton
-        |> with Info example
-
-This will output:
-`Scene -> []`,
-`Control -> []`,
-`Info -> "I am wrapped" []`
-
--}
+{-| -}
 wrap : wrapper -> Ui region html attribute wrapper -> Ui region html attribute wrapper
 wrap wrapper =
     Wrap wrapper >> List.singleton
@@ -263,9 +231,12 @@ node nodeType idString =
 -- Functions inherited from List --
 
 
-{-| Modify descendent `Ui`s according to their order.
+{-| Modify items `Ui`s according to their order. For example, zip their indices between the elements:
 
-    indexedMapList (\i -> addTextLabel (String.fromInt i)) (textLabel "I am a labeled label")
+    singleton [1008] ++ singleton [2004] ++ singleton [1007]
+        |> indexedMapList (\i -> (++) (singleton [i]))
+        |> toList
+            --> [0, 1008, 1, 2004, 2, 1007]
 
 -}
 indexedMapList : (Int -> Ui region html attribute wrapper -> Ui region html attribute wrapper) -> Ui region html attribute wrapper -> Ui region html attribute wrapper
@@ -388,6 +359,32 @@ toString =
         |> Maybe.map
             (\state ->
                 view state Layout.textual
+             -- Ui->String
+            )
+        |> Maybe.withDefault (\_ -> "Failed to generate mock state")
+
+
+{-| For testing
+-}
+toList : Ui region (List element) attribute () -> List element
+toList =
+    State.fromString "http://x/path_query"
+        |> Maybe.map
+            (\state ->
+                view state (Layout.list_ List.concat)
+             -- Ui->String
+            )
+        |> Maybe.withDefault (\_ -> [])
+
+
+{-| For testing
+-}
+toListString : Ui region String attribute () -> String
+toListString =
+    State.fromString "http://x/path_query"
+        |> Maybe.map
+            (\state ->
+                view state (Layout.list_ (String.join "; "))
              -- Ui->String
             )
         |> Maybe.withDefault (\_ -> "Failed to generate mock state")

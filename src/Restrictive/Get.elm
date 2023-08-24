@@ -16,6 +16,7 @@ module Restrictive.Get exposing
     , consLists, concatLists, concatValues
     , sequence
     , get
+    , listPairs
     )
 
 {-| Fallible mapping from `key` to `value`
@@ -903,6 +904,11 @@ fromListBy fu =
 --             (<<)
 --     in
 --     function >> composeRightToLeft
+
+
+listPairs : Dict k v -> List ( k, v )
+listPairs =
+    Dict.toList
 
 
 composeWithTwoParameters : (a -> b -> c) -> (c -> d) -> a -> b -> d

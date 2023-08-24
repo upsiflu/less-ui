@@ -1,6 +1,7 @@
 module Restrictive.Layout exposing
     ( Layout
     , list, textual
+    , list_
     )
 
 {-| Lay out the [`ViewModel`](Ui.Layout.ViewModel)
@@ -20,6 +21,7 @@ Note that `Restrictive` always assumes a `Header` region.
 -}
 
 import Bool.Extra exposing (ifElse)
+import Dict
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
 import Restrictive.State as State
@@ -61,6 +63,24 @@ list regions =
         }
     , concat = List.concat
     , arrange = Get.concatValues (Region.withHeader regions)
+    }
+
+
+{-| Demonstrates removal and insertion operations
+-}
+list_ :
+    (List element -> element)
+    -> Layout region element attribute ()
+list_ concat =
+    { remove = ()
+    , insert = ()
+    , wrap = \_ -> identity
+    , elements =
+        { link = \_ { url, label } -> label
+        , switch = \_ { url, label } -> label
+        }
+    , concat = concat
+    , arrange = Get.listPairs >> List.map Tuple.second >> concat
     }
 
 

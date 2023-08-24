@@ -211,22 +211,22 @@ turnOnFlag flag =
 
     import Url exposing (Url)
 
-    testQuery : (Url -> Url) -> String -> String
-    testQuery fu =
-        (++) "http://localhost/?"
-            >> Url.fromString
-            >> Maybe.andThen (fu >> .query)
-            >> Maybe.withDefault "Url.fromString or .query failed"
+    testQuery : String -> (Url -> Url) -> String
+    testQuery query fu =
+        "http://localhost/?" ++ query
+            |> Url.fromString
+            |> Maybe.andThen (fu >> .query)
+            |> Maybe.withDefault "Url.fromString or .query failed"
 
 
-    testQuery (toggleFlag "g")
-        "f&g&h&a=b&c=d=e"
-    --> "f&h&a=b&c=d=e"
+    toggleFlag "g"
+       |> testQuery "f&g&h&a=b&c=d=e"
+                --> "f&h&a=b&c=d=e"
 
 
-    testQuery (toggleFlag "g")
-        "f&h&a=b&c=d=e"
-    --> "f&g&h&a=b&c=d=e"
+    toggleFlag "g"
+       |> testQuery "f&h&a=b&c=d=e"
+                --> "f&g&h&a=b&c=d=e"
 
 -}
 toggleFlag : Flag -> Url -> Url
@@ -375,9 +375,9 @@ getFlags =
 -------
 
 
-{-| Encodes an intended transition of [the Ui State](Ui.State).
+{-| Encodes an intended transition of [the Ui State](Restrictive.State).
 
-Use the convenience functions in `Restrictive` to build
+Use [the convenience functions in `Ui`](Restrictive.Ui#goTo) to build
 
 -}
 type Link
