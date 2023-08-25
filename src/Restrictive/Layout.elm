@@ -1,7 +1,6 @@
 module Restrictive.Layout exposing
     ( Layout
-    , list, textual
-    , list_
+    , list, list_, textual
     )
 
 {-| Lay out the [`ViewModel`](Ui.Layout.ViewModel)
@@ -16,7 +15,7 @@ Note that `Restrictive` always assumes a `Header` region.
 
 # General cases
 
-@docs list, textual
+@docs list, list_, textual
 
 -}
 
@@ -78,8 +77,8 @@ list_ concat =
     , inserted = ()
     , wrap = \_ -> identity
     , elements =
-        { link = \_ { url, label } -> label
-        , switch = \_ { url, label } -> label
+        { link = \_ { label } -> label
+        , switch = \_ { label } -> label
         }
     , concat = concat
     , arrange = Get.listPairs >> List.map Tuple.second >> concat

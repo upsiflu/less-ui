@@ -10,7 +10,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout
-import Restrictive.Layout.Html.Keyed exposing (Wrapper(..))
+import Restrictive.Layout.Html.Keyed as Keyed exposing (Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.State
 import Restrictive.Ui as Ui
@@ -46,11 +46,11 @@ update () features =
 
 
 type alias Ui =
-    Restrictive.Layout.Html.Keyed.Ui Msg
+    Keyed.Ui Msg
 
 
 type alias Document =
-    Restrictive.Layout.Html.Keyed.Document Msg
+    Keyed.Document Msg
 
 
 textLabel : String -> Ui
@@ -76,7 +76,7 @@ view _ =
                 ui
             ++ showTab "Global Navbar"
                 globalNav
-    , layout = Restrictive.Layout.Html.Keyed.default
+    , layout = Keyed.layout
     , title = "Restrictive Ui feature test"
     }
 
@@ -162,5 +162,5 @@ main =
     application
         { init = init
         , update = update
-        , view = view
+        , view = view >> Restrictive.mapDocument Keyed.toHtml
         }

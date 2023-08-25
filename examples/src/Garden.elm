@@ -11,7 +11,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive exposing (Application, application)
 import Restrictive.Layout as Layout
-import Restrictive.Layout.Html.Keyed exposing (Wrapper(..))
+import Restrictive.Layout.Html.Keyed as Keyed exposing (Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
 
@@ -41,14 +41,14 @@ update msg garden =
 
 
 type alias Ui =
-    Restrictive.Layout.Html.Keyed.Ui Msg
+    Keyed.Ui Msg
 
 
-type alias Document =
-    Restrictive.Layout.Html.Keyed.Document Msg
+type alias KeyedDocument =
+    Keyed.Document Msg
 
 
-view : Garden -> Document
+view : Garden -> KeyedDocument
 view garden =
     { body =
         page
@@ -60,7 +60,7 @@ view garden =
                     }
                     (Rhododendron.view RhododendronMsg garden.rhododendron)
                 )
-    , layout = Restrictive.Layout.Html.Keyed.default
+    , layout = Keyed.layout
     , title = "Welcome to the Garden!"
     }
 
@@ -110,8 +110,8 @@ myInfo =
 
 
 
--- Field `view` expected `(Path, Fragment) -> Garden -> { body : Ui Msg, layout : Layout, title : String }`
---, found                `(Path, Fragment) -> Garden -> { body : Ui (Html Msg), layout : Layout, title : String }`Elm
+-- Field `view` expected `Document -> State -> Document`
+--, found                `Document Region (Keyed msg) (Attribute Never) (Wrapper Msg)`Elm
 
 
 {-| -}
@@ -120,5 +120,5 @@ main =
     application
         { init = init
         , update = update
-        , view = view
+        , view = view >> Restrictive.mapDocument Keyed.toHtml
         }

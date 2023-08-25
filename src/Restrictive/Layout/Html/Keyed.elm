@@ -1,19 +1,29 @@
 module Restrictive.Layout.Html.Keyed exposing
-    ( default, Ui, Document, Wrapper(..)
-    , wrap, elements, niceLayout
+    ( layout, Ui, Document, Wrapper(..)
+    , wrap, elements, arrange
+    , toHtml
     )
 
 {-| Layout functions specific to the Ui library
 
     Html.Keyed
 
-Use the `default` Layout or override any of its fields.
 
-@docs default, Ui, Document, Wrapper
+# Use the defaults...
+
+@docs layout, Ui, Document, Wrapper
+
+
+# ...or override any of its fields:
+
+@docs wrap, elements, arrange
 
 ---
 
-@docs wrap, elements, niceLayout
+
+# View
+
+@docs toHtml
 
 -}
 
@@ -29,41 +39,48 @@ import Restrictive.State
 import Restrictive.Ui
 
 
+type alias Keyed msg =
+    ( String, Html msg )
+
+
 {-| -}
-default : Layout Region (List ( String, Html msg )) (Html.Attribute Never) (Wrapper msg)
-default =
+toHtml : List (Keyed msg) -> List (Html msg)
+toHtml =
+    List.map Tuple.second
+
+
+{-| -}
+layout : Layout Region (List (Keyed msg)) (Html.Attribute Never) (Wrapper msg)
+layout =
     { removed = Removed
     , removable = Removable
     , inserted = Inserted
     , wrap = wrap
     , elements = elements
     , concat = List.concat
-    , arrange =
-        withHeader Region.allRegions
-            --Todo: Add custom class variant
-            --Todo: Use the toList function in Dict
-            |> Get.toListBy (niceLayout "")
+    , arrange = arrange
     }
-
-
-
--- we have
 
 
 {-| -}
 type alias Ui msg =
     Restrictive.Ui.Ui
         Region
-        (List ( String, Html msg ))
+        (List (Keyed msg))
         (Html.Attribute Never)
         (Wrapper msg)
 
 
-{-| -}
+{-| Document
+Region
+(Keyed msg)
+(Attribute Never)
+(Wrapper Msg)
+-}
 type alias Document msg =
     Restrictive.Document
         Region
-        (List ( String, Html msg ))
+        (List (Keyed msg))
         (Html.Attribute Never)
         (Wrapper msg)
 
@@ -78,7 +95,7 @@ type Wrapper msg
     | Inserted
 
 
-wrap : Wrapper msg -> List ( String, Html msg ) -> List ( String, Html msg )
+wrap : Wrapper msg -> List (Keyed msg) -> List (Keyed msg)
 wrap wrapper children =
     case wrapper of
         Node str attrs ->
@@ -106,7 +123,7 @@ wrap wrapper children =
                 children
 
 
-elements : Restrictive.State.Elements (List ( String, Html msg )) (Html.Attribute Never)
+elements : Restrictive.State.Elements (List (Keyed msg)) (Html.Attribute Never)
 elements =
     { link =
         \attr { url, label } ->
@@ -132,19 +149,23 @@ elements =
     }
 
 
-niceLayout : String -> Get (OrHeader Region) (List ( String, Html msg ) -> ( String, Html msg ))
-niceLayout prefix =
-    Get.fromList
-        [ ( Header
-          , Html.Lazy.lazy3 node "nav" [ Attr.class prefix, Attr.class "handle" ] >> Tuple.pair "handle"
-          )
-        , ( Region Scene
-          , Html.Lazy.lazy3 node "main" [ Attr.class prefix, Attr.class "scene" ] >> Tuple.pair "scene"
-          )
-        , ( Region Control
-          , Html.Lazy.lazy3 node "div" [ Attr.class prefix, Attr.class "control" ] >> Tuple.pair "control"
-          )
-        , ( Region Info
-          , Html.Lazy.lazy3 node "div" [ Attr.class prefix, Attr.class "info" ] >> Tuple.pair "info"
-          )
-        ]
+{-| -}
+arrange : Get (OrHeader Region) (List (Keyed msg)) -> List (Keyed msg)
+arrange =
+    withHeader Region.allRegions
+        |> Get.toListBy
+            (Get.fromList
+                [ ( Header
+                  , Html.Lazy.lazy3 node "nav" [ Attr.class "handle" ] >> Tuple.pair "handle"
+                  )
+                , ( Region Scene
+                  , Html.Lazy.lazy3 node "main" [ Attr.class "scene" ] >> Tuple.pair "scene"
+                  )
+                , ( Region Control
+                  , Html.Lazy.lazy3 node "div" [ Attr.class "control" ] >> Tuple.pair "control"
+                  )
+                , ( Region Info
+                  , Html.Lazy.lazy3 node "div" [ Attr.class "info" ] >> Tuple.pair "info"
+                  )
+                ]
+            )

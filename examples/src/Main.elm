@@ -1,14 +1,12 @@
 module Main exposing (Msg)
 
-import Browser
 import Control exposing (Control)
 import Date
-import Html exposing (Html)
+import Html
 import Html.Attributes as Attr
 import MultiTool
-import Restrictive exposing (Application, application)
-import Restrictive.Layout as Layout
-import Restrictive.Layout.Html.Keyed exposing (Ui, Wrapper(..), default)
+import Restrictive exposing (application)
+import Restrictive.Layout.Html.Keyed as Keyed exposing (Ui, Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
 import Tools.Control
@@ -159,7 +157,7 @@ headerForm formState =
                                   )
                                 ]
                             )
-                            |> Ui.view uiState default
+                            |> Ui.view uiState Keyed.layout
                             |> List.map Tuple.second
                 , subscriptions = \state -> Sub.none
                 , parse =
@@ -331,7 +329,8 @@ main =
                             )
                         ++ Ui.at Scene (moreFun 10 ++ headerForm model.stringState)
                         ++ Ui.at Info (textLabel "Info!")
-                , layout = Restrictive.Layout.Html.Keyed.default
+                , layout = Keyed.layout
                 , title = "Hello World"
                 }
+                    |> Restrictive.mapDocument Keyed.toHtml
         }

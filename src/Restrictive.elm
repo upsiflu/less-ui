@@ -1,9 +1,9 @@
-module Restrictive exposing (application, Application, Document, Msg)
+module Restrictive exposing (application, Application, Document, Msg, mapDocument)
 
 {-| In contrast to `Browser.Application`, this module maks the `Url` the
 single source of truth for the state of your user interface.
 
-@docs application, Application, Document, Msg
+@docs application, Application, Document, Msg, mapDocument
 
 ---
 
@@ -57,10 +57,22 @@ type alias Document region html attribute wrapper =
     { body : Ui region html attribute wrapper, layout : Layout region html attribute wrapper, title : String }
 
 
-{-| Separate Url update from Model update
+{-| -}
+mapDocument : (html -> List (Html msg)) -> Document region html attribute wrapper -> (State -> Browser.Document msg)
+mapDocument toHtml document =
+    \state ->
+        { title = document.title
+        , body = Ui.view state document.layout document.body |> toHtml
+        }
 
 
-### Lifecycle
+{-| An `Html` application for the Elm Browser runtime
+
+
+## Separate Url update from Model update
+
+
+### Lifecycle:
 
     Opened Url
     in new tab           -> init   (initial)
@@ -75,7 +87,7 @@ type alias Document region html attribute wrapper =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : model -> Document region (List ( String, Html modelMsg )) attribute wrapper
+    , view : model -> (State -> Browser.Document modelMsg)
     }
     -> Application model modelMsg
 application config =
@@ -87,7 +99,10 @@ application config =
                         ( config.init, State.init url )
                 in
                 ( ( key, initialState, updatedModel )
-                , Cmd.batch [ Cmd.map ModelMsg modelCmd, Nav.replaceUrl key (Url.toString initialState.current) ]
+                , Cmd.batch
+                    [ Cmd.map ModelMsg modelCmd
+                    , Nav.replaceUrl key (Url.toString initialState.current)
+                    ]
                 )
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
@@ -139,12 +154,10 @@ application config =
                                )
         , view =
             \( _, state, model ) ->
-                config.view model
+                config.view model state
                     |> (\document ->
                             { title = document.title
-                            , body =
-                                Ui.view state document.layout document.body
-                                    |> List.map (Tuple.second >> Html.map ModelMsg)
+                            , body = List.map (Html.map ModelMsg) document.body
                             }
                        )
         }
