@@ -1,5 +1,5 @@
 module Restrictive.Layout.Html.Keyed exposing
-    ( layout, Ui, Document, Wrapper(..)
+    ( layout, Ui, Wrapper(..)
     , wrap, elements, arrange
     , toHtml
     )
@@ -11,7 +11,7 @@ module Restrictive.Layout.Html.Keyed exposing
 
 # Use the defaults...
 
-@docs layout, Ui, Document, Wrapper
+@docs layout, Ui, Wrapper
 
 
 # ...or override any of its fields:
@@ -31,7 +31,6 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Keyed exposing (node)
 import Html.Lazy
-import Restrictive
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout exposing (Layout)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
@@ -65,20 +64,6 @@ layout =
 {-| -}
 type alias Ui msg =
     Restrictive.Ui.Ui
-        Region
-        (List (Keyed msg))
-        (Html.Attribute Never)
-        (Wrapper msg)
-
-
-{-| Document
-Region
-(Keyed msg)
-(Attribute Never)
-(Wrapper Msg)
--}
-type alias Document msg =
-    Restrictive.Document
         Region
         (List (Keyed msg))
         (Html.Attribute Never)

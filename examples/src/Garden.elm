@@ -9,8 +9,7 @@ module Garden exposing (Garden, main, Msg)
 import Garden.Rhododendron as Rhododendron exposing (Rhododendron)
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Restrictive exposing (Application, application)
-import Restrictive.Layout as Layout
+import Restrictive
 import Restrictive.Layout.Html.Keyed as Keyed exposing (Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
@@ -44,25 +43,22 @@ type alias Ui =
     Keyed.Ui Msg
 
 
-type alias KeyedDocument =
-    Keyed.Document Msg
-
-
-view : Garden -> KeyedDocument
+view : Garden -> Restrictive.Document Msg
 view garden =
-    { body =
-        page
-            ++ Ui.at Scene
-                (Ui.toggle []
-                    { flag = "rhododendron"
-                    , isInline = True
-                    , label = [ ( "Label", Html.text "Toggle Rhododendron" ) ]
-                    }
-                    (Rhododendron.view RhododendronMsg garden.rhododendron)
-                )
-    , layout = Keyed.layout
-    , title = "Welcome to the Garden!"
-    }
+    Restrictive.mapDocument Keyed.toHtml
+        { body =
+            page
+                ++ Ui.at Scene
+                    (Ui.toggle []
+                        { flag = "rhododendron"
+                        , isInline = True
+                        , label = [ ( "Label", Html.text "Toggle Rhododendron" ) ]
+                        }
+                        (Rhododendron.view RhododendronMsg garden.rhododendron)
+                    )
+        , layout = Keyed.layout
+        , title = "Welcome to the Garden!"
+        }
 
 
 page : Ui
@@ -115,10 +111,10 @@ myInfo =
 
 
 {-| -}
-main : Application Garden Msg
+main : Restrictive.Application Garden Msg
 main =
-    application
+    Restrictive.application
         { init = init
         , update = update
-        , view = view >> Restrictive.mapDocument Keyed.toHtml
+        , view = view
         }

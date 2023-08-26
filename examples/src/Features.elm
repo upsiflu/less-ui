@@ -8,8 +8,7 @@ module Features exposing (Features, main, Msg)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Restrictive exposing (Application, application)
-import Restrictive.Layout
+import Restrictive
 import Restrictive.Layout.Html.Keyed as Keyed exposing (Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.State
@@ -49,16 +48,12 @@ type alias Ui =
     Keyed.Ui Msg
 
 
-type alias Document =
-    Keyed.Document Msg
-
-
 textLabel : String -> Ui
 textLabel str =
     Ui.singleton [ ( str, Html.text str ) ]
 
 
-view : Features -> Document
+view : Features -> Restrictive.Document Msg
 view _ =
     let
         showTab : String -> Ui -> Ui
@@ -70,15 +65,16 @@ view _ =
                 }
                 contents
     in
-    { body =
-        textLabel "Toggle the features on top of the page! "
-            ++ showTab "Flat Ui Layout"
-                ui
-            ++ showTab "Global Navbar"
-                globalNav
-    , layout = Keyed.layout
-    , title = "Restrictive Ui feature test"
-    }
+    Restrictive.mapDocument Keyed.toHtml
+        { body =
+            textLabel "Toggle the features on top of the page! "
+                ++ showTab "Flat Ui Layout"
+                    ui
+                ++ showTab "Global Navbar"
+                    globalNav
+        , layout = Keyed.layout
+        , title = "Restrictive Ui feature test"
+        }
 
 
 {-| [Ui](Ui): Flat layout instead of nested components
@@ -148,8 +144,8 @@ fragments fr =
     Ui.singleton articles
         ++ (Ui.bounce []
                 { here = ( Nothing, Just "1" )
-                , there = ( Nothing, Just "3" )
                 , label = [ ( "label", Html.text "Bounce between 1 and 3" ) ]
+                , there = ( Nothing, Just "3" )
                 }
                 (textLabel "Number Three - this is visible only when `there` is active!")
                 |> Ui.at Control
@@ -157,10 +153,10 @@ fragments fr =
 
 
 {-| -}
-main : Application Features Msg
+main : Restrictive.Application Features Msg
 main =
-    application
+    Restrictive.application
         { init = init
         , update = update
-        , view = view >> Restrictive.mapDocument Keyed.toHtml
+        , view = view
         }

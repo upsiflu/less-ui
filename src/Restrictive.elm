@@ -53,12 +53,15 @@ type alias Application model modelMsg =
 
 
 {-| -}
-type alias Document region html attribute wrapper =
-    { body : Ui region html attribute wrapper, layout : Layout region html attribute wrapper, title : String }
+type alias Document msg =
+    State -> Browser.Document msg
 
 
 {-| -}
-mapDocument : (html -> List (Html msg)) -> Document region html attribute wrapper -> (State -> Browser.Document msg)
+mapDocument :
+    (html -> List (Html msg))
+    -> { body : Ui region html attribute wrapper, layout : Layout region html attribute wrapper, title : String }
+    -> (State -> Browser.Document msg)
 mapDocument toHtml document =
     \state ->
         { title = document.title

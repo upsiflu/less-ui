@@ -1,5 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Sans+Condensed:ital,wght@0,400;0,700;1,400&display=swap');
 
+
+/*
+
+Todo:
+
+Form Style:
+ - form radio -> traditional beveled switch-button style; non-selected have only separators beveled
+ - form list -> only one `add` button (at beginning); `delete` buttons span height of line; style of buttons: just beveled separators
+ - form check -> same as form radio but with groove when not selected
+
+What about tokens?
+
+Ui Style:
+ - Toggle links -> highlight-color; bold; inverted background when selected; 50% cornder-radius
+ - Goto links -> blue; underlined
+ - Bounce links -> like Toggle links
+
+*/
+
+
+
 * {
     font-family: 'Fira Sans Condensed', sans-serif;
 }
