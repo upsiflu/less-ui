@@ -122,7 +122,7 @@ type alias Get key a =
 
 {-| in any case, return Nothing
 -}
-empty : Get key a
+empty : Get key_ a_
 empty =
     Dict.empty
 
@@ -134,7 +134,7 @@ singleton =
 
 
 
----- ASSOCIATE VALUES ----
+-- ASSOCIATE VALUES ----
 
 
 {-| insert at key, combining with existing value
@@ -655,7 +655,7 @@ andMap =
         |> member Scene -> False
 
 -}
-member : key -> Get key a -> Bool
+member : key -> Get key a_ -> Bool
 member =
     composeWithTwoParameters get Maybe.isJust
 
@@ -854,7 +854,7 @@ concatValues list =
 
 
 {-| -}
-keys : List key -> Get key a -> List key
+keys : List key -> Get key a_ -> List key
 keys list getA =
     List.foldr
         (\key ->
