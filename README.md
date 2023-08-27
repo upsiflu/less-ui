@@ -66,10 +66,16 @@ Now check out [localhost:8000](http://localhost:8000/)
 ```shell
 npm install -g elm-verify-examples
 
-
 elm-verify-examples && elm-test && rm -r ./tests/VerifyExamples
 ```
 
+**Review the code:**
+
+```shell
+npm install -g elm-review
+
+elm-review
+```
 
 **Outside of the scope of this package:**
 

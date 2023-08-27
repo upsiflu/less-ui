@@ -463,8 +463,9 @@ err =
 
 {-| Draw a link either inline or in the `Header` region
 -}
-type alias LinkStyle html =
-    { isInline : Bool
+type alias LinkStyle html attribute =
+    { attributes : List attribute
+    , isInline : Bool
     , label : html
     }
 
@@ -524,11 +525,10 @@ view :
     OrHeader region
     -> Url
     -> Elements html attribute
-    -> LinkStyle html
-    -> List attribute
+    -> LinkStyle html attribute
     -> Link
     -> Get (OrHeader region) html
-view region url customHtml { isInline, label } attributes link =
+view region url elements { attributes, isInline, label } link =
     Get.singleton
         (if isInline then
             region
@@ -539,7 +539,7 @@ view region url customHtml { isInline, label } attributes link =
     <|
         case link of
             Toggle _ flag ->
-                customHtml.switch
+                elements.switch
                     attributes
                     { url = linkToString link
                     , label = label
@@ -547,7 +547,7 @@ view region url customHtml { isInline, label } attributes link =
                     }
 
             _ ->
-                customHtml.link
+                elements.link
                     attributes
                     { url = linkToString link
                     , label = label
@@ -557,29 +557,25 @@ view region url customHtml { isInline, label } attributes link =
 codecs : List (Codec Link)
 codecs =
     let
-        buildLink : Path -> Maybe String -> Maybe String -> Maybe Flag -> Maybe String -> Bool -> Link
-        buildLink path_ fragment_ reroute_ toggle_ errorMessage_ isAbsolute_ =
-            case reroute_ of
-                Just here ->
-                    Bounce { isAbsolute = isAbsolute_ } { there = ( parsePath path_, fragment_ ), here = queryParseLocation here }
+        buildLink : Path -> Fragment -> Maybe String -> Maybe Flag -> Maybe String -> Bool -> Link
+        buildLink pathString fragment reroute maybeFlag errorMessage isAbsolute =
+            case ( parsePath pathString, reroute, maybeFlag ) of
+                ( myPath, Just here, _ ) ->
+                    Bounce { isAbsolute = isAbsolute } { there = ( myPath, fragment ), here = queryParseLocation here }
 
-                Nothing ->
-                    case toggle_ of
-                        Just flag ->
-                            Toggle { isAbsolute = isAbsolute_ } flag
+                ( _, _, Just flag ) ->
+                    Toggle { isAbsolute = isAbsolute } flag
 
-                        Nothing ->
-                            case errorMessage_ of
-                                Just e ->
-                                    err e
+                ( myPath, _, Nothing ) ->
+                    case ( errorMessage, fragment ) of
+                        ( Just e, _ ) ->
+                            err e
 
-                                Nothing ->
-                                    case ( parsePath path_, fragment_ ) of
-                                        ( Nothing, Nothing ) ->
-                                            GoTo ( Just "", Nothing )
+                        ( Nothing, Nothing ) ->
+                            GoTo ( Just "", Nothing )
 
-                                        eitherPathOrFragment ->
-                                            GoTo eitherPathOrFragment
+                        ( Nothing, orFragment ) ->
+                            GoTo ( myPath, orFragment )
 
         getAbsoluteFlag : Url.Codec.CodecInProgress Link (Bool -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
         getAbsoluteFlag =

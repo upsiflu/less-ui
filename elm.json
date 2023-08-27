@@ -17,6 +17,7 @@
     "dependencies": {
         "Chadtech/elm-bool-extra": "2.4.2 <= v < 3.0.0",
         "Janiczek/elm-url-codec": "1.0.0 <= v < 2.0.0",
+        "edkelly303/elm-any-type-forms": "5.0.0 <= v < 6.0.0",
         "elm/browser": "1.0.2 <= v < 2.0.0",
         "elm/core": "1.0.5 <= v < 2.0.0",
         "elm/html": "1.0.0 <= v < 2.0.0",
@@ -24,6 +25,7 @@
         "elm-community/list-extra": "8.7.0 <= v < 9.0.0",
         "elm-community/maybe-extra": "5.3.0 <= v < 6.0.0",
         "elm-community/string-extra": "4.0.1 <= v < 5.0.0",
+        "lue-bird/elm-review-single-use-type-vars-end-with-underscore": "2.0.3 <= v < 3.0.0",
         "pzp1997/assoc-list": "1.0.0 <= v < 2.0.0",
         "stoeffel/set-extra": "1.2.3 <= v < 2.0.0"
     },

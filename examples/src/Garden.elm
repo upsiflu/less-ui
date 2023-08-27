@@ -105,11 +105,6 @@ myInfo =
     textLabel "Info"
 
 
-
--- Field `view` expected `Document -> State -> Document`
---, found                `Document Region (Keyed msg) (Attribute Never) (Wrapper Msg)`Elm
-
-
 {-| -}
 main : Restrictive.Application Garden Msg
 main =

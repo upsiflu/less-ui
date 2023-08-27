@@ -5,14 +5,14 @@
 
 Todo:
 
-Form Style:
+*Form Style:
  - form radio -> traditional beveled switch-button style; non-selected have only separators beveled
  - form list -> only one `add` button (at beginning); `delete` buttons span height of line; style of buttons: just beveled separators
  - form check -> same as form radio but with groove when not selected
 
 What about tokens?
 
-Ui Style:
+*Ui Style:
  - Toggle links -> highlight-color; bold; inverted background when selected; 50% cornder-radius
  - Goto links -> blue; underlined
  - Bounce links -> like Toggle links
@@ -62,21 +62,6 @@ fieldset>label {
     display       : flex;
     flex-direction: row;
     align-items   : baseline;
-}
-
-label>input+button {
-    margin-left: 4px;
-    clip-path  : polygon(0 -4px, calc(100% + 4px) -4px, calc(100% + 4px) calc(100% + 4px), 0px calc(100% + 4px));
-}
-
-input:has(+button) {
-    border-right: 0px;
-    margin-right: -4px;
-}
-
-label>span:first-of-type {
-    min-width: 4rem;
-    display  : inline-block;
 }
 
 :not(p) ul {
@@ -243,67 +228,61 @@ button:focus {
 }
 
 
+/* 
+*Ui Style:
+ - Toggle links -> highlight-color; bold; inverted background when selected; 50% cornder-radius
+ - Goto links -> blue; underlined
+ - Bounce links -> like Toggle links */
+
+:root {
+    --color-toggle: rgb(76, 31, 154);
+    --color-focus : rgb(0, 190, 164);
+}
+
 a[href][role="switch"] {
     position       : relative;
-    margin         : 4px 12px;
-    outline-offset : 0.5rem;
-    border-radius  : 1rem;
+    margin         : -2px;
+    color          : var(--color-toggle);
+    mix-blend-mode : multiply;
+    transition     : all 0.1s;
+    border-radius  : 1.4em;
+    padding        : .8ch 1ch;
     text-decoration: none;
+    min-height     : 2.8em;
+    min-width      : 2.8em;
+    display        : inline-flex;
+    align-items    : center;
+    justify-content: center;
+    box-sizing     : border-box;
+    font-weight    : bolder;
+    background     : white;
+    border         : 3px solid transparent;
 }
+
+fieldset a[href][role="switch"] {}
 
 a[href][role="switch"]:focus {
-    outline        : 2px double currentColor;
-    text-decoration: underline;
+    border: 3px double var(--color-focus);
 }
 
-a[role="switch"]:before {
-    display: inline-block;
-    content: "​";
-    margin : 4px 0;
-
+a[href][role="switch"]:focus-visible {
+    outline       : 3px double var(--color-focus);
+    outline-offset: 1px;
 }
 
-
-body {
-    background: silver
-}
-
-a[role="switch"]:after {
-    transition   : all 0.3s;
-    border-radius: 1.1rem;
-    width        : calc(100% + 1rem);
-    height       : calc(100% + 1rem);
-    position     : absolute;
-    top          : -0.5rem;
-    left         : -0.5rem;
-    display      : block;
-    content      : "​";
-    outline      : 0.5px solid currentColor;
+a[href][role="switch"]:hover {
+    border: 3px double var(--color-toggle);
 }
 
 
-
-a[aria-checked="true"]:after,
-a[role="switch"]:active:after {
-    box-shadow: inset 3px 3px currentColor;
-    outline   : 0.5px solid transparent;
+a[href][role="switch"][aria-checked=true] {
+    color     : white;
+    background: var(--color-toggle);
 }
 
-
-a[role="switch"]:hover:after {
-    box-shadow: inset -1.5px -1.5px currentColor;
+a>* {
+    cursor: inherit;
 }
-
-a[aria-checked="true"]:hover:after,
-a[role="switch"]:active:hover:after {
-    box-shadow: inset 1.5px 1.5px currentColor;
-}
-
-.scene a {
-    background: white;
-}
-
-
 
 
 /*-------------------------------------------*/
@@ -433,7 +412,8 @@ article {
 
 .control-container:has(>input:focus),
 div:has(>[type="radio"]:focus) {
-    background: rgb(123, 195, 189);
+    background: var(--color-focus);
+    outline   : 1px solid var(--color-focus);
 }
 
 

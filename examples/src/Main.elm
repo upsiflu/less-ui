@@ -131,7 +131,7 @@ passwordControl =
 
 headerForm formState =
     let
-        makeHeaderControl uiState =
+        makeHeaderControl { makeInnerHtml } =
             Control.create
                 { label = "Password"
                 , initEmpty = ( "", Cmd.none )
@@ -139,9 +139,9 @@ headerForm formState =
                 , update = \pw state -> ( pw, Cmd.none )
                 , view =
                     \{ state, id, label, name, class } ->
-                        Ui.toggle []
+                        (Ui.toggle []
                             { flag = id
-                            , isInline = False
+                            , isInline = True
                             , label = [ ( id, Html.label [ Attr.for id ] [ Html.text label ] ) ]
                             }
                             (Ui.singleton
@@ -157,7 +157,23 @@ headerForm formState =
                                   )
                                 ]
                             )
-                            |> Ui.view uiState Keyed.layout
+                            ++ (Ui.toggle []
+                                    { flag = "Fun10"
+                                    , isInline = False
+                                    , label = [ ( "0", Html.text "I want to be in the Hader!" ) ]
+                                    }
+                                    []
+                                    |> Ui.at Info
+                               )
+                            ++ Ui.goTo []
+                                { destination = ( Just "Hi", Nothing )
+                                , isInline = False
+                                , label = [ ( "1", Html.text "Me too!" ) ]
+                                }
+                                []
+                        )
+                            |> Ui.wrap (Ol [])
+                            |> makeInnerHtml
                             |> List.map Tuple.second
                 , subscriptions = \state -> Sub.none
                 , parse =
@@ -176,6 +192,15 @@ headerForm formState =
                 , onUpdate = StringUpdated
                 , view = Html.fieldset []
                 }
+
+        myOuterFormWithoutFormState =
+            Ui.toggle []
+                { flag = "Fun10"
+                , isInline = False
+                , label = [ ( "0", Html.text "I want to be in the Hader!" ) ]
+                }
+                []
+                |> Ui.at Info
     in
     Ui.stateful (\uiState -> [ ( "headerControl", (myHeaderForm uiState).view formState ) ])
 
@@ -307,7 +332,7 @@ main =
                             Ui.toggle []
                                 { flag = "Fun" ++ String.fromInt int
                                 , isInline = True
-                                , label = [ ( "button", Html.label [] [ Html.text " + " ] ) ]
+                                , label = [ ( "button", Html.label [] [ Html.text "＋" ] ) ]
                                 }
                                 (Ui.singleton [ ( "Fun", funForm.view model.funState ) ]
                                     ++ (if int > 0 then
@@ -319,8 +344,9 @@ main =
                                 )
                                 |> Ui.wrap (Ul [])
                     in
-                    Ui.at Scene
-                        (textLabel "Scene!")
+                    textLabel "Header!"
+                        ++ Ui.at Scene
+                            (textLabel "Scene!")
                         ++ Ui.at
                             Control
                             (Ui.singleton
@@ -329,6 +355,11 @@ main =
                             )
                         ++ Ui.at Scene (moreFun 10 ++ headerForm model.stringState)
                         ++ Ui.at Info (textLabel "Info!")
+                        ++ Ui.at Info
+                            (Ui.toggle []
+                                { flag = "Fun10", isInline = False, label = [ ( "Hello", Html.text "Hello" ) ] }
+                                []
+                            )
                 , layout = Keyed.layout
                 , title = "Hello World"
                 }

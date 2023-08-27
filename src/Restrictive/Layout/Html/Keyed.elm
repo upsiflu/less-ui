@@ -94,7 +94,7 @@ wrap wrapper children =
 
         Removed ->
             List.map
-                (\( k, a ) -> ( k, Html.div [ Attr.class "removed" ] [ a ] ))
+                (\( k, a ) -> ( k, Html.div [ Attr.class "removed", Attr.attribute "aria-hidden" "true", Attr.tabindex -1 ] [ a ] ))
                 children
 
         Removable ->
@@ -108,7 +108,7 @@ wrap wrapper children =
                 children
 
 
-elements : Restrictive.State.Elements (List (Keyed msg)) (Html.Attribute Never)
+elements : Restrictive.State.Elements (List (Keyed msg_)) (Html.Attribute Never)
 elements =
     { link =
         \attr { url, label } ->
@@ -141,7 +141,7 @@ arrange =
         |> Get.toListBy
             (Get.fromList
                 [ ( Header
-                  , Html.Lazy.lazy3 node "nav" [ Attr.class "handle" ] >> Tuple.pair "handle"
+                  , Html.Lazy.lazy3 node "header" [ Attr.class "header" ] >> Tuple.pair "header"
                   )
                 , ( Region Scene
                   , Html.Lazy.lazy3 node "main" [ Attr.class "scene" ] >> Tuple.pair "scene"

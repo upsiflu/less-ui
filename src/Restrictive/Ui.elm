@@ -117,16 +117,23 @@ type alias Ui region html attribute wrapper =
 
 {-|
 
-    Logical bifurcation (link*state active/inactive): `Twig`
-    Visual bifurcation (screen regions): `At`
+    Leaf html -- Rendered html node
+
+    Twig (State.LinkStyle html attribute) State.Link Ui -- Logical bifurcation (link*state active/inactive)
+
+    At region Ui -- Visual bifurcation (screen regions)
+
+    Wrap wrapper Ui -- Dom bifurcation (things like section, header, p, ul, table...)
+
+    Stateful ({ makeInnerHtml : Ui -> html } -> html) Ui -- Forwards the state to rendere an html node
 
 -}
 type Item region html attribute wrapper
     = Leaf html
-    | Twig (List attribute) (State.LinkStyle html) State.Link (Ui region html attribute wrapper)
+    | Twig (State.LinkStyle html attribute) State.Link (Ui region html attribute wrapper)
     | At region (Ui region html attribute wrapper)
     | Wrap wrapper (Ui region html attribute wrapper)
-    | Stateful (State -> html)
+    | Stateful ({ makeInnerHtml : Ui region html attribute wrapper -> html } -> html) (Ui region html attribute wrapper)
 
 
 
@@ -134,7 +141,7 @@ type Item region html attribute wrapper
 
 
 {-| -}
-singleton : html -> Ui region html attribute wrapper
+singleton : html -> Ui region_ html attribute_ wrapper_
 singleton =
     Leaf >> List.singleton
 
@@ -170,11 +177,8 @@ with members_ =
     List.map
         (\original ->
             case original of
-                Leaf html ->
-                    Leaf html
-
-                Twig attrs linkStyle link members ->
-                    Twig attrs linkStyle link (members ++ members_)
+                Twig linkStyle link members ->
+                    Twig linkStyle link (members ++ members_)
 
                 At region ui ->
                     At region (with members_ ui)
@@ -182,8 +186,8 @@ with members_ =
                 Wrap wrapper ui ->
                     Wrap wrapper (with members_ ui)
 
-                Stateful fu ->
-                    Stateful fu
+                _ ->
+                    original
         )
 
 
@@ -327,8 +331,13 @@ view state layout =
                         Leaf html_ ->
                             Get.singleton region html_
 
-                        Twig attrs linkStyle link elements ->
-                            [ State.view region state.current layout.elements linkStyle attrs link
+                        Twig linkStyle link elements ->
+                            [ State.view
+                                region
+                                state.current
+                                layout.elements
+                                linkStyle
+                                link
                             , case State.toTuple (State.linkIsActive link state) of
                                 ( True, Just False ) ->
                                     viewUi region elements
@@ -354,12 +363,73 @@ view state layout =
                             viewUi region elements
                                 |> Get.updateAt region (layout.wrap wrapper)
 
-                        Stateful fu ->
-                            Get.singleton region (fu state)
+                        Stateful makeOuterHtml elements ->
+                            let
+                                toHtml ui =
+                                    let
+                                        rendered =
+                                            viewUi region ui
+                                    in
+                                    { inRegion = Get.get region rendered |> Maybe.withDefault (layout.concat [])
+                                    , outOfRegion = Get.remove region rendered
+                                    }
+                            in
+                            [ { makeInnerHtml = toHtml >> .inRegion }
+                                |> makeOuterHtml
+                                |> Get.singleton region
+                            , (toHtml elements).outOfRegion
+                            ]
+                                |> Get.concatBy layout.concat
+                 -- Todo: distribute the elements that are not in `region`
+                 {- Problem: The `outside` elements never receive the state that the `inside`
+                    elements receive.
+
+                    The interesting detail is how regions work here:
+                    1. Generate the inner Html, with the state information hidden inside the form
+                    2. Supply back the outer Html
+                    3. Set it as a child node at `region`
+                    4. concat it with all the other `elements`
+                       (which have no clue about the state inside the form)
+
+                    Solution:
+                      For each region, generate an outer Html,
+                      where each time the inner Html is limited to the same region.
+
+                    Example:
+                      We want a form that displays an inline input plus a hint at `info`.
+                      So for the inline region, the `.inside` will return the input;
+                      for the `Scene` and `Header it will return Html.none or [];
+                      and for `Info` it will return the hint.
+
+                    Implementation:
+                    1. We have the same `toHtml` but we use only `inRegion`.
+                    2. For each region, we render the whole thing:
+
+                        regions
+                            |> List.map
+                                \innerRegion ->
+                                    ( region
+                                    , { makeInnerHtml =
+                                            at region
+                                                >> viewUi innerRegion
+                                                >> Get.get innerRegion
+                                      }
+                                        |> makeOuterHtml
+                                    )
+                            |> Maybe.values
+                            |> Get.fromList
+
+                    4. To make it somewhat more performant, we can
+                       add a parameter to `viewUi` to `onlyIncludeRegion`
+                       such that leaves at excluded regions are ignored
+                       and wraps at excluded regions don't update.
+
+                 -}
                 )
                 >> Get.concatBy layout.concat
     in
-    viewUi Header >> layout.arrange
+    viewUi Header
+        >> layout.arrange
 
 
 {-| For testing
@@ -376,7 +446,7 @@ toString =
 
 {-| For testing
 -}
-toList : Ui region (List element) attribute () -> List element
+toList : Ui region_ (List element) attribute_ () -> List element
 toList =
     State.fromString "http://x/path_query"
         |> Maybe.map
@@ -388,7 +458,7 @@ toList =
 
 {-| For testing
 -}
-toListString : Ui region String attribute () -> String
+toListString : Ui region_ String attribute_ () -> String
 toListString =
     State.fromString "http://x/path_query"
         |> Maybe.map
@@ -405,9 +475,9 @@ toListString =
 
 
 {-| -}
-customLink : List attribute -> State.LinkStyle html -> State.Link -> Ui region html attribute wrapper
-customLink attrs linkStyle link =
-    [ Twig attrs linkStyle link [] ]
+customLink : State.LinkStyle html attribute -> State.Link -> Ui region_ html attribute wrapper_
+customLink linkStyle link =
+    [ Twig linkStyle link [] ]
 
 
 {-| -}
@@ -422,8 +492,9 @@ toggle :
     -> Ui aspect html attribute wrapper
 toggle attrs { flag, isInline, label } dependentUi =
     State.toggle flag
-        |> customLink attrs
-            { isInline = isInline
+        |> customLink
+            { attributes = attrs
+            , isInline = isInline
             , label = label
             }
         |> with dependentUi
@@ -441,8 +512,9 @@ goTo :
     -> Ui aspect html attribute wrapper
 goTo attrs { destination, isInline, label } dependentUi =
     State.goTo destination
-        |> customLink attrs
-            { isInline = isInline
+        |> customLink
+            { attributes = attrs
+            , isInline = isInline
             , label = label
             }
         |> with dependentUi
@@ -460,8 +532,9 @@ bounce :
     -> Ui aspect html attribute wrapper
 bounce attrs { here, label, there } dependentUi =
     State.bounce { here = here, there = there }
-        |> customLink attrs
-            { isInline = True
+        |> customLink
+            { attributes = attrs
+            , isInline = True
             , label = label
             }
         |> with dependentUi
@@ -487,7 +560,9 @@ Here is how you use this function:
 
 Caution: If you use this functionality, the `Ui` will contain functions and will no longer support equality checks and serialisation.
 
+TODO : This does not work because it doesn't return a Get but an html
+
 -}
-stateful : (State -> html) -> Ui region html attribute wrapper
-stateful fu =
-    [ Stateful fu ]
+stateful : ({ makeInnerHtml : Ui region_ html attribute_ wrapper_ -> html } -> html) -> Ui region_ html attribute_ wrapper_ -> Ui region_ html attribute_ wrapper_
+stateful fu elements =
+    [ Stateful fu elements ]

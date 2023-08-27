@@ -50,7 +50,7 @@ list :
         Layout
             region
             (List ( String, element ))
-            attribute
+            attribute_
             (List ( String, element ) -> List ( String, element ))
 list regions =
     { removed = List.map (\( _, v ) -> ( "-", v ))
@@ -70,7 +70,7 @@ list regions =
 -}
 list_ :
     (List element -> element)
-    -> Layout region element attribute ()
+    -> Layout region_ element attribute_ ()
 list_ concat =
     { removed = ()
     , removable = ()

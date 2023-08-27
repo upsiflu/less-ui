@@ -37,6 +37,8 @@ import NoUnsortedTopLevelDeclarations
 import Simplify
 import ReviewPipelineStyles
 import ReviewPipelineStyles.Premade
+import OnlyAllSingleUseTypeVarsEndWith_
+import CognitiveComplexity
 
 
 config : List Rule
@@ -81,4 +83,6 @@ config =
             , ReviewPipelineStyles.Premade.noRepeatedParentheticalApplication
             , ReviewPipelineStyles.Premade.noPipelinesWithConfusingNonCommutativeFunctions
             ]
+    , OnlyAllSingleUseTypeVarsEndWith_.rule
+    , CognitiveComplexity.rule 15
     ]

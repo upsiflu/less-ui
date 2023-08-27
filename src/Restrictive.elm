@@ -65,7 +65,9 @@ mapDocument :
 mapDocument toHtml document =
     \state ->
         { title = document.title
-        , body = Ui.view state document.layout document.body |> toHtml
+        , body =
+            Ui.view state document.layout document.body
+                |> toHtml
         }
 
 
@@ -113,21 +115,23 @@ application config =
         , update =
             \msg ( key, state, model ) ->
                 let
-                    updateUrl : State.Link -> ( ( Nav.Key, { current : Url, previous : Maybe Url }, model ), Cmd msg )
+                    updateUrl : State.Link -> ( ( Nav.Key, State, model ), Cmd msg )
                     updateUrl link =
-                        State.toStateTransition link state.current
-                            |> (\canonicalState ->
-                                    ( ( key, { state | current = canonicalState, previous = Just state.current }, model )
-                                    , if state.current == canonicalState then
-                                        Cmd.none
+                        let
+                            next : Url
+                            next =
+                                State.toStateTransition link state.current
+                        in
+                        ( ( key, { state | current = next, previous = Just state.current }, model )
+                        , if state.current == next then
+                            Cmd.none
 
-                                      else if canonicalState.path == state.current.path && canonicalState.fragment == state.current.fragment then
-                                        Nav.replaceUrl key (State.toUrlString canonicalState)
+                          else if next.path == state.current.path && next.fragment == state.current.fragment then
+                            Nav.replaceUrl key (State.toUrlString next)
 
-                                      else
-                                        Nav.pushUrl key (State.toUrlString canonicalState)
-                                    )
-                               )
+                          else
+                            Nav.pushUrl key (State.toUrlString next)
+                        )
                 in
                 case msg of
                     UrlChanged url ->
