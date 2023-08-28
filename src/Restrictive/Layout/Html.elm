@@ -1,7 +1,9 @@
 module Restrictive.Layout.Html exposing
     ( layout, Ui, Wrapper(..)
     , wrap, elements, arrange
+    , passiveLayout
     , toHtml
+    , wrapPassive
     )
 
 {-| Layout functions specific to the Ui library
@@ -17,6 +19,11 @@ module Restrictive.Layout.Html exposing
 # ...or override any of its fields:
 
 @docs wrap, elements, arrange
+
+
+# Special case: a layout that cannot emit any messages
+
+@docs passiveLayout
 
 ---
 
@@ -57,6 +64,19 @@ layout =
 
 
 {-| -}
+passiveLayout : Layout Region (List (Html Never)) (Html.Attribute Never) Restrictive.Ui.StatelessWrapper
+passiveLayout =
+    { removed = Restrictive.Ui.Removed
+    , removable = Restrictive.Ui.Removable
+    , inserted = Restrictive.Ui.Inserted
+    , wrap = wrapPassive
+    , elements = elements
+    , concat = List.concat
+    , arrange = arrange
+    }
+
+
+{-| -}
 type alias Ui msg =
     Restrictive.Ui.Ui
         Region
@@ -88,6 +108,27 @@ type Wrapper msg
     | Removed
     | Removable
     | Inserted
+
+
+wrapPassive : Restrictive.Ui.StatelessWrapper -> List (Html Never) -> List (Html Never)
+wrapPassive wrapper =
+    wrap (statefulWrapper wrapper)
+
+
+statefulWrapper : Restrictive.Ui.StatelessWrapper -> Wrapper Never
+statefulWrapper wrapper =
+    case wrapper of
+        Restrictive.Ui.Node str attrs ->
+            Node str attrs
+
+        Restrictive.Ui.Removed ->
+            Removed
+
+        Restrictive.Ui.Removable ->
+            Removable
+
+        Restrictive.Ui.Inserted ->
+            Inserted
 
 
 wrap : Wrapper msg -> List (Html msg) -> List (Html msg)

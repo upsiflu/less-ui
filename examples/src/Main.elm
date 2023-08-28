@@ -6,7 +6,7 @@ import Html
 import Html.Attributes as Attr
 import MultiTool
 import Restrictive exposing (application)
-import Restrictive.Layout.Html.Keyed as Keyed exposing (Ui, Wrapper(..))
+import Restrictive.Layout.Html as Html exposing (Ui, Wrapper(..))
 import Restrictive.Layout.Region as Region exposing (Region(..))
 import Restrictive.Ui as Ui
 import Tools.Control
@@ -133,8 +133,12 @@ headerForm formState =
     let
         makeHeaderControl :
             { makeInnerHtml :
-                Ui.Ui Region (List ( String, Html.Html msg )) attribute (Wrapper b)
-                -> List ( c, Html.Html String )
+                Ui.Ui
+                    Region
+                    Ui.StatelessHtml
+                    Ui.StatelessAttribute
+                    Ui.StatelessWrapper
+                -> List (Html.Html Never)
             }
             -> Control String String String
         makeHeaderControl { makeInnerHtml } =
@@ -145,42 +149,49 @@ headerForm formState =
                 , update = \pw state -> ( pw, Cmd.none )
                 , view =
                     \{ state, id, label, name, class } ->
-                        (Ui.toggle []
-                            { flag = id
-                            , isInline = True
-                            , label = [ ( id, Html.label [ Attr.for id ] [ Html.text label ] ) ]
-                            }
-                            (Ui.singleton
-                                [ ( "-"
-                                  , Html.input
-                                        [ Attr.type_ "password"
-                                        , Attr.value state
-                                        , Attr.id id
-                                        , Attr.class class
-                                        , Attr.name name
-                                        ]
-                                        []
-                                  )
-                                ]
-                            )
-                            ++ (Ui.toggle []
-                                    { flag = "Fun10"
-                                    , isInline = False
-                                    , label = [ ( "0", Html.text "I want to be in the Hader!" ) ]
+                        let
+                            myUi :
+                                Ui.Ui
+                                    Region
+                                    Ui.StatelessHtml
+                                    Ui.StatelessAttribute
+                                    Ui.StatelessWrapper
+                            myUi =
+                                Ui.toggle []
+                                    { flag = id
+                                    , isInline = True
+                                    , label = [ Html.label [ Attr.for id ] [ Html.text label ] ]
                                     }
-                                    []
-                                    |> Ui.at Info
-                               )
-                            ++ Ui.goTo []
-                                { destination = ( Just "Hi", Nothing )
-                                , isInline = False
-                                , label = [ ( "1", Html.text "Me too!" ) ]
-                                }
-                                []
-                        )
-                            |> Ui.wrap (Ol [])
+                                    (Ui.singleton
+                                        [ Html.input
+                                            [ Attr.type_ "password"
+                                            , Attr.value state
+                                            , Attr.id id
+                                            , Attr.class class
+                                            , Attr.name name
+                                            ]
+                                            []
+                                        ]
+                                    )
+                                    ++ (Ui.toggle []
+                                            { flag = "Fun10"
+                                            , isInline = False
+                                            , label = [ Html.text "I want to be in the Hader!" ]
+                                            }
+                                            []
+                                            |> Ui.at Info
+                                       )
+                                    ++ Ui.goTo []
+                                        { destination = ( Just "Hi", Nothing )
+                                        , isInline = False
+                                        , label = [ Html.text "Me too!" ]
+                                        }
+                                        []
+                        in
+                        myUi
+                            |> Ui.wrap (Ui.Node "ol" [])
                             |> makeInnerHtml
-                            |> List.map Tuple.second
+                            |> List.map (Html.map never)
                 , subscriptions = \state -> Sub.none
                 , parse =
                     \state ->
@@ -203,36 +214,28 @@ headerForm formState =
             Ui.toggle []
                 { flag = "Fun10"
                 , isInline = False
-                , label = [ ( "0", Html.text "I want to be in the Hader!" ) ]
+                , label = [ Html.text "I want to be in the Hader!" ]
                 }
                 []
                 |> Ui.at Info
     in
     myOuterFormWithoutFormState
-        |> Ui.stateful
+        ++ Ui.stateful
             [ Region.Scene, Region.Info, Region.Control ]
-            {-
-               Field `makeOuterHtml` expected
-                   `{ makeInnerHtml :
-                       Ui Region (List ( String, Html String )) attribute (Wrapper msg)
-                           -> List ( String, Html String )
-                       }
-                       -> List ( String, Html String )`
-               , found
-                   `{ makeInnerHtml :
-                       Ui Region (List ( String, Html String )) attribute (Wrapper msg)
-                           -> List ( String, Html String )
-                       }
-                       -> List ( String, Html (Msg delta0 delta1 delta2 (Delta String)) )`
-
-            -}
+            Html.passiveLayout
             { makeOuterHtml =
                 \makeInnerHtml ->
-                    [ ( "headerControl"
-                      , (myHeaderForm makeInnerHtml).view formState
-                      )
+                    [ (myHeaderForm makeInnerHtml).view formState
                     ]
             }
+
+
+type alias StatelessHtml =
+    List (Html.Html Never)
+
+
+type alias StatelessAttribute =
+    Html.Attribute Never
 
 
 stringForm =
@@ -323,7 +326,7 @@ funForm =
 
 textLabel : String -> Ui msg
 textLabel str =
-    Ui.singleton [ ( str, Html.text str ) ]
+    Ui.singleton [ Html.text str ]
 
 
 main =
@@ -370,9 +373,9 @@ main =
                             Ui.toggle []
                                 { flag = "Fun" ++ String.fromInt int
                                 , isInline = True
-                                , label = [ ( "button", Html.label [] [ Html.text "＋" ] ) ]
+                                , label = [ Html.label [] [ Html.text "＋" ] ]
                                 }
-                                (Ui.singleton [ ( "Fun", funForm.view model.funState ) ]
+                                (Ui.singleton [ funForm.view model.funState ]
                                     ++ (if int > 0 then
                                             moreFun (int - 1)
 
@@ -380,7 +383,7 @@ main =
                                             []
                                        )
                                 )
-                                |> Ui.wrap (Ul [])
+                                |> Ui.wrap (Node "ul" [])
                     in
                     textLabel "Header!"
                         ++ Ui.at Scene
@@ -388,18 +391,21 @@ main =
                         ++ Ui.at
                             Control
                             (Ui.singleton
-                                [ ( "Form", userForm.view model.state ) ]
-                                ++ Ui.singleton [ ( "New", newForm.view model.newState ) ]
+                                [ userForm.view model.state ]
+                                ++ Ui.singleton [ newForm.view model.newState ]
                             )
-                        ++ Ui.at Scene (moreFun 10 ++ headerForm model.stringState)
+                        ++ Ui.at Scene
+                            (moreFun 10
+                                ++ headerForm model.stringState
+                            )
                         ++ Ui.at Info (textLabel "Info!")
                         ++ Ui.at Info
                             (Ui.toggle []
-                                { flag = "Fun10", isInline = False, label = [ ( "Hello", Html.text "Hello" ) ] }
+                                { flag = "Fun10", isInline = False, label = [ Html.text "Hello" ] }
                                 []
                             )
-                , layout = Keyed.layout
+                , layout = Html.layout
                 , title = "Hello World"
                 }
-                    |> Restrictive.mapDocument Keyed.toHtml
+                    |> Restrictive.mapDocument Html.toHtml
         }

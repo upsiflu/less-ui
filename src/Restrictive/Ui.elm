@@ -11,6 +11,7 @@ module Restrictive.Ui exposing
     , map
     , indexedMapList, mapList
     , mapEach
+    , StatelessAttribute, StatelessHtml, StatelessWrapper(..)
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
@@ -147,10 +148,10 @@ type Item region html attribute wrapper
     | Wrap wrapper (Ui region html attribute wrapper)
     | Stateful
         (List region)
-        (Layout region (Html Never) attribute wrapper)
+        (Layout region StatelessHtml StatelessAttribute StatelessWrapper)
         { makeOuterHtml :
             { makeInnerHtml :
-                Ui region (Html Never) attribute wrapper -> Html Never
+                Ui region StatelessHtml StatelessAttribute StatelessWrapper -> StatelessHtml
             }
             -> html
         }
@@ -351,6 +352,29 @@ map fu =
         )
 
 
+{-| -}
+mapWrapper : (wrapper -> wrapper2) -> Ui region html attribute wrapper -> Ui region html attribute wrapper2
+mapWrapper fu =
+    List.map
+        (\item ->
+            case item of
+                Leaf html ->
+                    Leaf html
+
+                Twig linkStyle link elements ->
+                    Twig linkStyle link (mapWrapper fu elements)
+
+                At innerRegion elements ->
+                    At innerRegion (mapWrapper fu elements)
+
+                Wrap wrapper elements ->
+                    Wrap (fu wrapper) (mapWrapper fu elements)
+
+                Stateful regions layout { makeOuterHtml } ->
+                    Stateful regions layout { makeOuterHtml = makeOuterHtml }
+        )
+
+
 
 ---- DECOMPOSE ----
 
@@ -377,7 +401,7 @@ view state layout =
 I assume it's related to Elm not allowing cyclic type dependencies in `let` functions, let alone within functions.
 So here is explicit polymorphism.
 -}
-viewStatic : State -> Layout region (Html Never) attribute wrapper -> OrHeader region -> Ui region (Html Never) attribute wrapper -> Get (OrHeader region) (Html Never)
+viewStatic : State -> Layout region StatelessHtml StatelessAttribute wrapper -> OrHeader region -> Ui region StatelessHtml StatelessAttribute wrapper -> Get (OrHeader region) StatelessHtml
 viewStatic =
     viewUi
 
@@ -423,26 +447,23 @@ viewUi state layout region =
                         |> Get.updateAt region (layout.wrap wrapper)
 
                 Stateful regions staticLayout { makeOuterHtml } ->
-                    let
-                        atOuterRegion : Ui region (Html Never) attribute wrapper -> Ui region (Html Never) attribute wrapper
-                        atOuterRegion =
-                            case region of
-                                Header ->
-                                    identity
-
-                                Region r ->
-                                    at r
-                    in
                     (Header :: List.map Region regions)
                         |> List.map
                             (\soloRegion ->
                                 ( soloRegion
                                 , makeOuterHtml
                                     { makeInnerHtml =
-                                        atOuterRegion
+                                        (case region of
+                                            Header ->
+                                                identity
+
+                                            Region r ->
+                                                at r
+                                        )
                                             >> viewStatic state staticLayout soloRegion
                                             >> Get.get soloRegion
-                                            >> Maybe.withDefault (Html.text "")
+                                            >> Maybe.withDefault [ Html.text "" ]
+                                            >> List.map (Html.map never)
                                     }
                                 )
                             )
@@ -494,8 +515,24 @@ viewUi state layout region =
 
             `makeInnerHtml` is called in a context where `Html String` is needed,
             not `Html msg`.
-            SOLUTION: `makeInnerHtml` creates `Html Never` which we can convert to anything
+
+            Solution:
+
+            `makeInnerHtml` creates `Html Never` which we can convert to anything
             with `Html.map never`. Ta-da!
+
+
+            New new problems:
+
+            1.
+            If we provide a `Ui` to `makeInnerHtml`, then this Ui must
+            have stateless html, which means `Html Never`.
+            But the `attribute` and `wrapper` type parameters are
+            bound to that Attribute `Never`.
+
+            2.
+            Inside a `Form`, we want to construct `Html delta`,
+            which is specific to the form's control.
 
          -}
         )
@@ -640,8 +677,23 @@ Caution: If you use this functionality, the `Ui` will contain functions and will
 -}
 stateful :
     List region
-    -> Layout region (Html Never) attribute wrapper
-    -> { makeOuterHtml : { makeInnerHtml : Ui region (Html Never) attribute wrapper -> Html Never } -> html }
-    -> Ui region html attribute wrapper
+    -> Layout region StatelessHtml StatelessAttribute StatelessWrapper
+    -> { makeOuterHtml : { makeInnerHtml : Ui region StatelessHtml StatelessAttribute StatelessWrapper -> StatelessHtml } -> html }
+    -> Ui region html attribute_ wrapper_
 stateful regions layout makeOuterHtml =
     [ Stateful regions layout makeOuterHtml ]
+
+
+type alias StatelessHtml =
+    List (Html Never)
+
+
+type alias StatelessAttribute =
+    Html.Attribute Never
+
+
+type StatelessWrapper
+    = Node String (List (Html.Attribute Never))
+    | Removed
+    | Removable
+    | Inserted
