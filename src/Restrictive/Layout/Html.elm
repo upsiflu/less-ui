@@ -1,9 +1,8 @@
 module Restrictive.Layout.Html exposing
-    ( layout, Ui, Wrapper(..)
+    ( layout, Wrapper(..)
     , wrap, elements, arrange
-    , passiveLayout
+    , staticLayout
     , toHtml
-    , wrapPassive
     )
 
 {-| Layout functions specific to the Ui library
@@ -13,7 +12,7 @@ module Restrictive.Layout.Html exposing
 
 # Use the defaults...
 
-@docs layout, Ui, Wrapper
+@docs layout, Wrapper
 
 
 # ...or override any of its fields:
@@ -23,7 +22,7 @@ module Restrictive.Layout.Html exposing
 
 # Special case: a layout that cannot emit any messages
 
-@docs passiveLayout
+@docs staticLayout
 
 ---
 
@@ -41,7 +40,6 @@ import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout exposing (Layout)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
 import Restrictive.State
-import Restrictive.Ui
 
 
 {-| -}
@@ -64,25 +62,16 @@ layout =
 
 
 {-| -}
-passiveLayout : Layout Region (List (Html Never)) (Html.Attribute Never) Restrictive.Ui.StatelessWrapper
-passiveLayout =
-    { removed = Restrictive.Ui.Removed
-    , removable = Restrictive.Ui.Removable
-    , inserted = Restrictive.Ui.Inserted
-    , wrap = wrapPassive
+staticLayout : Layout Region (List (Html Never)) (Html.Attribute Never) (Wrapper Never)
+staticLayout =
+    { removed = Removed
+    , removable = Removable
+    , inserted = Inserted
+    , wrap = wrap
     , elements = elements
     , concat = List.concat
     , arrange = arrange
     }
-
-
-{-| -}
-type alias Ui msg =
-    Restrictive.Ui.Ui
-        Region
-        (List (Html msg))
-        (Html.Attribute Never)
-        (Wrapper msg)
 
 
 {-| Todo:
@@ -108,27 +97,6 @@ type Wrapper msg
     | Removed
     | Removable
     | Inserted
-
-
-wrapPassive : Restrictive.Ui.StatelessWrapper -> List (Html Never) -> List (Html Never)
-wrapPassive wrapper =
-    wrap (statefulWrapper wrapper)
-
-
-statefulWrapper : Restrictive.Ui.StatelessWrapper -> Wrapper Never
-statefulWrapper wrapper =
-    case wrapper of
-        Restrictive.Ui.Node str attrs ->
-            Node str attrs
-
-        Restrictive.Ui.Removed ->
-            Removed
-
-        Restrictive.Ui.Removable ->
-            Removable
-
-        Restrictive.Ui.Inserted ->
-            Inserted
 
 
 wrap : Wrapper msg -> List (Html msg) -> List (Html msg)

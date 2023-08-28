@@ -6,7 +6,8 @@ import Html
 import Html.Attributes as Attr
 import MultiTool
 import Restrictive exposing (application)
-import Restrictive.Layout.Html as Html exposing (Ui, Wrapper(..))
+import Restrictive.Layout.Html as Html exposing (Wrapper(..))
+import Restrictive.Layout.Html.Ui exposing (StatelessUi, Ui)
 import Restrictive.Layout.Region as Region exposing (Region(..))
 import Restrictive.Ui as Ui
 import Tools.Control
@@ -129,113 +130,88 @@ passwordControl =
         }
 
 
+makeHeaderControl :
+    { makeInnerHtml :
+        StatelessUi
+        -> List (Html.Html Never)
+    }
+    -> Control String String String
+makeHeaderControl { makeInnerHtml } =
+    Control.create
+        { label = "Password"
+        , initEmpty = ( "", Cmd.none )
+        , initWith = \pw -> ( pw, Cmd.none )
+        , update = \pw state -> ( pw, Cmd.none )
+        , view =
+            \{ state, id, label, name, class } ->
+                let
+                    myUi : StatelessUi
+                    myUi =
+                        Ui.toggle []
+                            { flag = id
+                            , isInline = True
+                            , label = [ Html.label [ Attr.for id ] [ Html.text label ] ]
+                            }
+                            (Ui.singleton
+                                [ Html.input
+                                    [ Attr.type_ "password"
+                                    , Attr.value state
+                                    , Attr.id id
+                                    , Attr.class class
+                                    , Attr.name name
+                                    ]
+                                    []
+                                ]
+                            )
+                            ++ (Ui.toggle []
+                                    { flag = "Fun10"
+                                    , isInline = False
+                                    , label = [ Html.text "I want to be in the Hader!" ]
+                                    }
+                                    []
+                                    |> Ui.at Info
+                                -- draws an empty fildset into the Info field, as expected :-)
+                                -- Note that the **Form**.view repeats in each Region.
+                               )
+                            ++ Ui.goTo []
+                                { destination = ( Just "Hi", Nothing )
+                                , isInline = False
+                                , label = [ Html.text "Me too!" ]
+                                }
+                                []
+                in
+                myUi
+                    |> Ui.wrap (Html.Node "ol" [])
+                    |> makeInnerHtml
+                    |> List.map (Html.map never)
+        , subscriptions = \state -> Sub.none
+        , parse =
+            \state ->
+                case Date.fromIsoString state of
+                    Ok date ->
+                        Ok state
+
+                    Err error ->
+                        Err [ error ]
+        }
+
+
 headerForm formState =
     let
-        makeHeaderControl :
-            { makeInnerHtml :
-                Ui.Ui
-                    Region
-                    Ui.StatelessHtml
-                    Ui.StatelessAttribute
-                    Ui.StatelessWrapper
-                -> List (Html.Html Never)
-            }
-            -> Control String String String
-        makeHeaderControl { makeInnerHtml } =
-            Control.create
-                { label = "Password"
-                , initEmpty = ( "", Cmd.none )
-                , initWith = \pw -> ( pw, Cmd.none )
-                , update = \pw state -> ( pw, Cmd.none )
-                , view =
-                    \{ state, id, label, name, class } ->
-                        let
-                            myUi :
-                                Ui.Ui
-                                    Region
-                                    Ui.StatelessHtml
-                                    Ui.StatelessAttribute
-                                    Ui.StatelessWrapper
-                            myUi =
-                                Ui.toggle []
-                                    { flag = id
-                                    , isInline = True
-                                    , label = [ Html.label [ Attr.for id ] [ Html.text label ] ]
-                                    }
-                                    (Ui.singleton
-                                        [ Html.input
-                                            [ Attr.type_ "password"
-                                            , Attr.value state
-                                            , Attr.id id
-                                            , Attr.class class
-                                            , Attr.name name
-                                            ]
-                                            []
-                                        ]
-                                    )
-                                    ++ (Ui.toggle []
-                                            { flag = "Fun10"
-                                            , isInline = False
-                                            , label = [ Html.text "I want to be in the Hader!" ]
-                                            }
-                                            []
-                                            |> Ui.at Info
-                                       )
-                                    ++ Ui.goTo []
-                                        { destination = ( Just "Hi", Nothing )
-                                        , isInline = False
-                                        , label = [ Html.text "Me too!" ]
-                                        }
-                                        []
-                        in
-                        myUi
-                            |> Ui.wrap (Ui.Node "ol" [])
-                            |> makeInnerHtml
-                            |> List.map (Html.map never)
-                , subscriptions = \state -> Sub.none
-                , parse =
-                    \state ->
-                        case Date.fromIsoString state of
-                            Ok date ->
-                                Ok state
+        makeOuterHtml uiState =
+            [ (makeForm uiState).view formState ]
 
-                            Err error ->
-                                Err [ error ]
-                }
-
-        myHeaderForm uiState =
+        makeForm uiState =
             Control.form
                 { control = makeHeaderControl uiState
                 , onUpdate = StringUpdated
                 , view = Html.fieldset []
                 }
-
-        myOuterFormWithoutFormState =
-            Ui.toggle []
-                { flag = "Fun10"
-                , isInline = False
-                , label = [ Html.text "I want to be in the Hader!" ]
-                }
-                []
-                |> Ui.at Info
     in
-    myOuterFormWithoutFormState
-        ++ Ui.stateful
-            [ Region.Scene, Region.Info, Region.Control ]
-            Html.passiveLayout
-            { makeOuterHtml =
-                \makeInnerHtml ->
-                    [ (myHeaderForm makeInnerHtml).view formState
-                    ]
-            }
-
-
-type alias StatelessHtml =
-    List (Html.Html Never)
-
-
-type alias StatelessAttribute =
-    Html.Attribute Never
+    Ui.stateful
+        [ Region.Scene, Region.Info, Region.Control ]
+        Html.staticLayout
+        makeOuterHtml
 
 
 stringForm =

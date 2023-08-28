@@ -8,10 +8,11 @@ module Restrictive.Ui exposing
     , ol, ul, node
     , uncons
     , stateful
+    , StatelessWrapper
     , map
     , indexedMapList, mapList
     , mapEach
-    , StatelessAttribute, StatelessHtml, StatelessWrapper(..)
+    , mapWrapper
     )
 
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
@@ -73,6 +74,7 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 ## Mix with Html
 
 @docs stateful
+@docs StatelessWrapper
 
 
 ## Map
@@ -102,6 +104,13 @@ It is usually easier to build exactly the `Ui` you need instead of altering and 
 @docs indexedMapList, mapList
 @docs mapEach
 
+
+# Slated for removal
+
+The following exports have no application and may be removed in the next release.
+
+@docs mapWrapper
+
 -}
 
 import Html exposing (Html)
@@ -110,6 +119,7 @@ import Html.Keyed
 import List.Extra as List
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout as Layout exposing (Layout)
+import Restrictive.Layout.Html as Html
 import Restrictive.Layout.Region exposing (OrHeader(..), Region)
 import Restrictive.State as State exposing (State)
 
@@ -148,13 +158,12 @@ type Item region html attribute wrapper
     | Wrap wrapper (Ui region html attribute wrapper)
     | Stateful
         (List region)
-        (Layout region StatelessHtml StatelessAttribute StatelessWrapper)
-        { makeOuterHtml :
-            { makeInnerHtml :
-                Ui region StatelessHtml StatelessAttribute StatelessWrapper -> StatelessHtml
-            }
-            -> html
-        }
+        (Layout region (List (Html Never)) (Html.Attribute Never) StatelessWrapper)
+        ({ makeInnerHtml :
+            Ui region (List (Html Never)) (Html.Attribute Never) StatelessWrapper -> List (Html Never)
+         }
+         -> html
+        )
 
 
 
@@ -343,12 +352,10 @@ map fu =
                 Wrap wrapper elements ->
                     Wrap wrapper (map fu elements)
 
-                Stateful regions layout { makeOuterHtml } ->
+                Stateful regions layout makeOuterHtml ->
                     Stateful regions
                         layout
-                        { makeOuterHtml =
-                            makeOuterHtml >> fu
-                        }
+                        (makeOuterHtml >> fu)
         )
 
 
@@ -370,8 +377,8 @@ mapWrapper fu =
                 Wrap wrapper elements ->
                     Wrap (fu wrapper) (mapWrapper fu elements)
 
-                Stateful regions layout { makeOuterHtml } ->
-                    Stateful regions layout { makeOuterHtml = makeOuterHtml }
+                Stateful regions layout makeOuterHtml ->
+                    Stateful regions layout makeOuterHtml
         )
 
 
@@ -401,7 +408,7 @@ view state layout =
 I assume it's related to Elm not allowing cyclic type dependencies in `let` functions, let alone within functions.
 So here is explicit polymorphism.
 -}
-viewStatic : State -> Layout region StatelessHtml StatelessAttribute wrapper -> OrHeader region -> Ui region StatelessHtml StatelessAttribute wrapper -> Get (OrHeader region) StatelessHtml
+viewStatic : State -> Layout region (List (Html Never)) (Html.Attribute Never) wrapper -> OrHeader region -> Ui region (List (Html Never)) (Html.Attribute Never) wrapper -> Get (OrHeader region) (List (Html Never))
 viewStatic =
     viewUi
 
@@ -446,7 +453,7 @@ viewUi state layout region =
                     viewUi state layout region elements
                         |> Get.updateAt region (layout.wrap wrapper)
 
-                Stateful regions staticLayout { makeOuterHtml } ->
+                Stateful regions staticLayout makeOuterHtml ->
                     (Header :: List.map Region regions)
                         |> List.map
                             (\soloRegion ->
@@ -677,23 +684,12 @@ Caution: If you use this functionality, the `Ui` will contain functions and will
 -}
 stateful :
     List region
-    -> Layout region StatelessHtml StatelessAttribute StatelessWrapper
-    -> { makeOuterHtml : { makeInnerHtml : Ui region StatelessHtml StatelessAttribute StatelessWrapper -> StatelessHtml } -> html }
+    -> Layout region (List (Html Never)) (Html.Attribute Never) StatelessWrapper
+    -> ({ makeInnerHtml : Ui region (List (Html Never)) (Html.Attribute Never) StatelessWrapper -> List (Html Never) } -> html)
     -> Ui region html attribute_ wrapper_
 stateful regions layout makeOuterHtml =
     [ Stateful regions layout makeOuterHtml ]
 
 
-type alias StatelessHtml =
-    List (Html Never)
-
-
-type alias StatelessAttribute =
-    Html.Attribute Never
-
-
-type StatelessWrapper
-    = Node String (List (Html.Attribute Never))
-    | Removed
-    | Removable
-    | Inserted
+type alias StatelessWrapper =
+    Html.Wrapper Never
