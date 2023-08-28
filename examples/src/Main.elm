@@ -7,7 +7,7 @@ import Html.Attributes as Attr
 import MultiTool
 import Restrictive exposing (application)
 import Restrictive.Layout.Html.Keyed as Keyed exposing (Ui, Wrapper(..))
-import Restrictive.Layout.Region exposing (Region(..))
+import Restrictive.Layout.Region as Region exposing (Region(..))
 import Restrictive.Ui as Ui
 import Tools.Control
 
@@ -131,6 +131,12 @@ passwordControl =
 
 headerForm formState =
     let
+        makeHeaderControl :
+            { makeInnerHtml :
+                Ui.Ui Region (List ( String, Html.Html msg )) attribute (Wrapper b)
+                -> List ( c, Html.Html String )
+            }
+            -> Control String String String
         makeHeaderControl { makeInnerHtml } =
             Control.create
                 { label = "Password"
@@ -202,7 +208,31 @@ headerForm formState =
                 []
                 |> Ui.at Info
     in
-    Ui.stateful (\uiState -> [ ( "headerControl", (myHeaderForm uiState).view formState ) ])
+    myOuterFormWithoutFormState
+        |> Ui.stateful
+            [ Region.Scene, Region.Info, Region.Control ]
+            {-
+               Field `makeOuterHtml` expected
+                   `{ makeInnerHtml :
+                       Ui Region (List ( String, Html String )) attribute (Wrapper msg)
+                           -> List ( String, Html String )
+                       }
+                       -> List ( String, Html String )`
+               , found
+                   `{ makeInnerHtml :
+                       Ui Region (List ( String, Html String )) attribute (Wrapper msg)
+                           -> List ( String, Html String )
+                       }
+                       -> List ( String, Html (Msg delta0 delta1 delta2 (Delta String)) )`
+
+            -}
+            { makeOuterHtml =
+                \makeInnerHtml ->
+                    [ ( "headerControl"
+                      , (myHeaderForm makeInnerHtml).view formState
+                      )
+                    ]
+            }
 
 
 stringForm =
@@ -281,6 +311,14 @@ funForm =
 
 
 ---- Application ----
+--What about:
+{-
+   Instead of {innerHtml}->html,
+
+   we can do a Default module like Keyed, but with Form!
+   I.e.
+
+-}
 
 
 textLabel : String -> Ui msg

@@ -10,6 +10,7 @@ module Restrictive.State exposing
     , Link, getLink
     , Elements, LinkStyle
     , relative
+    , mapLinkStyle
     , view
     , toStateTransition, toTuple
     , upTo, querySerialiseLocation, queryParseLocation, linkToString
@@ -63,6 +64,7 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
 # Map
 
 @docs relative
+@docs mapLinkStyle
 
 
 # View
@@ -467,6 +469,15 @@ type alias LinkStyle html attribute =
     { attributes : List attribute
     , isInline : Bool
     , label : html
+    }
+
+
+{-| -}
+mapLinkStyle : (html -> html2) -> LinkStyle html attribute -> LinkStyle html2 attribute
+mapLinkStyle fu linkStyle =
+    { attributes = linkStyle.attributes
+    , isInline = linkStyle.isInline
+    , label = fu linkStyle.label
     }
 
 

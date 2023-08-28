@@ -8,6 +8,7 @@ module Restrictive.Ui exposing
     , ol, ul, node
     , uncons
     , stateful
+    , map
     , indexedMapList, mapList
     , mapEach
     )
@@ -75,6 +76,8 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 
 ## Map
 
+@docs map
+
 Since `Ui`s are `List`s, it is easy to use the library functions from the `List` and `List.Extra` packages.
 However, I recommend against it.
 
@@ -117,15 +120,24 @@ type alias Ui region html attribute wrapper =
 
 {-|
 
-    Leaf html -- Rendered html node
+    Leaf html           -- Rendered html node
 
-    Twig (State.LinkStyle html attribute) State.Link Ui -- Logical bifurcation (link*state active/inactive)
+    Twig State.LinkStyle
+         State.Link
+         Ui             -- Logical bifurcation (link*state active/inactive)
 
-    At region Ui -- Visual bifurcation (screen regions)
+    At region Ui        -- Visual bifurcation (screen regions)
 
-    Wrap wrapper Ui -- Dom bifurcation (things like section, header, p, ul, table...)
+    Wrap wrapper Ui     -- Dom bifurcation (things like section, header, p, ul, table...)
 
-    Stateful ({ makeInnerHtml : Ui -> html } -> html) Ui -- Forwards the state to rendere an html node
+    Stateful (List region)
+        { makeOuterHtml :
+            { makeInnerHtml : Ui -> Html Never }
+            -> html
+        }               -- Composes nested `view` functions from libraries such as elm-any-type-form
+                        -- that require a specific `Html x` (Html delta) type for custom views.
+                        -- Note that this means that a form's Html can never nest another form's Html
+                        -- because forms rely on messages, and views can only emit their local delta.
 
 -}
 type Item region html attribute wrapper
@@ -133,7 +145,15 @@ type Item region html attribute wrapper
     | Twig (State.LinkStyle html attribute) State.Link (Ui region html attribute wrapper)
     | At region (Ui region html attribute wrapper)
     | Wrap wrapper (Ui region html attribute wrapper)
-    | Stateful ({ makeInnerHtml : Ui region html attribute wrapper -> html } -> html) (Ui region html attribute wrapper)
+    | Stateful
+        (List region)
+        (Layout region (Html Never) attribute wrapper)
+        { makeOuterHtml :
+            { makeInnerHtml :
+                Ui region (Html Never) attribute wrapper -> Html Never
+            }
+            -> html
+        }
 
 
 
@@ -301,6 +321,37 @@ mapEach fu =
 
 
 
+---- MAP ----
+
+
+{-| -}
+map : (html -> html2) -> Ui region html attribute wrapper -> Ui region html2 attribute wrapper
+map fu =
+    List.map
+        (\item ->
+            case item of
+                Leaf html ->
+                    Leaf (fu html)
+
+                Twig linkStyle link elements ->
+                    Twig (State.mapLinkStyle fu linkStyle) link (map fu elements)
+
+                At innerRegion elements ->
+                    At innerRegion (map fu elements)
+
+                Wrap wrapper elements ->
+                    Wrap wrapper (map fu elements)
+
+                Stateful regions layout { makeOuterHtml } ->
+                    Stateful regions
+                        layout
+                        { makeOuterHtml =
+                            makeOuterHtml >> fu
+                        }
+        )
+
+
+
 ---- DECOMPOSE ----
 
 
@@ -312,124 +363,143 @@ uncons =
 
 
 
---idea: we want to create custom views for our forms (elm-any-type-form).
---they only accept Html msg as a type.
---so we have to render the custom view with a given state, then render the form with it, and then `singleton` the whole thing into a Ui again.
---Should be possible.
 ---- VIEW ----
 
 
 {-| -}
 view : State -> Layout region html attribute wrapper -> Ui region html attribute wrapper -> html
 view state layout =
-    let
-        viewUi : OrHeader region -> Ui region html attribute wrapper -> Get (OrHeader region) html
-        viewUi region =
-            List.map
-                (\descendant ->
-                    case descendant of
-                        Leaf html_ ->
-                            Get.singleton region html_
-
-                        Twig linkStyle link elements ->
-                            [ State.view
-                                region
-                                state.current
-                                layout.elements
-                                linkStyle
-                                link
-                            , case State.toTuple (State.linkIsActive link state) of
-                                ( True, Just False ) ->
-                                    viewUi region elements
-                                        |> Get.map (layout.wrap layout.inserted)
-
-                                ( True, _ ) ->
-                                    viewUi region elements
-                                        |> Get.map (layout.wrap layout.removable)
-
-                                ( False, Just False ) ->
-                                    Get.empty
-
-                                ( False, _ ) ->
-                                    viewUi region elements
-                                        |> Get.map (layout.wrap layout.removed)
-                            ]
-                                |> Get.concatBy layout.concat
-
-                        At innerRegion elements ->
-                            viewUi (Region innerRegion) elements
-
-                        Wrap wrapper elements ->
-                            viewUi region elements
-                                |> Get.updateAt region (layout.wrap wrapper)
-
-                        Stateful makeOuterHtml elements ->
-                            let
-                                toHtml ui =
-                                    let
-                                        rendered =
-                                            viewUi region ui
-                                    in
-                                    { inRegion = Get.get region rendered |> Maybe.withDefault (layout.concat [])
-                                    , outOfRegion = Get.remove region rendered
-                                    }
-                            in
-                            [ { makeInnerHtml = toHtml >> .inRegion }
-                                |> makeOuterHtml
-                                |> Get.singleton region
-                            , (toHtml elements).outOfRegion
-                            ]
-                                |> Get.concatBy layout.concat
-                 -- Todo: distribute the elements that are not in `region`
-                 {- Problem: The `outside` elements never receive the state that the `inside`
-                    elements receive.
-
-                    The interesting detail is how regions work here:
-                    1. Generate the inner Html, with the state information hidden inside the form
-                    2. Supply back the outer Html
-                    3. Set it as a child node at `region`
-                    4. concat it with all the other `elements`
-                       (which have no clue about the state inside the form)
-
-                    Solution:
-                      For each region, generate an outer Html,
-                      where each time the inner Html is limited to the same region.
-
-                    Example:
-                      We want a form that displays an inline input plus a hint at `info`.
-                      So for the inline region, the `.inside` will return the input;
-                      for the `Scene` and `Header it will return Html.none or [];
-                      and for `Info` it will return the hint.
-
-                    Implementation:
-                    1. We have the same `toHtml` but we use only `inRegion`.
-                    2. For each region, we render the whole thing:
-
-                        regions
-                            |> List.map
-                                \innerRegion ->
-                                    ( region
-                                    , { makeInnerHtml =
-                                            at region
-                                                >> viewUi innerRegion
-                                                >> Get.get innerRegion
-                                      }
-                                        |> makeOuterHtml
-                                    )
-                            |> Maybe.values
-                            |> Get.fromList
-
-                    4. To make it somewhat more performant, we can
-                       add a parameter to `viewUi` to `onlyIncludeRegion`
-                       such that leaves at excluded regions are ignored
-                       and wraps at excluded regions don't update.
-
-                 -}
-                )
-                >> Get.concatBy layout.concat
-    in
-    viewUi Header
+    viewUi state layout Header
         >> layout.arrange
+
+
+{-| Even though it's the same as `viewUi`, somehow Elm complains when I use `viewUi` inside `viewUi` with a different type.
+I assume it's related to Elm not allowing cyclic type dependencies in `let` functions, let alone within functions.
+So here is explicit polymorphism.
+-}
+viewStatic : State -> Layout region (Html Never) attribute wrapper -> OrHeader region -> Ui region (Html Never) attribute wrapper -> Get (OrHeader region) (Html Never)
+viewStatic =
+    viewUi
+
+
+viewUi : State -> Layout region html attribute wrapper -> OrHeader region -> Ui region html attribute wrapper -> Get (OrHeader region) html
+viewUi state layout region =
+    List.map
+        (\item ->
+            case item of
+                Leaf html_ ->
+                    Get.singleton region html_
+
+                Twig linkStyle link elements ->
+                    [ State.view
+                        region
+                        state.current
+                        layout.elements
+                        linkStyle
+                        link
+                    , case State.toTuple (State.linkIsActive link state) of
+                        ( True, Just False ) ->
+                            viewUi state layout region elements
+                                |> Get.map (layout.wrap layout.inserted)
+
+                        ( True, _ ) ->
+                            viewUi state layout region elements
+                                |> Get.map (layout.wrap layout.removable)
+
+                        ( False, Just False ) ->
+                            Get.empty
+
+                        ( False, _ ) ->
+                            viewUi state layout region elements
+                                |> Get.map (layout.wrap layout.removed)
+                    ]
+                        |> Get.concatBy layout.concat
+
+                At innerRegion elements ->
+                    viewUi state layout (Region innerRegion) elements
+
+                Wrap wrapper elements ->
+                    viewUi state layout region elements
+                        |> Get.updateAt region (layout.wrap wrapper)
+
+                Stateful regions staticLayout { makeOuterHtml } ->
+                    let
+                        atOuterRegion : Ui region (Html Never) attribute wrapper -> Ui region (Html Never) attribute wrapper
+                        atOuterRegion =
+                            case region of
+                                Header ->
+                                    identity
+
+                                Region r ->
+                                    at r
+                    in
+                    (Header :: List.map Region regions)
+                        |> List.map
+                            (\soloRegion ->
+                                ( soloRegion
+                                , makeOuterHtml
+                                    { makeInnerHtml =
+                                        atOuterRegion
+                                            >> viewStatic state staticLayout soloRegion
+                                            >> Get.get soloRegion
+                                            >> Maybe.withDefault (Html.text "")
+                                    }
+                                )
+                            )
+                        |> Get.fromList
+         {- Problem: The `outside` elements never receive the state that the `inside`
+            elements receive.
+
+            The interesting detail is how regions work here:
+            1. Generate the inner Html, with the state information hidden inside the form
+            2. Supply back the outer Html
+            3. Set it as a child node at `region`
+            4. concat it with all the other `elements`
+               (which have no clue about the state inside the form)
+
+            Solution:
+              For each region, generate an outer Html,
+              where each time the inner Html is limited to the same region.
+
+            Example:
+              We want a form that displays an inline input plus a hint at `info`.
+              So for the inline region, the `.inside` will return the input;
+              for the `Scene` and `Header it will return Html.none or [];
+              and for `Info` it will return the hint.
+
+            Implementation:
+            1. We have the same `toHtml` but we use only `inRegion`.
+            2. For each region, we render the whole thing:
+
+                regions
+                    |> List.map
+                        \innerRegion ->
+                            makeOuterHtml
+                                { makeInnerHtml =
+                                        at region
+                                            >> viewUi innerRegion
+                                            >> Get.get innerRegion
+                                }
+                                |> Maybe.map (Tuple.pair innerRegion)
+                    |> Maybe.values
+                    |> Get.fromList
+
+            4. To make it somewhat more performant, we can
+               add a parameter to `viewUi` to `onlyIncludeRegion`
+               such that leaves at excluded regions are ignored
+               and wraps at excluded regions don't update.
+
+
+            New problem:
+
+            `makeInnerHtml` is called in a context where `Html String` is needed,
+            not `Html msg`.
+            SOLUTION: `makeInnerHtml` creates `Html Never` which we can convert to anything
+            with `Html.map never`. Ta-da!
+
+         -}
+        )
+        >> Get.concatBy layout.concat
 
 
 {-| For testing
@@ -552,17 +622,26 @@ with `Ui` elements that alter and respond to the Url, then you need
 Here is how you use this function:
 
 1.  Write the `Ui` code for your widget extension.
-2.  Convert it to `html` using the `view` function. It will need a `Layout` which you can choose freely, and a State, which for now remains
-    your additional function parameter.
-3.  You will end up with a `Restrictive.State -> widget` function. Using your widget library's Html renderer, you can `>>` compose it with
-    `widget -> html` and thus get the parameter for `stateful`.
-4.  Now you have a `Ui` you can freely combine with the rest of your app.
+    You can use all the local parameters your widget provides.
+
+2.  Convert it to `html` using the `makeInnerHtml` function. Just pretend it exists:
+
+    { makeInnerHtml } ->
+    Ui.singleton...
+    |> makeInnerHtml
+
+    Note that the inner html will not bubble any messages to your app, so you are limited to Url-based state.
+
+3.  Your widget will create `Html msg`. This will be the parameter you provide `stateful`.
+    It will need a `Layout` to render `Ui (Html Never)` into `Html Never`.
 
 Caution: If you use this functionality, the `Ui` will contain functions and will no longer support equality checks and serialisation.
 
-TODO : This does not work because it doesn't return a Get but an html
-
 -}
-stateful : ({ makeInnerHtml : Ui region_ html attribute_ wrapper_ -> html } -> html) -> Ui region_ html attribute_ wrapper_ -> Ui region_ html attribute_ wrapper_
-stateful fu elements =
-    [ Stateful fu elements ]
+stateful :
+    List region
+    -> Layout region (Html Never) attribute wrapper
+    -> { makeOuterHtml : { makeInnerHtml : Ui region (Html Never) attribute wrapper -> Html Never } -> html }
+    -> Ui region html attribute wrapper
+stateful regions layout makeOuterHtml =
+    [ Stateful regions layout makeOuterHtml ]

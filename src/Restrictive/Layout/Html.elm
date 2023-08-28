@@ -65,7 +65,24 @@ type alias Ui msg =
         (Wrapper msg)
 
 
-{-| -}
+{-| Todo:
+collapsible (proxyLabel):
+
+    summary
+        (details proxyLabel)
+        :: children
+
+dismissible id:
+
+    summary
+        (details "")
+        :: "x"
+        :: children
+
+In each case, the `details` should be rendered without triangle and instead in the special color.
+We should implement it not with `details` but with a special css element where ...
+
+-}
 type Wrapper msg
     = Node String (List (Html.Attribute msg))
     | Removed
