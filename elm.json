@@ -9,7 +9,7 @@
         "Restrictive.Ui",
         "Restrictive.Get",
         "Restrictive.State",
-        "Restrictive.Layout",
+        "Restrictive.Layout.Html",
         "Restrictive.Layout.Html.Keyed",
         "Restrictive.Layout.Region"
     ],

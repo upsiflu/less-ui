@@ -41,9 +41,8 @@ This opens two possible pitfalls:
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (Html)
-import Restrictive.Layout exposing (Layout)
 import Restrictive.State as State exposing (State)
-import Restrictive.Ui as Ui exposing (Ui)
+import Restrictive.Ui as Ui exposing (Layout, Ui)
 import Url exposing (Url)
 
 
@@ -60,7 +59,7 @@ type alias Document msg =
 {-| -}
 mapDocument :
     (html -> List (Html msg))
-    -> { body : Ui region html attribute wrapper, layout : Layout region html attribute wrapper, title : String }
+    -> { body : Ui region html wrapper, layout : Layout region narrowHtml_ html narrowWrapper_ wrapper, title : String }
     -> (State -> Browser.Document msg)
 mapDocument toHtml document =
     \state ->

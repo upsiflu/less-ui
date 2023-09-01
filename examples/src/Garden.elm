@@ -40,7 +40,7 @@ update msg garden =
 
 
 type alias Ui =
-    Keyed.Ui Msg
+    Keyed.Ui Msg Msg
 
 
 view : Garden -> Restrictive.Document Msg
@@ -49,7 +49,7 @@ view garden =
         { body =
             page
                 ++ Ui.at Scene
-                    (Ui.toggle []
+                    (Keyed.toggle []
                         { flag = "rhododendron"
                         , isInline = True
                         , label = [ ( "Label", Html.text "Toggle Rhododendron" ) ]

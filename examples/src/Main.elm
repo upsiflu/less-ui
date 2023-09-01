@@ -4,10 +4,10 @@ import Control exposing (Control)
 import Date
 import Html
 import Html.Attributes as Attr
+import Html.Events as Events
 import MultiTool
 import Restrictive exposing (application)
-import Restrictive.Layout.Html as Html exposing (Wrapper(..))
-import Restrictive.Layout.Html.Ui exposing (StatelessUi, Ui)
+import Restrictive.Layout.Html as Html exposing (Ui)
 import Restrictive.Layout.Region as Region exposing (Region(..))
 import Restrictive.Ui as Ui
 import Tools.Control
@@ -61,11 +61,11 @@ shapeTools =
     tools.build shapeSpec
 
 
-newForm =
+shapeForm =
     Control.simpleForm
         { control = shapeTools.control
         , onSubmit = FormSubmitted
-        , onUpdate = Form2Updated
+        , onUpdate = ShapeFormUpdated
         }
 
 
@@ -130,32 +130,24 @@ passwordControl =
         }
 
 
-makeHeaderControl :
-    { makeInnerHtml :
-        StatelessUi
-        -> List (Html.Html Never)
-    }
-    -> Control String String String
-makeHeaderControl { makeInnerHtml } =
+getStringControl { makeInnerHtml } =
     Control.create
-        { label = "Password"
-        , initEmpty = ( "", Cmd.none )
+        { label = "Just a normal String -- but with extra"
+        , initEmpty = ( "Nothing yet", Cmd.none )
         , initWith = \pw -> ( pw, Cmd.none )
         , update = \pw state -> ( pw, Cmd.none )
         , view =
             \{ state, id, label, name, class } ->
                 let
-                    myUi : StatelessUi
-                    myUi =
-                        Ui.toggle []
+                    myStaticUi =
+                        Html.toggle []
                             { flag = id
                             , isInline = True
                             , label = [ Html.label [ Attr.for id ] [ Html.text label ] ]
                             }
                             (Ui.singleton
                                 [ Html.input
-                                    [ Attr.type_ "password"
-                                    , Attr.value state
+                                    [ Attr.value state
                                     , Attr.id id
                                     , Attr.class class
                                     , Attr.name name
@@ -163,61 +155,68 @@ makeHeaderControl { makeInnerHtml } =
                                     []
                                 ]
                             )
-                            ++ (Ui.toggle []
+                            ++ (Html.toggle []
                                     { flag = "Fun10"
                                     , isInline = False
-                                    , label = [ Html.text "I want to be in the Hader!" ]
+                                    , label = [ Html.text "From GetStringControl to Header.. wheee!" ]
                                     }
                                     []
                                     |> Ui.at Info
-                                -- draws an empty fildset into the Info field, as expected :-)
+                                -- draws an empty fieldset into the Info field, as expected :-)
                                 -- Note that the **Form**.view repeats in each Region.
                                )
-                            ++ Ui.goTo []
+                            ++ Html.goTo []
                                 { destination = ( Just "Hi", Nothing )
-                                , isInline = False
-                                , label = [ Html.text "Me too!" ]
+                                , isInline = True
+                                , label = [ Html.text "Me, no!" ]
                                 }
                                 []
+
+                    renderedUi =
+                        makeInnerHtml myStaticUi
+                            |> Maybe.withDefault []
                 in
-                myUi
-                    |> Ui.wrap (Html.Node "ol" [])
-                    |> makeInnerHtml
-                    |> List.map (Html.map never)
+                renderedUi
+                    ++ [ Html.input
+                            [ Events.onInput identity
+                            , Attr.value state
+                            , Attr.id id
+                            , Attr.class class
+                            , Attr.name name
+                            ]
+                            []
+                       ]
         , subscriptions = \state -> Sub.none
         , parse =
-            \state ->
-                case Date.fromIsoString state of
-                    Ok date ->
-                        Ok state
-
-                    Err error ->
-                        Err [ error ]
+            Ok
         }
 
 
-headerForm formState =
+getStringForm maybeFormState =
     let
-        makeOuterHtml uiState =
-            [ (makeForm uiState).view formState ]
+        formState =
+            maybeFormState
+                |> Maybe.withDefault
+                    (Tuple.first (getForm { makeInnerHtml = \_ -> Nothing }).init)
 
-        makeForm uiState =
+        makeOuterHtml uiState =
+            [ (getForm uiState).view formState ]
+
+        getForm makeHtml =
             Control.form
-                { control = makeHeaderControl uiState
-                , onUpdate = StringUpdated
+                { control = getStringControl makeHtml
+                , onUpdate = StringFormUpdated
                 , view = Html.fieldset []
                 }
     in
-    Ui.stateful
-        [ Region.Scene, Region.Info, Region.Control ]
-        Html.staticLayout
-        makeOuterHtml
+    Html.nest
+        { combine = makeOuterHtml }
 
 
 stringForm =
     Control.form
         { control = Control.string
-        , onUpdate = StringUpdated
+        , onUpdate = StringFormUpdated
         , view = Html.fieldset []
         }
 
@@ -226,11 +225,11 @@ stringForm =
 ----
 
 
-type Msg delta0 delta1 delta2 deltaString
-    = Form0Updated delta0
-    | Form1Updated delta1
-    | Form2Updated delta2
-    | StringUpdated deltaString
+type Msg userDelta tupleIntStringDelta shapeDelta stringDelta
+    = UserFormUpdated userDelta
+    | TupleIntStringFormUpdated tupleIntStringDelta
+    | ShapeFormUpdated shapeDelta
+    | StringFormUpdated stringDelta
     | FormSubmitted
 
 
@@ -275,16 +274,16 @@ roleControl =
 userForm =
     Control.form
         { control = userControl
-        , onUpdate = Form0Updated
+        , onUpdate = UserFormUpdated
         , view = Html.fieldset []
         }
 
 
-funForm =
+tupleIntStringForm =
     Control.simpleForm
         { control = Control.tuple Control.int Control.string
         , onSubmit = FormSubmitted
-        , onUpdate = Form1Updated
+        , onUpdate = TupleIntStringFormUpdated
         }
 
 
@@ -300,7 +299,7 @@ funForm =
 -}
 
 
-textLabel : String -> Ui msg
+textLabel : String -> Ui narrowMsg msg
 textLabel str =
     Ui.singleton [ Html.text str ]
 
@@ -308,9 +307,9 @@ textLabel str =
 main =
     application
         { init =
-            ( { funState = funForm.init |> Tuple.first
-              , state = userForm.init |> Tuple.first
-              , newState = newForm.init |> Tuple.first
+            ( { tupleIntStringState = tupleIntStringForm.init |> Tuple.first
+              , userState = userForm.init |> Tuple.first
+              , shapeState = shapeForm.init |> Tuple.first
               , stringState = stringForm.init |> Tuple.first
               }
             , Cmd.none
@@ -318,26 +317,26 @@ main =
         , update =
             \msg model ->
                 case msg of
-                    Form0Updated delta ->
+                    UserFormUpdated delta ->
                         let
                             ( state, cmd ) =
-                                userForm.update delta model.state
+                                userForm.update delta model.userState
                         in
-                        ( { model | state = state }, cmd )
+                        ( { model | userState = state }, cmd )
 
-                    Form1Updated delta ->
+                    TupleIntStringFormUpdated delta ->
                         let
                             ( state, cmd ) =
-                                funForm.update delta model.funState
+                                tupleIntStringForm.update delta model.tupleIntStringState
                         in
-                        ( { model | funState = state }, cmd )
+                        ( { model | tupleIntStringState = state }, cmd )
 
-                    Form2Updated delta ->
+                    ShapeFormUpdated delta ->
                         let
                             ( state, cmd ) =
-                                newForm.update delta model.newState
+                                shapeForm.update delta model.shapeState
                         in
-                        ( { model | newState = state }, cmd )
+                        ( { model | shapeState = state }, cmd )
 
                     _ ->
                         ( model, Cmd.none )
@@ -346,12 +345,12 @@ main =
                 { body =
                     let
                         moreFun int =
-                            Ui.toggle []
+                            Html.toggle []
                                 { flag = "Fun" ++ String.fromInt int
                                 , isInline = True
                                 , label = [ Html.label [] [ Html.text "＋" ] ]
                                 }
-                                (Ui.singleton [ funForm.view model.funState ]
+                                (Ui.singleton [ tupleIntStringForm.view model.tupleIntStringState ]
                                     ++ (if int > 0 then
                                             moreFun (int - 1)
 
@@ -359,29 +358,30 @@ main =
                                             []
                                        )
                                 )
-                                |> Ui.wrap (Node "ul" [])
+                                |> Ui.wrap (Html.Node "ul" [])
                     in
                     textLabel "Header!"
                         ++ Ui.at Scene
                             (textLabel "Scene!")
                         ++ Ui.at
                             Control
-                            (Ui.singleton
-                                [ userForm.view model.state ]
-                                ++ Ui.singleton [ newForm.view model.newState ]
+                            (Ui.singleton [ userForm.view model.userState ]
+                                ++ Ui.singleton [ userForm.view model.userState ]
+                                ++ Ui.singleton [ shapeForm.view model.shapeState ]
                             )
                         ++ Ui.at Scene
                             (moreFun 10
-                                ++ headerForm model.stringState
+                                ++ getStringForm (Just model.stringState)
+                                ++ getStringForm (Just model.stringState)
                             )
                         ++ Ui.at Info (textLabel "Info!")
                         ++ Ui.at Info
-                            (Ui.toggle []
+                            (Html.toggle []
                                 { flag = "Fun10", isInline = False, label = [ Html.text "Hello" ] }
                                 []
                             )
                 , layout = Html.layout
                 , title = "Hello World"
                 }
-                    |> Restrictive.mapDocument Html.toHtml
+                    |> Restrictive.mapDocument identity
         }

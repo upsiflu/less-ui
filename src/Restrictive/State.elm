@@ -8,7 +8,7 @@ module Restrictive.State exposing
     , getLocation, getFragment, getPath
     , goTo, bounce, toggle
     , Link, getLink
-    , Elements, LinkStyle
+    , Templates, LinkStyle
     , relative
     , mapLinkStyle
     , view
@@ -58,7 +58,7 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
 
 @docs Link, getLink
 
-@docs Elements, LinkStyle
+@docs Templates, LinkStyle
 
 
 # Map
@@ -465,18 +465,16 @@ err =
 
 {-| Draw a link either inline or in the `Header` region
 -}
-type alias LinkStyle html attribute =
-    { attributes : List attribute
-    , isInline : Bool
+type alias LinkStyle html =
+    { isInline : Bool
     , label : html
     }
 
 
 {-| -}
-mapLinkStyle : (html -> html2) -> LinkStyle html attribute -> LinkStyle html2 attribute
+mapLinkStyle : (html -> html2) -> LinkStyle html -> LinkStyle html2
 mapLinkStyle fu linkStyle =
-    { attributes = linkStyle.attributes
-    , isInline = linkStyle.isInline
+    { isInline = linkStyle.isInline
     , label = fu linkStyle.label
     }
 
@@ -486,14 +484,12 @@ mapLinkStyle fu linkStyle =
 (Future: Add radio for tabs and exclusive ViewMode toggles)
 
 -}
-type alias Elements html attribute =
+type alias Templates html =
     { link :
-        List attribute
-        -> { url : String, label : html }
+        { url : String, label : html }
         -> html
     , switch :
-        List attribute
-        -> { url : String, label : html, isChecked : Bool }
+        { url : String, label : html, isChecked : Bool }
         -> html
     }
 
@@ -535,11 +531,11 @@ type alias Elements html attribute =
 view :
     OrHeader region
     -> Url
-    -> Elements html attribute
-    -> LinkStyle html attribute
+    -> Templates html
+    -> LinkStyle html
     -> Link
     -> Get (OrHeader region) html
-view region url elements { attributes, isInline, label } link =
+view region url elements { isInline, label } link =
     Get.singleton
         (if isInline then
             region
@@ -551,7 +547,6 @@ view region url elements { attributes, isInline, label } link =
         case link of
             Toggle _ flag ->
                 elements.switch
-                    attributes
                     { url = linkToString link
                     , label = label
                     , isChecked = hasFlag flag url
@@ -559,7 +554,6 @@ view region url elements { attributes, isInline, label } link =
 
             _ ->
                 elements.link
-                    attributes
                     { url = linkToString link
                     , label = label
                     }

@@ -45,7 +45,7 @@ update () features =
 
 
 type alias Ui =
-    Keyed.Ui Msg
+    Keyed.Ui Msg Msg
 
 
 textLabel : String -> Ui
@@ -58,7 +58,7 @@ view _ =
     let
         showTab : String -> Ui -> Ui
         showTab str contents =
-            Ui.toggle []
+            Keyed.toggle []
                 { flag = str
                 , isInline = False
                 , label = [ ( str, Html.text str ) ]
@@ -91,19 +91,19 @@ ui =
 -}
 paths : Ui
 paths =
-    Ui.goTo []
+    Keyed.goTo []
         { destination = ( Just "Path-1", Nothing )
         , isInline = True
         , label = [ ( "label", Html.text "Path-1" ) ]
         }
         []
-        ++ Ui.goTo []
+        ++ Keyed.goTo []
             { destination = ( Just "Path-2", Nothing )
             , isInline = True
             , label = [ ( "label", Html.text "Path-2" ) ]
             }
             []
-        ++ Ui.goTo []
+        ++ Keyed.goTo []
             { destination = ( Nothing, Nothing )
             , isInline = True
             , label = [ ( "label", Html.text "Nothing" ) ]
@@ -116,7 +116,7 @@ globalNav =
     [ "Introduction", "First Steps", "Last Steps" ]
         |> List.concatMap
             (\title ->
-                Ui.goTo []
+                Keyed.goTo []
                     { destination = ( Just title, Nothing )
                     , isInline = False
                     , label = [ ( title, Html.text title ) ]
@@ -142,7 +142,7 @@ fragments fr =
                 |> List.indexedMap (String.fromInt >> Tuple.pair)
     in
     Ui.singleton articles
-        ++ (Ui.bounce []
+        ++ (Keyed.bounce []
                 { here = ( Nothing, Just "1" )
                 , label = [ ( "label", Html.text "Bounce between 1 and 3" ) ]
                 , there = ( Nothing, Just "3" )

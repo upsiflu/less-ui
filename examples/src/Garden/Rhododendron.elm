@@ -10,7 +10,7 @@ import Html exposing (Html, button, input, text)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed
-import Restrictive.Layout.Html.Keyed exposing (Wrapper(..))
+import Restrictive.Layout.Html.Keyed as Keyed exposing (Wrapper(..))
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
 
@@ -82,7 +82,7 @@ map toPath ((Rhododendron label descendants) as rhodo) =
 
 
 type alias Ui msg =
-    Restrictive.Layout.Html.Keyed.Ui msg
+    Keyed.Ui msg msg
 
 
 {-| -}
@@ -103,7 +103,7 @@ view howToMessage ((Rhododendron label _) as rhododendron) =
         scene (Rhododendron s descendants) =
             Ui.singleton [ ( "Hello", text s ) ]
                 ++ List.concatMap scene descendants
-                |> Ui.wrap (Ul [])
+                |> Keyed.ul []
     in
     scene rhododendron
         ++ controls

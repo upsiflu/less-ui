@@ -889,29 +889,9 @@ fromListBy fu =
 
 
 ---- Helpers ----
--- {-| This is a strangely important function that deserves an important name.
--- `mapParameter a = a >> (<<)`
--- `mapParameter a b = (|>) >> (a b)`
--- `mapParameter a b c = c >> (a b)`
--- `mapParameter a b c d = (a b (c d))`
--- -}
--- mapParameter :
---     (a
---      -> (b -> c)
---     )
---     ->
---         (a
---          -> ((input -> b) -> (input -> c))
---         )
--- mapParameter function =
---     let
---         composeRightToLeft : (b -> c) -> (input -> b) -> (input -> c)
---         composeRightToLeft =
---             (<<)
---     in
---     function >> composeRightToLeft
 
 
+{-| -}
 listPairs : Dict k v -> List ( k, v )
 listPairs =
     Dict.toList

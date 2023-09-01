@@ -1,35 +1,34 @@
 module Restrictive.Layout.Html exposing
-    ( layout, Wrapper(..)
-    , wrap, elements, arrange
-    , staticLayout
-    , toHtml
+    ( Ui
+    , toggle, goTo, bounce
+    , Wrapper(..), nest
+    , layout
+    , removed, removable, inserted, wrap, templates, arrange, concat
     )
 
-{-| Layout functions specific to the Ui library
+{-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Restrictive.Ui`](Restrictive.Ui)
 
-    Html.Keyed
-
-
-# Use the defaults...
-
-@docs layout, Wrapper
+@docs Ui
 
 
-# ...or override any of its fields:
+# Create links
 
-@docs wrap, elements, arrange
-
-
-# Special case: a layout that cannot emit any messages
-
-@docs staticLayout
-
----
+@docs toggle, goTo, bounce
 
 
-# View
+# Wrap the DOM
 
-@docs toHtml
+@docs Wrapper, nest
+
+
+# Layout
+
+@docs layout
+
+
+### Costruct your own:
+
+@docs removed, removable, inserted, wrap, templates, arrange, concat
 
 -}
 
@@ -37,112 +36,214 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Lazy
 import Restrictive.Get as Get exposing (Get)
-import Restrictive.Layout exposing (Layout)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
-import Restrictive.State
+import Restrictive.State as State
+import Restrictive.Ui as Ui
 
 
 {-| -}
-toHtml : List (Html msg) -> List (Html msg)
-toHtml =
-    identity
+type alias Ui msg narrowMsg =
+    Ui.Ui
+        Region
+        (List (Html msg))
+        (Wrapper narrowMsg msg)
 
 
 {-| -}
-layout : Layout Region (List (Html msg)) (Html.Attribute Never) (Wrapper msg)
-layout =
-    { removed = Removed
-    , removable = Removable
-    , inserted = Inserted
-    , wrap = wrap
-    , elements = elements
-    , concat = List.concat
-    , arrange = arrange
-    }
+type alias NarrowUi narrowMsg =
+    Ui narrowMsg narrowMsg
+
+
+
+---- Create links ----
 
 
 {-| -}
-staticLayout : Layout Region (List (Html Never)) (Html.Attribute Never) (Wrapper Never)
-staticLayout =
-    { removed = Removed
-    , removable = Removable
-    , inserted = Inserted
-    , wrap = wrap
-    , elements = elements
-    , concat = List.concat
-    , arrange = arrange
-    }
+toggle :
+    List (Html.Attribute Never)
+    ->
+        { flag : State.Flag
+        , isInline : Bool
+        , label : List (Html msg)
+        }
+    -> Ui msg narrowMsg
+    -> Ui msg narrowMsg
+toggle attrs { flag, isInline, label } =
+    State.toggle flag
+        |> Link
+            (templates attrs)
+            { isInline = isInline
+            , label = label
+            }
+        |> Ui.wrap
 
 
-{-| Todo:
-collapsible (proxyLabel):
+{-| -}
+goTo :
+    List (Html.Attribute Never)
+    ->
+        { destination : ( Maybe State.Path, State.Fragment )
+        , isInline : Bool
+        , label : List (Html msg)
+        }
+    -> Ui msg narrowMsg
+    -> Ui msg narrowMsg
+goTo attrs { destination, isInline, label } =
+    State.goTo destination
+        |> Link
+            (templates attrs)
+            { isInline = isInline
+            , label = label
+            }
+        |> Ui.wrap
 
-    summary
-        (details proxyLabel)
-        :: children
 
-dismissible id:
+{-| -}
+bounce :
+    List (Html.Attribute Never)
+    ->
+        { here : ( Maybe State.Path, State.Fragment )
+        , label : List (Html msg)
+        , there : ( Maybe State.Path, State.Fragment )
+        }
+    -> Ui msg narrowMsg
+    -> Ui msg narrowMsg
+bounce attrs { here, label, there } =
+    State.bounce { here = here, there = there }
+        |> Link
+            (templates attrs)
+            { isInline = False
+            , label = label
+            }
+        |> Ui.wrap
 
-    summary
-        (details "")
-        :: "x"
-        :: children
 
-In each case, the `details` should be rendered without triangle and instead in the special color.
-We should implement it not with `details` but with a special css element where ...
+
+---- Working with contingent transformations ----
+
+
+{-| Use with [`Ui.wrap`](Restrictive.Ui#wrap)
+
+    Ui.wrap (Node "section" [ Attr.class "hello" ])
 
 -}
-type Wrapper msg
+type Wrapper narrowMsg msg
     = Node String (List (Html.Attribute msg))
-    | Removed
-    | Removable
-    | Inserted
+    | Nest
+        { combine :
+            { makeInnerHtml :
+                NarrowUi narrowMsg
+                -> Maybe (List (Html narrowMsg))
+            }
+            -> List (Html msg)
+        }
+    | Link (State.Templates (List (Html msg))) (State.LinkStyle (List (Html msg))) State.Link
 
 
-wrap : Wrapper msg -> List (Html msg) -> List (Html msg)
-wrap wrapper children =
-    case wrapper of
-        Node str attrs ->
-            [ Html.node str attrs children ]
+{-| Gives your Html widgets access to state information.
 
-        Removed ->
-            List.map
-                (\a -> Html.span [ Attr.class "removed", Attr.attribute "aria-hidden" "true", Attr.tabindex -1 ] [ a ])
-                children
+For example, if you want to extend a widget or form generator (`elm-any-type-forms`) that can only output Html
+with `Ui` elements that alter and respond to the Url, then you need
 
-        Removable ->
-            List.map
-                (\a -> Html.span [ Attr.class "removable" ] [ a ])
-                children
+  - a way to convert from `Ui` to `html` -> `view`
+  - a way to convert from `html` to `Ui` -> `singleton`
+  - a way to forward the current state to the nested `Ui`
 
-        Inserted ->
-            List.map
-                (\a -> Html.span [ Attr.class "inserted removable" ] [ a ])
-                children
+Here is how you use this function:
 
+1.  Write the `Ui` code for your widget extension.
+    You can use all the local parameters your widget provides.
 
-elements : Restrictive.State.Elements (List (Html msg_)) (Html.Attribute Never)
-elements =
-    { link =
-        \attr { url, label } ->
-            [ Html.a (Attr.href url :: List.map (Attr.map never) attr) label ]
-    , switch =
-        \attr { url, label, isChecked } ->
-            [ Html.a
-                (Attr.href url
-                    :: Attr.attribute "role" "switch"
-                    :: Attr.attribute "aria-checked"
-                        (if isChecked then
-                            "true"
+2.  Convert it to `html` using the `makeInnerHtml` function. Just pretend it exists:
 
-                         else
-                            "false"
-                        )
-                    :: List.map (Attr.map never) attr
-                )
-                label
-            ]
+    { makeInnerHtml } ->
+    Ui.singleton...
+    |> makeInnerHtml
+
+    Note that the inner html will not bubble any messages to your app, so you are limited to Url-based state.
+
+3.  Your widget will create `Html msg`. This will be the parameter you provide `stateful`.
+    It will need a `Layout` to render `Ui (Html Never)` into `Html Never`.
+
+Caution: If you use this functionality, the `Ui` will contain functions and will no longer support equality checks and serialisation.
+
+-}
+nest :
+    { combine :
+        { makeInnerHtml :
+            NarrowUi narrowMsg
+            -> Maybe (List (Html narrowMsg))
+        }
+        -> List (Html msg)
     }
+    -> Ui msg narrowMsg
+nest config =
+    Ui.wrap (Nest config) []
+
+
+
+----- LAYOUT -----
+
+
+{-| -}
+layout :
+    Ui.Layout
+        Region
+        (List (Html narrowMsg))
+        (List (Html msg))
+        (Wrapper narrowMsg narrowMsg)
+        (Wrapper narrowMsg msg)
+layout =
+    { removed = removed
+    , removable = removable
+    , inserted = inserted
+    , wrap = wrap
+    , concat = concat
+    , arrange = arrange
+    }
+
+
+{-| -}
+removed : List (Html msg) -> List (Html msg)
+removed =
+    List.map (\a -> Html.span [ Attr.class "removed", Attr.attribute "aria-hidden" "true", Attr.tabindex -1 ] [ a ])
+
+
+{-| -}
+removable : List (Html msg) -> List (Html msg)
+removable =
+    List.map (\a -> Html.span [ Attr.class "removable" ] [ a ])
+
+
+{-| -}
+inserted : List (Html msg) -> List (Html msg)
+inserted =
+    List.map (\a -> Html.span [ Attr.class "inserted removable" ] [ a ])
+
+
+{-| -}
+wrap : Wrapper narrowMsg msg -> Ui.Wrapper Region (List (Html narrowMsg)) (List (Html msg)) (Wrapper narrowMsg narrowMsg)
+wrap =
+    \wrapper ->
+        case wrapper of
+            Node str attrs ->
+                Ui.WrapHtml (Html.node str attrs >> List.singleton)
+
+            Nest { combine } ->
+                Ui.Nest
+                    { regions = [ Scene, Control, Info ]
+                    , narrowLayout = layout
+                    , combine = combine
+                    }
+
+            Link ele style link ->
+                Ui.Link ele style link
+
+
+{-| -}
+concat : List (List a) -> List a
+concat =
+    List.concat
 
 
 {-| -}
@@ -165,3 +266,28 @@ arrange =
                   )
                 ]
             )
+
+
+{-| -}
+templates : List (Html.Attribute Never) -> State.Templates (List (Html msg_))
+templates attrs =
+    { link =
+        \{ url, label } ->
+            [ Html.a (Attr.href url :: List.map (Attr.map never) attrs) label ]
+    , switch =
+        \{ url, label, isChecked } ->
+            [ Html.a
+                (Attr.href url
+                    :: Attr.attribute "role" "switch"
+                    :: Attr.attribute "aria-checked"
+                        (if isChecked then
+                            "true"
+
+                         else
+                            "false"
+                        )
+                    :: List.map (Attr.map never) attrs
+                )
+                label
+            ]
+    }
