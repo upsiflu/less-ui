@@ -133,7 +133,7 @@ type alias Ui region html wrapper =
 type Item region html wrapper
     = Leaf html
     | At region (Ui region html wrapper)
-    | Wrap wrapper (Ui region html wrapper)
+    | Wrap wrapper
 
 
 
@@ -165,9 +165,9 @@ at region =
 
 
 {-| -}
-wrap : wrapper -> Ui region html wrapper -> Ui region html wrapper
-wrap wrapper =
-    Wrap wrapper >> List.singleton
+wrap : wrapper -> Ui region_ html_ wrapper
+wrap =
+    Wrap >> List.singleton
 
 
 
@@ -252,8 +252,8 @@ map fu =
                 At innerRegion elements ->
                     At innerRegion (map fu elements)
 
-                Wrap wrapper elements ->
-                    Wrap wrapper (map fu elements)
+                Wrap wrapper ->
+                    Wrap wrapper
         )
 
 
@@ -269,8 +269,8 @@ mapWrapper fu =
                 At innerRegion elements ->
                     At innerRegion (mapWrapper fu elements)
 
-                Wrap wrapper elements ->
-                    Wrap (fu wrapper) (mapWrapper fu elements)
+                Wrap wrapper ->
+                    Wrap (fu wrapper)
         )
 
 
@@ -295,7 +295,7 @@ type alias Layout region narrowHtml html narrowWrapper customWrapper =
     { removed : html -> html
     , removable : html -> html
     , inserted : html -> html
-    , wrap : customWrapper -> Wrapper region narrowHtml html narrowWrapper
+    , wrap : customWrapper -> Wrapper region narrowHtml html narrowWrapper customWrapper
     , concat : List html -> html
     , arrange : Get (OrHeader region) html -> html
     }
@@ -319,14 +319,15 @@ which makes it comparable and serializable.
 See [`Layout.Html`](Layout.Html#Wrapper) for the default example of a defunctionalized wrapper.
 
 -}
-type Wrapper region narrowHtml html narrowWrapper
-    = WrapHtml (html -> html)
+type Wrapper region narrowHtml html narrowWrapper wrapper
+    = WrapHtml (html -> html) (Ui region html wrapper)
     | Nest
         { regions : List region
         , narrowLayout : Layout region narrowHtml narrowHtml narrowWrapper narrowWrapper
         , combine : { makeInnerHtml : Ui region narrowHtml narrowWrapper -> Maybe narrowHtml } -> html
         }
-    | Link (State.Templates html) (State.LinkStyle html) State.Link
+    | Link (State.Templates html) (State.LinkStyle html) State.Link (Ui region html wrapper)
+    | Keyed (List ( String, html ) -> html) (List ( String, Ui region html wrapper ))
 
 
 
@@ -344,8 +345,8 @@ view state layout =
 I assume it's related to Elm not allowing cyclic type dependencies in `let` functions, let alone within functions.
 So here is explicit polymorphism.
 -}
-viewStatic : State -> Layout region narrowHtml_ html narrowWrapper_ wrapper -> OrHeader region -> Ui region html wrapper -> Get (OrHeader region) html
-viewStatic =
+viewOtherUi : State -> Layout region narrowHtml_ html narrowWrapper_ wrapper -> OrHeader region -> Ui region html wrapper -> Get (OrHeader region) html
+viewOtherUi =
     viewUi
 
 
@@ -366,17 +367,18 @@ viewUi state layout region =
                 At innerRegion elements ->
                     viewUi state layout (Region innerRegion) elements
 
-                Wrap wrapper elements ->
-                    viewWrapper wrapper elements
+                Wrap wrapper ->
+                    viewWrapper wrapper
 
-        viewWrapper : wrapper -> Ui region html wrapper -> Get (OrHeader region) html
-        viewWrapper wrapper elements =
+        viewWrapper : wrapper -> Get (OrHeader region) html
+        viewWrapper wrapper =
             case layout.wrap wrapper of
-                WrapHtml fu ->
+                WrapHtml fu elements ->
                     viewUi state layout region elements
                         |> Get.updateAt region fu
 
                 Nest { regions, narrowLayout, combine } ->
+                    --Important: at this implementation, `Nest` throws away the elements!
                     List.map
                         (\soloRegion ->
                             ( soloRegion
@@ -389,7 +391,7 @@ viewUi state layout region =
                                         Region r ->
                                             at r
                                     )
-                                        >> viewStatic state narrowLayout soloRegion
+                                        >> viewOtherUi state narrowLayout soloRegion
                                         >> Get.get soloRegion
                                 }
                             )
@@ -397,7 +399,7 @@ viewUi state layout region =
                         (Header :: List.map Region regions)
                         |> Get.fromList
 
-                Link templates linkStyle link ->
+                Link templates linkStyle link elements ->
                     [ State.view
                         region
                         state.current
@@ -406,7 +408,7 @@ viewUi state layout region =
                         link
                     , case State.toTuple (State.linkIsActive link state) of
                         ( True, Just False ) ->
-                            viewUi state layout region elements
+                            viewOtherUi state layout region elements
                                 |> Get.map layout.inserted
 
                         ( True, _ ) ->
@@ -421,6 +423,20 @@ viewUi state layout region =
                                 |> Get.map layout.removed
                     ]
                         |> Get.concatBy layout.concat
+
+                Keyed fu elementLists ->
+                    List.concatMap
+                        (\( key, ui ) ->
+                            List.indexedMap
+                                (\i item ->
+                                    viewItem item
+                                        |> Get.map (\itm -> [ ( key ++ String.fromInt i, itm ) ])
+                                )
+                                ui
+                        )
+                        elementLists
+                        |> Get.concat
+                        |> Get.map fu
     in
     List.map viewItem
         >> Get.concatBy layout.concat

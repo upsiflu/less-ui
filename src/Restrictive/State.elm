@@ -44,15 +44,18 @@ module Restrictive.State exposing
 @docs getLocation, getFragment, getPath
 
 
-# Link
+# Create Links
 
 Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest) on click
 
-  - [Jump Navigation (goTo)](#goTo)
-      - [With two consecutive navigation steps (bounce)](#bounce)
-  - [Progressive Disclosure (toggle)](#toggle)
-      - unique at a given Ui node (tab) [ToDo]
-      - unique in the browser tab (drowdown, dialog) [ToDo]
+  - Jump Navigation
+      - [x]  [With a single target (goTo)](#goTo)
+      - [x]  [With two back-and-forth targets (bounce)](#bounce)
+
+  - Progressive Disclosure
+      - [x]  [Orthogonal; any number can be active (toggle)](#toggle)
+      - [ ] Exactly one active at a given Ui node (tab) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8) ☞ [#2](https://github.com/upsiflu/restrictive/issues/2)
+      - [ ] One or zero active in the browser tab (dropdown, dialog) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8)
 
 @docs goTo, bounce, toggle
 
@@ -377,10 +380,7 @@ getFlags =
 -------
 
 
-{-| Encodes an intended transition of [the Ui State](Restrictive.State).
-
-Use [the convenience functions in `Ui`](Restrictive.Ui#goTo) to build
-
+{-| Encodes an intended transition of [the Ui State](#State)
 -}
 type Link
     = GoTo ( Maybe Path, Fragment )

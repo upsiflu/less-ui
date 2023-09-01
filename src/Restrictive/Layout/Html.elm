@@ -1,7 +1,7 @@
 module Restrictive.Layout.Html exposing
     ( Ui
     , toggle, goTo, bounce
-    , Wrapper(..), nest
+    , Wrapper(..), ol, ul, keyedNode, nest
     , layout
     , removed, removable, inserted, wrap, templates, arrange, concat
     )
@@ -11,14 +11,16 @@ module Restrictive.Layout.Html exposing
 @docs Ui
 
 
-# Create links
+# Create Links
+
+_For use cases, read [the Create Links section in the State module](Restrictive-State#create-links)_
 
 @docs toggle, goTo, bounce
 
 
 # Wrap the DOM
 
-@docs Wrapper, nest
+@docs Wrapper, ol, ul, keyedNode, nest
 
 
 # Layout
@@ -34,6 +36,7 @@ module Restrictive.Layout.Html exposing
 
 import Html exposing (Html)
 import Html.Attributes as Attr
+import Html.Keyed
 import Html.Lazy
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
@@ -42,7 +45,7 @@ import Restrictive.Ui as Ui
 
 
 {-| -}
-type alias Ui msg narrowMsg =
+type alias Ui narrowMsg msg =
     Ui.Ui
         Region
         (List (Html msg))
@@ -58,7 +61,8 @@ type alias NarrowUi narrowMsg =
 ---- Create links ----
 
 
-{-| -}
+{-| Toggle a `flag` and show/hide the nested `Ui` accordingly.
+-}
 toggle :
     List (Html.Attribute Never)
     ->
@@ -66,19 +70,20 @@ toggle :
         , isInline : Bool
         , label : List (Html msg)
         }
-    -> Ui msg narrowMsg
-    -> Ui msg narrowMsg
+    -> Ui narrowMsg msg
+    -> Ui narrowMsg msg
 toggle attrs { flag, isInline, label } =
-    State.toggle flag
-        |> Link
-            (templates attrs)
-            { isInline = isInline
-            , label = label
-            }
-        |> Ui.wrap
+    Link
+        (templates attrs)
+        { isInline = isInline
+        , label = label
+        }
+        (State.toggle flag)
+        >> Ui.wrap
 
 
-{-| -}
+{-| Navigate to a `destination` and show the nested `Ui` when it's reached.
+-}
 goTo :
     List (Html.Attribute Never)
     ->
@@ -86,19 +91,20 @@ goTo :
         , isInline : Bool
         , label : List (Html msg)
         }
-    -> Ui msg narrowMsg
-    -> Ui msg narrowMsg
+    -> Ui narrowMsg msg
+    -> Ui narrowMsg msg
 goTo attrs { destination, isInline, label } =
-    State.goTo destination
-        |> Link
-            (templates attrs)
-            { isInline = isInline
-            , label = label
-            }
-        |> Ui.wrap
+    Link
+        (templates attrs)
+        { isInline = isInline
+        , label = label
+        }
+        (State.goTo destination)
+        >> Ui.wrap
 
 
-{-| -}
+{-| Navigate to `there`, and from there, back `here`.
+-}
 bounce :
     List (Html.Attribute Never)
     ->
@@ -106,16 +112,16 @@ bounce :
         , label : List (Html msg)
         , there : ( Maybe State.Path, State.Fragment )
         }
-    -> Ui msg narrowMsg
-    -> Ui msg narrowMsg
+    -> Ui narrowMsg msg
+    -> Ui narrowMsg msg
 bounce attrs { here, label, there } =
-    State.bounce { here = here, there = there }
-        |> Link
-            (templates attrs)
-            { isInline = False
-            , label = label
-            }
-        |> Ui.wrap
+    Link
+        (templates attrs)
+        { isInline = False
+        , label = label
+        }
+        (State.bounce { here = here, there = there })
+        >> Ui.wrap
 
 
 
@@ -128,7 +134,7 @@ bounce attrs { here, label, there } =
 
 -}
 type Wrapper narrowMsg msg
-    = Node String (List (Html.Attribute msg))
+    = Node String (List (Html.Attribute msg)) (Ui narrowMsg msg)
     | Nest
         { combine :
             { makeInnerHtml :
@@ -137,7 +143,36 @@ type Wrapper narrowMsg msg
             }
             -> List (Html msg)
         }
-    | Link (State.Templates (List (Html msg))) (State.LinkStyle (List (Html msg))) State.Link
+    | Link (State.Templates (List (Html msg))) (State.LinkStyle (List (Html msg))) State.Link (Ui narrowMsg msg)
+    | Keyed (List ( String, List (Html msg) ) -> List (Html msg)) (List ( String, Ui narrowMsg msg ))
+
+
+applyKeyedFu : (List ( String, Html msg ) -> Html msg) -> (List ( String, List (Html msg) ) -> List (Html msg))
+applyKeyedFu fu =
+    List.concatMap
+        (\( key, items ) ->
+            List.indexedMap (\i a -> ( key ++ "." ++ String.fromInt i, a )) items
+        )
+        >> fu
+        >> List.singleton
+
+
+{-| -}
+ol : List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
+ol attrs =
+    Keyed (applyKeyedFu (Html.Keyed.ol attrs)) >> Ui.wrap
+
+
+{-| -}
+ul : List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
+ul attrs =
+    Keyed (applyKeyedFu (Html.Keyed.ul attrs)) >> Ui.wrap
+
+
+{-| -}
+keyedNode : String -> List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
+keyedNode tagName attrs =
+    Keyed (applyKeyedFu (Html.Keyed.node tagName attrs)) >> Ui.wrap
 
 
 {-| Gives your Html widgets access to state information.
@@ -176,9 +211,9 @@ nest :
         }
         -> List (Html msg)
     }
-    -> Ui msg narrowMsg
+    -> Ui narrowMsg msg
 nest config =
-    Ui.wrap (Nest config) []
+    Ui.wrap (Nest config)
 
 
 
@@ -222,12 +257,12 @@ inserted =
 
 
 {-| -}
-wrap : Wrapper narrowMsg msg -> Ui.Wrapper Region (List (Html narrowMsg)) (List (Html msg)) (Wrapper narrowMsg narrowMsg)
+wrap : Wrapper narrowMsg msg -> Ui.Wrapper Region (List (Html narrowMsg)) (List (Html msg)) (Wrapper narrowMsg narrowMsg) (Wrapper narrowMsg msg)
 wrap =
     \wrapper ->
         case wrapper of
-            Node str attrs ->
-                Ui.WrapHtml (Html.node str attrs >> List.singleton)
+            Node str attrs elements ->
+                Ui.WrapHtml (Html.node str attrs >> List.singleton) elements
 
             Nest { combine } ->
                 Ui.Nest
@@ -236,8 +271,11 @@ wrap =
                     , combine = combine
                     }
 
-            Link ele style link ->
-                Ui.Link ele style link
+            Link template style link elements ->
+                Ui.Link template style link elements
+
+            Keyed fu list ->
+                Ui.Keyed fu list
 
 
 {-| -}

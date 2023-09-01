@@ -9,7 +9,7 @@ module Features exposing (Features, main, Msg)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Restrictive
-import Restrictive.Layout.Html.Keyed as Keyed exposing (Wrapper(..))
+import Restrictive.Layout.Html.Keyed as Keyed
 import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.State
 import Restrictive.Ui as Ui

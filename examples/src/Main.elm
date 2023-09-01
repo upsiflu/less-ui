@@ -1,6 +1,6 @@
 module Main exposing (Msg)
 
-import Control exposing (Control)
+import Control
 import Date
 import Html
 import Html.Attributes as Attr
@@ -8,7 +8,7 @@ import Html.Events as Events
 import MultiTool
 import Restrictive exposing (application)
 import Restrictive.Layout.Html as Html exposing (Ui)
-import Restrictive.Layout.Region as Region exposing (Region(..))
+import Restrictive.Layout.Region exposing (Region(..))
 import Restrictive.Ui as Ui
 import Tools.Control
 
@@ -130,6 +130,86 @@ passwordControl =
         }
 
 
+type CounterDelta
+    = Increment
+    | Decrement
+
+
+counterControl { makeInnerHtml } =
+    Control.create
+        { initEmpty = ( 0, Cmd.none )
+        , initWith = \output -> ( output, Cmd.none )
+        , update =
+            \delta state ->
+                case delta of
+                    Increment ->
+                        ( state + 1, Cmd.none )
+
+                    Decrement ->
+                        ( state - 1, Cmd.none )
+        , view =
+            \{ state, name, id, label, class } ->
+                [ Html.div [ Attr.class class ]
+                    [ Html.label
+                        [ Attr.for id ]
+                        [ Html.text label ]
+                    , Html.div
+                        [ Attr.id id
+                        , Attr.name name
+                        ]
+                        [ Html.button
+                            [ Attr.type_ "button"
+                            , Events.onClick Increment
+                            ]
+                            [ Html.text "+" ]
+                        , Html.div [] [ Html.text <| String.fromInt state ]
+                        , Html.button
+                            [ Attr.type_ "button"
+                            , Events.onClick Decrement
+                            ]
+                            [ Html.text "-" ]
+                        ]
+                    ]
+                ]
+        , subscriptions = \state -> Sub.none
+        , parse = Ok
+        , label = "Counter"
+        }
+
+
+getCounterForm maybeFormState =
+    let
+        formState =
+            maybeFormState
+                |> Maybe.withDefault
+                    (Tuple.first (getForm { makeInnerHtml = \_ -> Nothing }).init)
+
+        makeOuterHtml uiState =
+            [ (getForm uiState).view formState ]
+
+        getForm makeHtml =
+            Control.form
+                { control = counterControl makeHtml
+                , onUpdate = StringFormUpdated
+                , view = Html.fieldset []
+                }
+    in
+    Html.nest
+        { combine = makeOuterHtml }
+
+
+counterForm =
+    Control.form
+        { control = counterControl { makeInnerHtml = \_ -> Nothing }
+        , onUpdate = StringFormUpdated
+        , view = Html.fieldset []
+        }
+
+
+
+---------
+
+
 getStringControl { makeInnerHtml } =
     Control.create
         { label = "Just a normal String -- but with extra"
@@ -147,12 +227,14 @@ getStringControl { makeInnerHtml } =
                             }
                             (Ui.singleton
                                 [ Html.input
-                                    [ Attr.value state
+                                    [ Events.onInput identity
+                                    , Attr.value state
                                     , Attr.id id
                                     , Attr.class class
                                     , Attr.name name
                                     ]
                                     []
+                                , Html.text state
                                 ]
                             )
                             ++ (Html.toggle []
@@ -225,11 +307,12 @@ stringForm =
 ----
 
 
-type Msg userDelta tupleIntStringDelta shapeDelta stringDelta
+type Msg userDelta tupleIntStringDelta shapeDelta stringDelta counterDelta
     = UserFormUpdated userDelta
     | TupleIntStringFormUpdated tupleIntStringDelta
     | ShapeFormUpdated shapeDelta
     | StringFormUpdated stringDelta
+    | CounterFormUpdated counterDelta
     | FormSubmitted
 
 
@@ -311,6 +394,7 @@ main =
               , userState = userForm.init |> Tuple.first
               , shapeState = shapeForm.init |> Tuple.first
               , stringState = stringForm.init |> Tuple.first
+              , counterState = counterForm.init |> Tuple.first
               }
             , Cmd.none
             )
@@ -338,8 +422,19 @@ main =
                         in
                         ( { model | shapeState = state }, cmd )
 
-                    _ ->
-                        ( model, Cmd.none )
+                    StringFormUpdated delta ->
+                        let
+                            ( state, cmd ) =
+                                stringForm.update delta model.stringState
+                        in
+                        ( { model | stringState = state }, cmd )
+
+                    CounterFormUpdated delta ->
+                        let
+                            ( state, cmd ) =
+                                counterForm.update delta model.counterState
+                        in
+                        ( { model | counterState = state }, cmd )
         , view =
             \model ->
                 { body =
