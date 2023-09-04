@@ -4,12 +4,12 @@ module Restrictive.State exposing
     , next
     , setPath, setFragment
     , UrlCmd(..), integrateAssignment, addAssignment, removeAssignments, toggleFlag, turnOnFlag
-    , hasFlag, linkIsActive
+    , hasFlag, linkData, linkStatus
     , getLocation, getFragment, getPath
     , toString
-    , goTo, bounce, toggle, assign
+    , goTo, bounce, toggle, filter
     , Link, getLink
-    , Templates, LinkStyle
+    , Templates, LinkStyle, LinkData(..)
     , relative
     , mapLinkStyle
     , view
@@ -37,7 +37,7 @@ module Restrictive.State exposing
 
 # Query
 
-@docs hasFlag, linkIsActive
+@docs hasFlag, linkData, linkStatus
 
 
 # Deconstruct
@@ -60,11 +60,11 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
       - [ ] Exactly one active at a given Ui node (tab) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8) ☞ [#2](https://github.com/upsiflu/restrictive/issues/2)
       - [ ] One or zero active in the browser tab (dropdown, dialog) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8)
 
-@docs goTo, bounce, toggle, assign
+@docs goTo, bounce, toggle, filter
 
 @docs Link, getLink
 
-@docs Templates, LinkStyle
+@docs Templates, LinkStyle, LinkData
 
 
 # Map Links
@@ -103,23 +103,49 @@ type alias State =
 
 
 {-| -}
-linkIsActive : Link -> State -> Bool
-linkIsActive l url =
+linkData : Link -> State -> Maybe LinkData
+linkData l url =
+    case l of
+        GoTo _ ->
+            Nothing
+
+        Bounce _ _ ->
+            Nothing
+
+        Toggle _ _ ->
+            Nothing
+
+        Filter ( category, _ ) ->
+            Maybe.map Filtered (getValueOf category url)
+
+        ErrorMessage _ ->
+            Nothing
+
+
+{-| -}
+linkStatus : Link -> State -> Bool
+linkStatus l url =
     case l of
         GoTo ( maybePath, _ ) ->
-            Maybe.unwrap False ((==) url.path) maybePath
+            maybePath == Just url.path
 
         Bounce _ { there } ->
-            linkIsActive (GoTo there) url
+            linkStatus (GoTo there) url
 
         Toggle _ f ->
             hasFlag f url
 
-        Assign assignment ->
-            hasAssignment assignment url
+        Filter ( category, _ ) ->
+            hasCategory category url
 
-        ErrorMessage _ ->
-            True
+        ErrorMessage m ->
+            String.contains m (Url.toString url)
+
+
+{-| The data that a link emits in the context of a given Url.
+-}
+type LinkData
+    = Filtered String
 
 
 {-| **Progressive disclosure**: Turning off a `Flag` renders all corresponding bits
@@ -169,7 +195,7 @@ type alias Fragment =
 
 {-| Manage the assignments your app keeps in the Url.
 
-`Assign (a, b)` will delete all instances of `a=..` and replace them with `a=b`
+`Set (a, b)` will delete all instances of `a=..` and replace them with `a=b`
 `Add (a, b)` will append `a=b` to the end if it's not yet there
 `Clear (a, _)` will delete all instances of `a=..`
 
@@ -363,7 +389,12 @@ hasFlag flag =
 
 hasAssignment : Assignment -> State -> Bool
 hasAssignment ( key, value ) =
-    getFlags >> List.member (key ++ "=" ++ value)
+    hasFlag (key ++ "=" ++ value)
+
+
+hasCategory : String -> State -> Bool
+hasCategory category =
+    getFlags >> List.filterMap (String.split "=" >> List.head) >> List.member category
 
 
 
@@ -404,6 +435,22 @@ getFlags =
     .query >> parseQueryString >> .flags >> Set.toList
 
 
+getValueOf : String -> State -> Maybe String
+getValueOf category =
+    .query
+        >> parseQueryString
+        >> .assignments
+        >> List.filterMap
+            (\( k, v ) ->
+                if k == category then
+                    Just v
+
+                else
+                    Nothing
+            )
+        >> List.head
+
+
 
 ------------------
 -----------------
@@ -419,7 +466,7 @@ type Link
     = GoTo ( Maybe Path, Fragment )
     | Bounce { isAbsolute : Bool } { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) }
     | Toggle { isAbsolute : Bool } Flag
-    | Assign Assignment
+    | Filter Assignment
     | ErrorMessage String
 
 
@@ -475,9 +522,9 @@ toggle =
 
 
 {-| -}
-assign : Assignment -> Link
-assign =
-    Assign
+filter : Assignment -> Link
+filter =
+    Filter
 
 
 {-| -}
@@ -595,7 +642,7 @@ view region url elements { isInline, label } link =
                     , isChecked = hasFlag flag url
                     }
 
-            Assign assignment ->
+            Filter assignment ->
                 elements.search
                     { assignment = assignment
                     , label = label
@@ -890,7 +937,7 @@ toStateTransition link =
                         toggleFlag f
                    )
 
-        Assign ( key, value ) ->
+        Filter ( key, value ) ->
             addAssignment key value
 
         ErrorMessage e ->

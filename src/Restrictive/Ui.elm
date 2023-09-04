@@ -301,18 +301,12 @@ type Wrapper region narrowHtml html narrowWrapper wrapper
         , narrowLayout : Layout region narrowHtml narrowHtml narrowWrapper narrowWrapper
         , combine : { makeInnerHtml : Ui region narrowHtml narrowWrapper -> Maybe narrowHtml } -> html
         }
-    | Link (State.Templates html) (State.LinkStyle html) State.Link (Ui region html wrapper)
+    | Link (State.Templates html) (State.LinkStyle html) State.Link (Maybe State.LinkData -> Ui region html wrapper)
     | Keyed (List ( String, html ) -> html) (List ( String, Ui region html wrapper ))
 
 
 
 ---- VIEW ----
-{- New Idea: Add a Msg modelMsg type that can alter the state,
-   -- and provide `Layout` with `ModelMsg : modelMsg -> Msg` so that
-   -- it can `Html.map` all the non-Url-altering bits inside the view.alias
-   -- Also provide the message `urlCmds : List (UrlCmd) -> Msg = UrlCmds`
-   -- #28
--}
 
 
 {-| -}
@@ -380,7 +374,7 @@ viewUi state layout region =
                         (Header :: List.map Region regions)
                         |> Get.fromList
 
-                Link templates linkStyle link elements ->
+                Link templates linkStyle link getElements ->
                     [ State.view
                         region
                         state.current
@@ -388,23 +382,24 @@ viewUi state layout region =
                         linkStyle
                         link
                     , case
-                        ( State.linkIsActive link state.current
-                        , Maybe.map (State.linkIsActive link) state.previous
+                        ( State.linkStatus link state.current
+                        , Maybe.map (State.linkStatus link) state.previous
+                        , State.linkData link state.current
                         )
                       of
-                        ( True, Just False ) ->
-                            viewOtherUi state layout region elements
+                        ( True, Just False, linkData ) ->
+                            viewOtherUi state layout region (getElements linkData)
                                 |> Get.map layout.inserted
 
-                        ( True, _ ) ->
-                            viewUi state layout region elements
+                        ( True, _, linkData ) ->
+                            viewUi state layout region (getElements linkData)
                                 |> Get.map layout.removable
 
-                        ( False, Just True ) ->
-                            viewUi state layout region elements
+                        ( False, Just True, linkData ) ->
+                            viewUi state layout region (getElements linkData)
                                 |> Get.map layout.removed
 
-                        ( False, _ ) ->
+                        ( False, _, _ ) ->
                             Get.empty
                     ]
                         |> Get.concatBy layout.concat
