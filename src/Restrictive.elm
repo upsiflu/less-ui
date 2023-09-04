@@ -3,7 +3,7 @@ module Restrictive exposing (application, Application, mapDocument, Document)
 {-| Makes the `Url` the single source of truth for the state of your user interface,
 and hides the corresponding messages from your `update`.
 
-@docs application, Application, mapDocument, Document, Msg
+@docs application, Application, mapDocument, Document
 
 ---
 
@@ -104,7 +104,7 @@ application config =
                 in
                 ( ( key, { current = initialState, previous = Nothing }, initialModel )
                 , Cmd.batch
-                    [ Cmd.map ModelMsg modelCmd
+                    [ Cmd.map AppMsg modelCmd
                     , Nav.replaceUrl key (Url.toString initialState)
                     ]
                 )
@@ -153,12 +153,12 @@ application config =
                     LinkClicked (Browser.External href) ->
                         ( ( key, state, model ), Nav.load href )
 
-                    ModelMsg modelMsg ->
+                    AppMsg modelMsg ->
                         let
                             ( updatedModel, modelCmd ) =
                                 config.update modelMsg model
                         in
-                        ( ( key, state, updatedModel ), Cmd.map ModelMsg modelCmd )
+                        ( ( key, state, updatedModel ), Cmd.map AppMsg modelCmd )
 
                     UrlCmds assignments ->
                         ( ( key, state, model )
@@ -188,7 +188,7 @@ application config =
                         config.view model state
                 in
                 { title = title
-                , body = List.map (Html.map ModelMsg) body
+                , body = List.map (Html.map AppMsg) body
                 }
         }
 

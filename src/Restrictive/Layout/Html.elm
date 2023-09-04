@@ -1,22 +1,21 @@
 module Restrictive.Layout.Html exposing
-    ( Ui
-    , toggle, goTo, bounce
+    ( Ui, singleton
+    , toggle, goTo, bounce, assign
     , Wrapper(..), ol, ul, keyedNode, nest
     , layout
     , removed, removable, inserted, wrap, templates, arrange, concat
-    , assign
     )
 
 {-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Restrictive.Ui`](Restrictive.Ui)
 
-@docs Ui
+@docs Ui, singleton
 
 
 # Create Links
 
 _For use cases, read [the Create Links section in the State module](Restrictive-State#create-links)_
 
-@docs toggle, goTo, bounce
+@docs toggle, goTo, bounce, assign
 
 
 # Wrap the DOM
@@ -37,10 +36,12 @@ _For use cases, read [the Create Links section in the State module](Restrictive-
 
 import Html exposing (Html)
 import Html.Attributes as Attr
+import Html.Events as Events
 import Html.Keyed
 import Html.Lazy
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
+import Restrictive.Msg exposing (Msg(..))
 import Restrictive.State as State
 import Restrictive.Ui as Ui
 
@@ -49,13 +50,19 @@ import Restrictive.Ui as Ui
 type alias Ui narrowMsg msg =
     Ui.Ui
         Region
-        (List (Html msg))
+        (List (Html (Msg msg)))
         (Wrapper narrowMsg msg)
 
 
 {-| -}
 type alias NarrowUi narrowMsg =
     Ui narrowMsg narrowMsg
+
+
+{-| -}
+singleton : List (Html msg) -> Ui narrowMsg_ msg
+singleton =
+    List.map (Html.map AppMsg) >> Ui.singleton
 
 
 
@@ -77,7 +84,7 @@ toggle attrs { flag, isInline, label } =
     Link
         (templates attrs)
         { isInline = isInline
-        , label = label
+        , label = List.map (Html.map AppMsg) label
         }
         (State.toggle flag)
         >> Ui.wrap
@@ -99,7 +106,7 @@ assign attrs { category, isInline, label } searchTerm =
     Link
         (templates attrs)
         { isInline = isInline
-        , label = label
+        , label = List.map (Html.map AppMsg) label
         }
         (State.assign ( category, searchTerm ))
         >> Ui.wrap
@@ -120,7 +127,7 @@ goTo attrs { destination, isInline, label } =
     Link
         (templates attrs)
         { isInline = isInline
-        , label = label
+        , label = List.map (Html.map AppMsg) label
         }
         (State.goTo destination)
         >> Ui.wrap
@@ -141,7 +148,7 @@ bounce attrs { here, label, there } =
     Link
         (templates attrs)
         { isInline = False
-        , label = label
+        , label = List.map (Html.map AppMsg) label
         }
         (State.bounce { here = here, there = there })
         >> Ui.wrap
@@ -151,23 +158,19 @@ bounce attrs { here, label, there } =
 ---- Working with contingent transformations ----
 
 
-{-| Use with [`Ui.wrap`](Restrictive.Ui#wrap)
-
-    Ui.wrap (Node "section" [ Attr.class "hello" ])
-
--}
+{-| -}
 type Wrapper narrowMsg msg
-    = Node String (List (Html.Attribute msg)) (Ui narrowMsg msg)
+    = Node String (List (Html.Attribute (Msg msg))) (Ui narrowMsg msg)
     | Nest
         { combine :
             { makeInnerHtml :
                 NarrowUi narrowMsg
-                -> Maybe (List (Html narrowMsg))
+                -> Maybe (List (Html (Msg narrowMsg)))
             }
-            -> List (Html msg)
+            -> List (Html (Msg msg))
         }
-    | Link (State.Templates (List (Html msg))) (State.LinkStyle (List (Html msg))) State.Link (Ui narrowMsg msg)
-    | Keyed (List ( String, List (Html msg) ) -> List (Html msg)) (List ( String, Ui narrowMsg msg ))
+    | Link (State.Templates (List (Html (Msg msg)))) (State.LinkStyle (List (Html (Msg msg)))) State.Link (Ui narrowMsg msg)
+    | Keyed (List ( String, List (Html (Msg msg)) ) -> List (Html (Msg msg))) (List ( String, Ui narrowMsg msg ))
 
 
 applyKeyedFu : (List ( String, Html msg ) -> Html msg) -> (List ( String, List (Html msg) ) -> List (Html msg))
@@ -183,19 +186,19 @@ applyKeyedFu fu =
 {-| -}
 ol : List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
 ol attrs =
-    Keyed (applyKeyedFu (Html.Keyed.ol attrs)) >> Ui.wrap
+    Keyed (applyKeyedFu (Html.Keyed.ol (List.map (Attr.map AppMsg) attrs))) >> Ui.wrap
 
 
 {-| -}
 ul : List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
 ul attrs =
-    Keyed (applyKeyedFu (Html.Keyed.ul attrs)) >> Ui.wrap
+    Keyed (applyKeyedFu (Html.Keyed.ul (List.map (Attr.map AppMsg) attrs))) >> Ui.wrap
 
 
 {-| -}
 keyedNode : String -> List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
 keyedNode tagName attrs =
-    Keyed (applyKeyedFu (Html.Keyed.node tagName attrs)) >> Ui.wrap
+    Keyed (applyKeyedFu (Html.Keyed.node tagName (List.map (Attr.map AppMsg) attrs))) >> Ui.wrap
 
 
 {-| Gives your Html widgets access to state information.
@@ -230,9 +233,9 @@ nest :
     { combine :
         { makeInnerHtml :
             NarrowUi narrowMsg
-            -> Maybe (List (Html narrowMsg))
+            -> Maybe (List (Html (Msg narrowMsg)))
         }
-        -> List (Html msg)
+        -> List (Html (Msg msg))
     }
     -> Ui narrowMsg msg
 nest config =
@@ -247,8 +250,8 @@ nest config =
 layout :
     Ui.Layout
         Region
-        (List (Html narrowMsg))
-        (List (Html msg))
+        (List (Html (Msg narrowMsg)))
+        (List (Html (Msg msg)))
         (Wrapper narrowMsg narrowMsg)
         (Wrapper narrowMsg msg)
 layout =
@@ -280,25 +283,75 @@ inserted =
 
 
 {-| -}
-wrap : Wrapper narrowMsg msg -> Ui.Wrapper Region (List (Html narrowMsg)) (List (Html msg)) (Wrapper narrowMsg narrowMsg) (Wrapper narrowMsg msg)
-wrap =
-    \wrapper ->
-        case wrapper of
-            Node str attrs elements ->
-                Ui.WrapHtml (Html.node str attrs >> List.singleton) elements
+wrap :
+    Wrapper narrowMsg msg
+    ->
+        Ui.Wrapper
+            Region
+            (List (Html (Msg narrowMsg)))
+            (List (Html (Msg msg)))
+            (Wrapper narrowMsg narrowMsg)
+            (Wrapper narrowMsg msg)
+wrap wrapper =
+    case wrapper of
+        Node str attrs elements ->
+            Ui.WrapHtml (Html.node str attrs >> List.singleton) elements
 
-            Nest { combine } ->
-                Ui.Nest
-                    { regions = [ Scene, Control, Info ]
-                    , narrowLayout = layout
-                    , combine = combine
-                    }
+        {-
+           This argument is a record of type:
 
-            Link template style link elements ->
-                Ui.Link template style link elements
+               { combine :
+                     { makeInnerHtml :
+                           Ui.Ui
+                               Region
+                               (List (Html (Msg narrowMsg)))
+                               (Wrapper narrowMsg narrowMsg)
+                           -> Maybe (List (Html (Msg narrowMsg)))
+                     }
+                     -> List (Html (Msg msg))
+               , narrowLayout :
+                     Ui.Layout
+                         Region
+                         (List (Html (Msg narrowMsg)))
+                         (List (Html (Msg narrowMsg)))
+                         (Wrapper #(Msg narrowMsg)# #(Msg narrowMsg)#)
+                         (Wrapper #(Msg narrowMsg)# #(Msg narrowMsg)#)
+               , regions : List Region
+               }
 
-            Keyed fu list ->
-                Ui.Keyed fu list
+           But `Nest` needs the 1st argument to be:
+
+               { combine :
+                     { makeInnerHtml :
+                           Ui.Ui
+                               Region
+                               (List (Html (Msg narrowMsg)))
+                               (Wrapper narrowMsg narrowMsg)
+                           -> Maybe (List (Html (Msg narrowMsg)))
+                     }
+                     -> List (Html (Msg msg))
+               , narrowLayout :
+                     Ui.Layout
+                         Region
+                         (List (Html (Msg narrowMsg)))
+                         (List (Html (Msg narrowMsg)))
+                         (Wrapper #narrowMsg# #narrowMsg#)
+                         (Wrapper #narrowMsg# #narrowMsg#)
+               , regions : List Region
+               }
+        -}
+        Nest { combine } ->
+            Ui.Nest
+                { regions = [ Scene, Control, Info ]
+                , narrowLayout = layout
+                , combine = combine
+                }
+
+        Link template style link elements ->
+            Ui.Link template style link elements
+
+        Keyed fu list ->
+            Ui.Keyed fu list
 
 
 {-| -}
@@ -330,8 +383,16 @@ arrange =
 
 
 {-| -}
-templates : List (Html.Attribute Never) -> State.Templates (List (Html msg_))
+templates : List (Html.Attribute Never) -> State.Templates (List (Html (Msg msg_)))
 templates attrs =
+    {-
+       Field `link` expected
+           `{ url : String, label : List (Html msg), isCurrent : Bool } -> List (Html (Msg msg))`
+
+
+       , found
+           `{ url : String, label : Html modelMsg, isCurrent : Bool } -> List unknown`
+    -}
     { link =
         \{ url, label, isCurrent } ->
             [ Html.a
@@ -371,6 +432,7 @@ templates attrs =
             in
             Html.input
                 (Attr.value searchTerm
+                    :: Events.onInput (\newSearchTerm -> UrlCmds [ State.Set ( category, newSearchTerm ) ])
                     :: Attr.title category
                     :: Attr.attribute "aria-current"
                         (if isCurrent then

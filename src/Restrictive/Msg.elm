@@ -16,5 +16,5 @@ import Url exposing (Url)
 type Msg modelMsg
     = UrlChanged Url
     | LinkClicked Browser.UrlRequest
-    | ModelMsg modelMsg
+    | AppMsg modelMsg
     | UrlCmds (List UrlCmd)

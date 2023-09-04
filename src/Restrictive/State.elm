@@ -1,38 +1,38 @@
 module Restrictive.State exposing
-    ( State, Path, Flag, Fragment, Query
+    ( State, Path, Flag, Assignment, Fragment, Query
     , fromString, err
-    , setPath, setFragment
     , next
-    , addAssignment, removeAssignments, toggleFlag, turnOnFlag
+    , setPath, setFragment
+    , UrlCmd(..), integrateAssignment, addAssignment, removeAssignments, toggleFlag, turnOnFlag
     , hasFlag, linkIsActive
     , getLocation, getFragment, getPath
-    , goTo, bounce, toggle
+    , toString
+    , goTo, bounce, toggle, assign
     , Link, getLink
     , Templates, LinkStyle
     , relative
     , mapLinkStyle
     , view
     , upTo, querySerialiseLocation, queryParseLocation, linkToString
-    , Assignment, UrlCmd, assign, integrateAssignment, toString
     )
 
 {-| We use the Url query to keep track of the Ui state. This makes sharing a Ui state as easy as copying the Url.
 
-@docs State, Path, Flag, Fragment, Query
+@docs State, Path, Flag, Assignment, Fragment, Query
 
 
 # Create
 
-@docs init, fromString, err
+@docs fromString, err
 
 
 # Map
 
-@docs map, setPath, setFragment
-
 @docs next
 
-@docs addAssignment, removeAssignments, toggleFlag, turnOnFlag
+@docs setPath, setFragment
+
+@docs UrlCmd, integrateAssignment, addAssignment, removeAssignments, toggleFlag, turnOnFlag
 
 
 # Query
@@ -44,7 +44,7 @@ module Restrictive.State exposing
 
 @docs getLocation, getFragment, getPath
 
-@docs toUrlString, toTuple
+@docs toString
 
 
 # Create Links
@@ -60,7 +60,7 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
       - [ ] Exactly one active at a given Ui node (tab) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8) ☞ [#2](https://github.com/upsiflu/restrictive/issues/2)
       - [ ] One or zero active in the browser tab (dropdown, dialog) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8)
 
-@docs goTo, bounce, toggle
+@docs goTo, bounce, toggle, assign
 
 @docs Link, getLink
 
