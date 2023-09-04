@@ -1,10 +1,10 @@
 module Restrictive.State exposing
     ( State, Path, Flag, Fragment, Query
-    , init, fromString, err
-    , map, setPath, setFragment
+    , fromString, err
+    , setPath, setFragment
+    , next
     , addAssignment, removeAssignments, toggleFlag, turnOnFlag
     , hasFlag, linkIsActive
-    , toUrlString
     , getLocation, getFragment, getPath
     , goTo, bounce, toggle
     , Link, getLink
@@ -12,8 +12,8 @@ module Restrictive.State exposing
     , relative
     , mapLinkStyle
     , view
-    , toStateTransition, toTuple
     , upTo, querySerialiseLocation, queryParseLocation, linkToString
+    , Assignment, UrlCmd, assign, integrateAssignment, toString
     )
 
 {-| We use the Url query to keep track of the Ui state. This makes sharing a Ui state as easy as copying the Url.
@@ -30,6 +30,8 @@ module Restrictive.State exposing
 
 @docs map, setPath, setFragment
 
+@docs next
+
 @docs addAssignment, removeAssignments, toggleFlag, turnOnFlag
 
 
@@ -40,8 +42,9 @@ module Restrictive.State exposing
 
 # Deconstruct
 
-@docs toUrlString
 @docs getLocation, getFragment, getPath
+
+@docs toUrlString, toTuple
 
 
 # Create Links
@@ -64,20 +67,15 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
 @docs Templates, LinkStyle
 
 
-# Map
+# Map Links
 
 @docs relative
 @docs mapLinkStyle
 
 
-# View
+# View Links
 
 @docs view
-
-
-# Deconstruct
-
-@docs toStateTransition, toTuple
 
 
 # Internals
@@ -91,6 +89,7 @@ Test these functions with `elm-verify-examples` (see the Readme)
 import Maybe.Extra as Maybe
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region exposing (OrHeader(..))
+import Result.Extra as Result
 import Set exposing (Set)
 import Set.Extra as Set
 import String.Extra as String
@@ -100,58 +99,57 @@ import Url.Codec exposing (Codec, ParseError(..))
 
 {-| -}
 type alias State =
-    { current : Url, previous : Maybe Url }
+    Url
 
 
 {-| -}
-linkIsActive : Link -> State -> { current : Bool, previous : Maybe Bool }
-linkIsActive =
-    let
-        compareUrl : Link -> Url -> Bool
-        compareUrl l url =
-            case l of
-                GoTo ( maybePath, _ ) ->
-                    Maybe.unwrap False ((==) url.path) maybePath
+linkIsActive : Link -> State -> Bool
+linkIsActive l url =
+    case l of
+        GoTo ( maybePath, _ ) ->
+            Maybe.unwrap False ((==) url.path) maybePath
 
-                Bounce _ { there } ->
-                    compareUrl (GoTo there) url
+        Bounce _ { there } ->
+            linkIsActive (GoTo there) url
 
-                Toggle _ f ->
-                    hasFlag f url
+        Toggle _ f ->
+            hasFlag f url
 
-                ErrorMessage _ ->
-                    True
-    in
-    compareUrl >> map
+        Assign assignment ->
+            hasAssignment assignment url
+
+        ErrorMessage _ ->
+            True
 
 
-{-| -}
-map : (a -> b) -> { current : a, previous : Maybe a } -> { current : b, previous : Maybe b }
-map fu state_ =
-    { current = fu state_.current, previous = Maybe.map fu state_.previous }
+{-| **Progressive disclosure**: Turning off a `Flag` renders all corresponding bits
+of `Ui` invisible.
+Example: [Layout.Html#toggle](Restrictive.Layout.Html#toggle).
 
-
-{-| -}
-toTuple : { current : a, previous : Maybe a } -> ( a, Maybe a )
-toTuple state_ =
-    ( state_.current, state_.previous )
-
-
-{-| Turning off a `Flag` renders invisible the corresponding [Region](Restrictive.Layout.Region) in the corresponding [toggle Link](Ui.Link#toggle).
-
-Assignments such as `?a=b` may represent currently active Tabs or a search string.
-
-The patterns are **progressive disclosure** and **fulltext search**.
+**Parametric search:** Assignments such as `?a=b` may represent currently active Tabs
+or a search string.
+Example: [Layout.Html#search](Restrictive.Layout.Html#search).
 
 -}
 type alias Flag =
     String
 
 
-{-| Paths may represent an **editing-cursor position** or **viewport**. This is up to the app to define for now.
+{-| Paths may represent an **editing-cursor position** or **viewport**.
+This is up to the app to define for now.
 -}
 type alias Path =
     String
+
+
+{-| **Viewmode**: Assign a value to a key. **Search**: Assign a searchTerm to a category.
+
+Assignments are parallelly treated as Flags! So `?a=b` is both an assignment `(a, b)`
+and a flag `"a=b"`.
+
+-}
+type alias Assignment =
+    ( String, String )
 
 
 {-| "Graphical Web browsers typically scroll to position pages so that the top of the element
@@ -169,21 +167,31 @@ type alias Fragment =
     Maybe String
 
 
+{-| Manage the assignments your app keeps in the Url.
+
+`Assign (a, b)` will delete all instances of `a=..` and replace them with `a=b`
+`Add (a, b)` will append `a=b` to the end if it's not yet there
+`Clear (a, _)` will delete all instances of `a=..`
+
+**Outlook:** In the longer run, this type supports any message we want to send from
+the application to the restrictive framework.
+
+-}
+type UrlCmd
+    = Set Assignment
+    | Add Assignment
+    | Clear String
+
+
 
 ---- Create ----
-
-
-{-| -}
-init : Url -> State
-init state =
-    { current = state, previous = Nothing }
 
 
 {-| Only use for testing!
 -}
 fromString : String -> Maybe State
 fromString =
-    Url.fromString >> Maybe.map init
+    Url.fromString
 
 
 
@@ -191,19 +199,30 @@ fromString =
 
 
 {-| -}
-setPath : Path -> Url -> Url
+setPath : Path -> State -> State
 setPath path state =
     { state | path = "/" ++ path }
 
 
 {-| -}
-setFragment : Fragment -> Url -> Url
+setFragment : Fragment -> State -> State
 setFragment fragment state =
     { state | fragment = fragment }
 
 
 {-| -}
-turnOnFlag : Flag -> Url -> Url
+setLocation : ( Maybe Path, Fragment ) -> State -> State
+setLocation destination =
+    case destination of
+        ( Just path, fragment ) ->
+            setPath path >> setFragment fragment
+
+        ( Nothing, fragment ) ->
+            setFragment fragment
+
+
+{-| -}
+turnOnFlag : Flag -> State -> State
 turnOnFlag flag =
     if flag == "" then
         identity
@@ -234,7 +253,7 @@ turnOnFlag flag =
                 --> "f&g&h&a=b&c=d=e"
 
 -}
-toggleFlag : Flag -> Url -> Url
+toggleFlag : Flag -> State -> State
 toggleFlag flag =
     if flag == "" then
         identity
@@ -244,13 +263,33 @@ toggleFlag flag =
 
 
 {-| -}
-addAssignment : String -> String -> Url -> Url
+integrateAssignment : UrlCmd -> State -> State
+integrateAssignment urlCommand =
+    case urlCommand of
+        Set ( k, v ) ->
+            replaceAssignment k v
+
+        Add ( k, v ) ->
+            addAssignment k v
+
+        Clear k ->
+            removeAssignments [ k ]
+
+
+{-| -}
+addAssignment : String -> String -> State -> State
 addAssignment key value =
     mapQuery <| \q -> { q | assignments = ( key, value ) :: q.assignments }
 
 
 {-| -}
-removeAssignments : List String -> Url -> Url
+replaceAssignment : String -> String -> State -> State
+replaceAssignment key value =
+    mapQuery <| \q -> { q | assignments = ( key, value ) :: List.filter (\( k, _ ) -> k /= key) q.assignments }
+
+
+{-| -}
+removeAssignments : List String -> State -> State
 removeAssignments keys =
     mapQuery <|
         \q ->
@@ -262,7 +301,7 @@ removeAssignments keys =
             }
 
 
-mapQuery : (Query -> Query) -> Url -> Url
+mapQuery : (Query -> Query) -> State -> State
 mapQuery fu state =
     { state | query = (parseQueryString >> fu >> serializeQuery) state.query }
 
@@ -317,9 +356,14 @@ parseQueryString =
         --> Just True
 
 -}
-hasFlag : Flag -> Url -> Bool
+hasFlag : Flag -> State -> Bool
 hasFlag flag =
     getFlags >> List.member flag
+
+
+hasAssignment : Assignment -> State -> Bool
+hasAssignment ( key, value ) =
+    getFlags >> List.member (key ++ "=" ++ value)
 
 
 
@@ -327,46 +371,35 @@ hasFlag flag =
 
 
 {-| -}
-toUrlString : Url -> String
-toUrlString =
+toString : State -> String
+toString =
     Url.toString
 
 
 {-| -}
-getFragment : Url -> Fragment
+getFragment : State -> Fragment
 getFragment =
     .fragment
 
 
 {-| -}
-getPath : Url -> Path
+getPath : State -> Path
 getPath { path } =
     String.dropLeft 1 path
 
 
 {-| -}
-getLocation : Url -> ( Maybe Path, Fragment )
+getLocation : State -> ( Maybe Path, Fragment )
 getLocation url =
     ( String.nonEmpty (getPath url), getFragment url )
 
 
 {-| -}
-setLocation : ( Maybe Path, Fragment ) -> Url -> Url
-setLocation destination =
-    case destination of
-        ( Just path, fragment ) ->
-            setPath path >> setFragment fragment
-
-        ( Nothing, fragment ) ->
-            setFragment fragment
-
-
-{-| -}
 type alias Query =
-    { flags : Set Flag, assignments : List ( String, String ) }
+    { flags : Set Flag, assignments : List Assignment }
 
 
-getFlags : Url -> List Flag
+getFlags : State -> List Flag
 getFlags =
     .query >> parseQueryString >> .flags >> Set.toList
 
@@ -386,6 +419,7 @@ type Link
     = GoTo ( Maybe Path, Fragment )
     | Bounce { isAbsolute : Bool } { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) }
     | Toggle { isAbsolute : Bool } Flag
+    | Assign Assignment
     | ErrorMessage String
 
 
@@ -441,6 +475,12 @@ toggle =
 
 
 {-| -}
+assign : Assignment -> Link
+assign =
+    Assign
+
+
+{-| -}
 err : String -> Link
 err =
     ErrorMessage
@@ -486,10 +526,13 @@ mapLinkStyle fu linkStyle =
 -}
 type alias Templates html =
     { link :
-        { url : String, label : html }
+        { url : String, label : html, isCurrent : Bool }
         -> html
     , switch :
         { url : String, label : html, isChecked : Bool }
+        -> html
+    , search :
+        { assignment : Assignment, label : html, isCurrent : Bool }
         -> html
     }
 
@@ -552,10 +595,18 @@ view region url elements { isInline, label } link =
                     , isChecked = hasFlag flag url
                     }
 
+            Assign assignment ->
+                elements.search
+                    { assignment = assignment
+                    , label = label
+                    , isCurrent = hasAssignment assignment url
+                    }
+
             _ ->
                 elements.link
                     { url = linkToString link
                     , label = label
+                    , isCurrent = unwrapDestination link == Just (getLocation url)
                     }
 
 
@@ -750,44 +801,39 @@ In the following tests, we assume a previous path of "/"
         --> goTo (Nothing, Just "?fragment")
 
 -}
-getLink : Path -> Url -> Link
-getLink currentPath url =
-    case
-        Url.Codec.parseUrl codecs
-            { url
-                | path =
-                    if currentPath == url.path then
-                        ""
+getLink : State -> State -> Link
+getLink new current =
+    Url.Codec.parseUrl codecs
+        { new
+            | path =
+                if current.path == new.path then
+                    ""
 
-                    else
-                        url.path
-            }
-    of
-        Ok link ->
-            link
-
-        Err e ->
-            ErrorMessage <|
-                String.join ", " <|
-                    case e of
-                        SegmentMismatch { expected, available } ->
-                            [ "SegmentMismatch: expected", expected, "available", available ]
-
-                        SegmentNotAvailable ->
-                            [ "SegmentNotAvailable" ]
-
-                        DidNotConsumeEverything strList ->
-                            "DidNotConsumeEverything" :: strList
-
-                        NeededSingleQueryParameterValueGotMultiple { key, got } ->
-                            [ "NeededSingleQueryParameterValueGotMultiple", key ] ++ got
-
-                        _ ->
-                            [ "other link parse error" ]
+                else
+                    new.path
+        }
+        |> Result.extract parseErrorToLink
 
 
+parseErrorToLink : ParseError -> Link
+parseErrorToLink e =
+    ErrorMessage <|
+        String.join ", " <|
+            case e of
+                SegmentMismatch { expected, available } ->
+                    [ "SegmentMismatch: expected", expected, "available", available ]
 
----- Deconstruct ----
+                SegmentNotAvailable ->
+                    [ "SegmentNotAvailable" ]
+
+                DidNotConsumeEverything strList ->
+                    "DidNotConsumeEverything" :: strList
+
+                NeededSingleQueryParameterValueGotMultiple { key, got } ->
+                    [ "NeededSingleQueryParameterValueGotMultiple", key ] ++ got
+
+                _ ->
+                    [ "other link parse error" ]
 
 
 {-| **Lifecycle of a Link**
@@ -808,7 +854,16 @@ getLink currentPath url =
 -> Update the app with that
 
 -}
-toStateTransition : Link -> Url -> Url
+next : Link -> State -> State
+next link current =
+    toStateTransition link current
+
+
+
+---- Deconstruct ----
+
+
+toStateTransition : Link -> State -> State
 toStateTransition link =
     case link of
         GoTo destination ->
@@ -834,6 +889,9 @@ toStateTransition link =
                     else
                         toggleFlag f
                    )
+
+        Assign ( key, value ) ->
+            addAssignment key value
 
         ErrorMessage e ->
             addAssignment "errorMessage" e

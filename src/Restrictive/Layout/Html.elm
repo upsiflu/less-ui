@@ -4,6 +4,7 @@ module Restrictive.Layout.Html exposing
     , Wrapper(..), ol, ul, keyedNode, nest
     , layout
     , removed, removable, inserted, wrap, templates, arrange, concat
+    , assign
     )
 
 {-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Restrictive.Ui`](Restrictive.Ui)
@@ -79,6 +80,28 @@ toggle attrs { flag, isInline, label } =
         , label = label
         }
         (State.toggle flag)
+        >> Ui.wrap
+
+
+{-| Toggle a `flag` and show/hide the nested `Ui` accordingly.
+-}
+assign :
+    List (Html.Attribute Never)
+    ->
+        { category : State.Flag
+        , isInline : Bool
+        , label : List (Html msg)
+        }
+    -> String
+    -> Ui narrowMsg msg
+    -> Ui narrowMsg msg
+assign attrs { category, isInline, label } searchTerm =
+    Link
+        (templates attrs)
+        { isInline = isInline
+        , label = label
+        }
+        (State.assign ( category, searchTerm ))
         >> Ui.wrap
 
 
@@ -310,8 +333,20 @@ arrange =
 templates : List (Html.Attribute Never) -> State.Templates (List (Html msg_))
 templates attrs =
     { link =
-        \{ url, label } ->
-            [ Html.a (Attr.href url :: List.map (Attr.map never) attrs) label ]
+        \{ url, label, isCurrent } ->
+            [ Html.a
+                (Attr.href url
+                    :: Attr.attribute "aria-current"
+                        (if isCurrent then
+                            "page"
+
+                         else
+                            "false"
+                        )
+                    :: List.map (Attr.map never) attrs
+                )
+                label
+            ]
     , switch =
         \{ url, label, isChecked } ->
             [ Html.a
@@ -328,4 +363,24 @@ templates attrs =
                 )
                 label
             ]
+    , search =
+        \{ assignment, label, isCurrent } ->
+            let
+                ( category, searchTerm ) =
+                    assignment
+            in
+            Html.input
+                (Attr.value searchTerm
+                    :: Attr.title category
+                    :: Attr.attribute "aria-current"
+                        (if isCurrent then
+                            "page"
+
+                         else
+                            "false"
+                        )
+                    :: List.map (Attr.map never) attrs
+                )
+                []
+                :: label
     }

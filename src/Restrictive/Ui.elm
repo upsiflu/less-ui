@@ -1,7 +1,7 @@
 module Restrictive.Ui exposing
     ( Ui, Item
-    , singleton
-    , at, wrap
+    , singleton, wrap
+    , at
     , view
     , Layout, Wrapper(..)
     , repeat
@@ -15,20 +15,17 @@ module Restrictive.Ui exposing
 {-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
 and build accessible patterns orthogonal to the Dom tree.
 
-Ui is headless (like elm-widgets will be).
-Note that you can use `++`, `List.concatMap` and friends because `Ui`s are Lists.
-
 @docs Ui, Item
 
 
 # Create
 
-@docs singleton
+@docs singleton, wrap
 
 
 # Modify
 
-@docs at, wrap
+@docs at
 
 
 # Append
@@ -108,32 +105,11 @@ type alias Ui region html wrapper =
     List (Item region html wrapper)
 
 
-{-|
-
-    Leaf html           -- Rendered html node
-
-    Twig State.LinkStyle
-         State.Link
-         Ui             -- Logical bifurcation (link*state active/inactive)
-
-    At region Ui        -- Visual bifurcation (screen regions)
-
-    Wrap wrapper Ui     -- Dom bifurcation (things like section, header, p, ul, table...)
-
-    Stateful (List region)
-        { makeOuterHtml :
-            { makeInnerHtml : Ui -> Html Never }
-            -> html
-        }               -- Composes nested `view` functions from libraries such as elm-any-type-form
-                        -- that require a specific `Html x` (Html delta) type for custom views.
-                        -- Note that this means that a form's Html can never nest another form's Html
-                        -- because forms rely on messages, and views can only emit their local delta.
-
--}
+{-| -}
 type Item region html wrapper
     = Leaf html
-    | At region (Ui region html wrapper)
     | Wrap wrapper
+    | At region (Ui region html wrapper)
 
 
 
@@ -146,6 +122,13 @@ singleton =
     Leaf >> List.singleton
 
 
+{-| Check out [the default wrappers in `Restrictive.Layout.Html`](Restrictive.Layout.Html#wrap-the-dom).
+-}
+wrap : wrapper -> Ui region_ html_ wrapper
+wrap =
+    Wrap >> List.singleton
+
+
 
 ---- MODIFY ----
 
@@ -154,20 +137,12 @@ singleton =
 
 Note that the last designation "wins".
 
-Use `ui0 |> (with << at Region0) ui1` to logically nest ui1 under ui0 and designate ui1 to Region0.
-
-Todo: once designated, `Ui`s can't be redesignated
+[#26: Once designated, `Ui`s can't be redesignated](https://github.com/upsiflu/restrictive/issues/26)
 
 -}
 at : region -> Ui region html wrapper -> Ui region html wrapper
 at region =
     At region >> List.singleton
-
-
-{-| -}
-wrap : wrapper -> Ui region_ html_ wrapper
-wrap =
-    Wrap >> List.singleton
 
 
 
@@ -249,11 +224,11 @@ map fu =
                 Leaf html ->
                     Leaf (fu html)
 
-                At innerRegion elements ->
-                    At innerRegion (map fu elements)
-
                 Wrap wrapper ->
                     Wrap wrapper
+
+                At innerRegion elements ->
+                    At innerRegion (map fu elements)
         )
 
 
@@ -266,11 +241,11 @@ mapWrapper fu =
                 Leaf html ->
                     Leaf html
 
-                At innerRegion elements ->
-                    At innerRegion (mapWrapper fu elements)
-
                 Wrap wrapper ->
                     Wrap (fu wrapper)
+
+                At innerRegion elements ->
+                    At innerRegion (mapWrapper fu elements)
         )
 
 
@@ -332,10 +307,16 @@ type Wrapper region narrowHtml html narrowWrapper wrapper
 
 
 ---- VIEW ----
+{- New Idea: Add a Msg modelMsg type that can alter the state,
+   -- and provide `Layout` with `ModelMsg : modelMsg -> Msg` so that
+   -- it can `Html.map` all the non-Url-altering bits inside the view.alias
+   -- Also provide the message `urlCmds : List (UrlCmd) -> Msg = UrlCmds`
+   -- #28
+-}
 
 
 {-| -}
-view : State -> Layout region narrowHtml_ html narrowWrapper_ wrapper -> Ui region html wrapper -> html
+view : { current : State, previous : Maybe State } -> Layout region narrowHtml_ html narrowWrapper_ wrapper -> Ui region html wrapper -> html
 view state layout =
     viewUi state layout Header
         >> layout.arrange
@@ -345,13 +326,13 @@ view state layout =
 I assume it's related to Elm not allowing cyclic type dependencies in `let` functions, let alone within functions.
 So here is explicit polymorphism.
 -}
-viewOtherUi : State -> Layout region narrowHtml_ html narrowWrapper_ wrapper -> OrHeader region -> Ui region html wrapper -> Get (OrHeader region) html
+viewOtherUi : { current : State, previous : Maybe State } -> Layout region narrowHtml_ html narrowWrapper_ wrapper -> OrHeader region -> Ui region html wrapper -> Get (OrHeader region) html
 viewOtherUi =
     viewUi
 
 
 viewUi :
-    State
+    { current : State, previous : Maybe State }
     -> Layout region narrowHtml_ html narrowWrapper_ wrapper
     -> OrHeader region
     -> Ui region html wrapper
@@ -364,11 +345,11 @@ viewUi state layout region =
                 Leaf html_ ->
                     Get.singleton region html_
 
-                At innerRegion elements ->
-                    viewUi state layout (Region innerRegion) elements
-
                 Wrap wrapper ->
                     viewWrapper wrapper
+
+                At innerRegion elements ->
+                    viewUi state layout (Region innerRegion) elements
 
         viewWrapper : wrapper -> Get (OrHeader region) html
         viewWrapper wrapper =
@@ -406,7 +387,11 @@ viewUi state layout region =
                         templates
                         linkStyle
                         link
-                    , case State.toTuple (State.linkIsActive link state) of
+                    , case
+                        ( State.linkIsActive link state.current
+                        , Maybe.map (State.linkIsActive link) state.previous
+                        )
+                      of
                         ( True, Just False ) ->
                             viewOtherUi state layout region elements
                                 |> Get.map layout.inserted
@@ -415,12 +400,12 @@ viewUi state layout region =
                             viewUi state layout region elements
                                 |> Get.map layout.removable
 
-                        ( False, Just False ) ->
-                            Get.empty
-
-                        ( False, _ ) ->
+                        ( False, Just True ) ->
                             viewUi state layout region elements
                                 |> Get.map layout.removed
+
+                        ( False, _ ) ->
+                            Get.empty
                     ]
                         |> Get.concatBy layout.concat
 

@@ -1,9 +1,9 @@
-module Restrictive exposing (application, Application, Document, Msg, mapDocument)
+module Restrictive exposing (application, Application, mapDocument, Document)
 
-{-| In contrast to `Browser.Application`, this module maks the `Url` the
-single source of truth for the state of your user interface.
+{-| Makes the `Url` the single source of truth for the state of your user interface,
+and hides the corresponding messages from your `update`.
 
-@docs application, Application, Document, Msg, mapDocument
+@docs application, Application, mapDocument, Document, Msg
 
 ---
 
@@ -27,40 +27,43 @@ This opens two possible pitfalls:
 
 ## How?
 
-    - - - - - - Url ↘     ↗ ↗ Url' - - -
-                     Flags, Path
+    - - - - - - Url ↘              ↗ Url' - -
+                 Path, Flags, Fragment
                                ↘
-                               view
-                               ↗
-    - - - - -  Model ↘    ↗ Model' - - -
+                              view
+             Message ↘         ↗
+    - - - - -  Model ↘    ↗ Model' - - - - -
                      update
-             Message ↗    ↘ Cmd
+                          ↘ Cmd
 
 -}
 
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (Html)
+import Restrictive.Msg exposing (Msg(..))
 import Restrictive.State as State exposing (State)
 import Restrictive.Ui as Ui exposing (Layout, Ui)
-import Url exposing (Url)
+import Url
 
 
 {-| -}
 type alias Application model modelMsg =
-    Program () ( Nav.Key, State, model ) (Msg modelMsg)
+    Program () ( Nav.Key, { current : State, previous : Maybe State }, model ) (Msg modelMsg)
 
 
-{-| -}
+{-| Parametrizes [Browser.Document](https://package.elm-lang.org/packages/elm/browser/latest/Browser#Document)
+over the current [`State`](Restrictive.State)
+-}
 type alias Document msg =
-    State -> Browser.Document msg
+    { current : State, previous : Maybe State } -> Browser.Document msg
 
 
 {-| -}
 mapDocument :
     (html -> List (Html msg))
     -> { body : Ui region html wrapper, layout : Layout region narrowHtml_ html narrowWrapper_ wrapper, title : String }
-    -> (State -> Browser.Document msg)
+    -> Document msg
 mapDocument toHtml document =
     \state ->
         { title = document.title
@@ -70,16 +73,13 @@ mapDocument toHtml document =
         }
 
 
-{-| An `Html` application for the Elm Browser runtime
+{-| Create a standalone `Html` application for the Elm Browser runtime.
 
 
-## Separate Url update from Model update
-
-
-### Lifecycle:
+## App Lifecycle:
 
     Opened Url
-    in new tab           -> init   (initial)
+    in new tab           -> init
 
     Clicked
     internal link        -> update Relative Link
@@ -91,7 +91,7 @@ mapDocument toHtml document =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> ( model, Cmd modelMsg )
-    , view : model -> (State -> Browser.Document modelMsg)
+    , view : model -> ({ current : State, previous : Maybe State } -> Browser.Document modelMsg)
     }
     -> Application model modelMsg
 application config =
@@ -99,54 +99,54 @@ application config =
         { init =
             \_ url key ->
                 let
-                    ( ( updatedModel, modelCmd ), initialState ) =
-                        ( config.init, State.init url )
+                    ( ( initialModel, modelCmd ), initialState ) =
+                        ( config.init, url )
                 in
-                ( ( key, initialState, updatedModel )
+                ( ( key, { current = initialState, previous = Nothing }, initialModel )
                 , Cmd.batch
                     [ Cmd.map ModelMsg modelCmd
-                    , Nav.replaceUrl key (Url.toString initialState.current)
+                    , Nav.replaceUrl key (Url.toString initialState)
                     ]
                 )
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         , subscriptions = \_ -> Sub.none
         , update =
-            \msg ( key, state, model ) ->
+            \msg ( key, { current } as state, model ) ->
                 let
-                    updateUrl : State.Link -> ( ( Nav.Key, State, model ), Cmd msg )
+                    updateUrl : State.Link -> ( ( Nav.Key, { current : State, previous : Maybe State }, model ), Cmd msg )
                     updateUrl link =
                         let
-                            next : Url
+                            next : State
                             next =
-                                State.toStateTransition link state.current
+                                State.next link current
                         in
-                        ( ( key, { state | current = next, previous = Just state.current }, model )
-                        , if state.current == next then
+                        ( ( key, { current = next, previous = Just current }, model )
+                        , if current == next then
                             Cmd.none
 
-                          else if next.path == state.current.path && next.fragment == state.current.fragment then
-                            Nav.replaceUrl key (State.toUrlString next)
+                          else if next.path == current.path && next.fragment == current.fragment then
+                            Nav.replaceUrl key (State.toString next)
 
                           else
-                            Nav.pushUrl key (State.toUrlString next)
+                            Nav.pushUrl key (State.toString next)
                         )
                 in
                 case msg of
                     UrlChanged url ->
-                        if url == state.current then
+                        if url == current then
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            State.getLink state.current.path url
+                            State.getLink url current
                                 |> updateUrl
 
                     LinkClicked (Browser.Internal url) ->
-                        if url == state.current then
+                        if url == current then
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            State.getLink state.current.path url
+                            State.getLink url current
                                 |> State.relative
                                 |> updateUrl
 
@@ -154,18 +154,42 @@ application config =
                         ( ( key, state, model ), Nav.load href )
 
                     ModelMsg modelMsg ->
-                        config.update modelMsg model
-                            |> (\( updatedModel, modelCmd ) ->
-                                    ( ( key, state, updatedModel ), Cmd.map ModelMsg modelCmd )
-                               )
+                        let
+                            ( updatedModel, modelCmd ) =
+                                config.update modelMsg model
+                        in
+                        ( ( key, state, updatedModel ), Cmd.map ModelMsg modelCmd )
+
+                    UrlCmds assignments ->
+                        ( ( key, state, model )
+                        , List.foldl
+                            State.integrateAssignment
+                            current
+                            assignments
+                            |> State.toString
+                            |> Nav.replaceUrl key
+                        )
+
+        {-
+           Field `view` expected
+
+           `( Key, { current : Url, previous : Maybe State }, model )
+               -> Document (Msg modelMsg)`
+
+           , found
+
+           `( Key, State, model )
+               -> { title : String, body : List (Html (Msg modelMsg)) }`
+        -}
         , view =
             \( _, state, model ) ->
-                config.view model state
-                    |> (\document ->
-                            { title = document.title
-                            , body = List.map (Html.map ModelMsg) document.body
-                            }
-                       )
+                let
+                    { title, body } =
+                        config.view model state
+                in
+                { title = title
+                , body = List.map (Html.map ModelMsg) body
+                }
         }
 
 
@@ -187,11 +211,3 @@ application config =
    Now, `canonical.init` canonicalises the initial Url.
 
 -}
----- Update ----
-
-
-{-| -}
-type Msg modelMsg
-    = UrlChanged Url
-    | LinkClicked Browser.UrlRequest
-    | ModelMsg modelMsg
