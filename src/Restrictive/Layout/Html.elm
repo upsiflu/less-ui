@@ -41,8 +41,7 @@ import Html.Keyed
 import Html.Lazy
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
-import Restrictive.Msg exposing (Msg(..))
-import Restrictive.State as State
+import Restrictive.State as State exposing (Msg(..))
 import Restrictive.Ui as Ui
 
 
@@ -365,9 +364,9 @@ getTemplates attrs =
            `{ url : String, label : Html modelMsg, isCurrent : Bool } -> List unknown`
     -}
     { link =
-        \{ url, label, isCurrent } ->
+        \{ href, label, isCurrent } ->
             [ Html.a
-                (Attr.href url
+                (Attr.href href
                     :: Attr.attribute "aria-current"
                         (if isCurrent then
                             "page"
@@ -380,9 +379,9 @@ getTemplates attrs =
                 label
             ]
     , switch =
-        \{ url, label, isChecked } ->
+        \{ href, label, isChecked } ->
             [ Html.a
-                (Attr.href url
+                (Attr.href href
                     :: Attr.attribute "role" "switch"
                     :: Attr.attribute "aria-checked"
                         (if isChecked then

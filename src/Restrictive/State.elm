@@ -12,6 +12,7 @@ module Restrictive.State exposing
     , Templates, LinkStyle, LinkData(..)
     , relative
     , mapLinkStyle
+    , Msg(..)
     , view
     , upTo, querySerialiseLocation, queryParseLocation, linkToString
     )
@@ -72,6 +73,8 @@ Generate relative [`UrlRequest`s](../../../elm/browser/latest/Browser#UrlRequest
 @docs relative
 @docs mapLinkStyle
 
+@docs Msg
+
 
 # View Links
 
@@ -86,6 +89,8 @@ Test these functions with `elm-verify-examples` (see the Readme)
 
 -}
 
+import Browser
+import List.Extra as List
 import Maybe.Extra as Maybe
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region exposing (OrHeader(..))
@@ -102,9 +107,18 @@ type alias State =
     Url
 
 
+{-| Handles your message type (`modelMsg`) as well as changes to the Ui state (Url).
+-}
+type Msg modelMsg
+    = UrlChanged Url
+    | LinkClicked Browser.UrlRequest
+    | AppMsg modelMsg
+    | UrlCmds (List UrlCmd)
+
+
 {-| -}
-linkData : Link -> State -> Maybe LinkData
-linkData l url =
+linkData : State -> Link -> Maybe LinkData
+linkData url l =
     case l of
         GoTo _ ->
             Nothing
@@ -116,30 +130,30 @@ linkData l url =
             Nothing
 
         Filter ( category, _ ) ->
-            Maybe.map Filtered (getValueOf category url)
+            Maybe.map Filtered (getSearchTermOf category url)
 
         ErrorMessage _ ->
             Nothing
 
 
 {-| -}
-linkStatus : Link -> State -> Bool
-linkStatus l url =
+linkStatus : State -> Link -> Bool
+linkStatus state l =
     case l of
         GoTo ( maybePath, _ ) ->
-            maybePath == Just url.path
+            maybePath == Just state.path
 
         Bounce _ { there } ->
-            linkStatus (GoTo there) url
+            linkStatus state (GoTo there)
 
         Toggle _ f ->
-            hasFlag f url
+            hasFlag f state
 
         Filter ( category, _ ) ->
-            hasCategory category url
+            hasCategory category state
 
         ErrorMessage m ->
-            String.contains m (Url.toString url)
+            hasError m state
 
 
 {-| The data that a link emits in the context of a given Url.
@@ -168,6 +182,14 @@ type alias Path =
     String
 
 
+type alias Category =
+    String
+
+
+type alias SearchTerm =
+    String
+
+
 {-| **Viewmode**: Assign a value to a key. **Search**: Assign a searchTerm to a category.
 
 Assignments are parallelly treated as Flags! So `?a=b` is both an assignment `(a, b)`
@@ -175,7 +197,7 @@ and a flag `"a=b"`.
 
 -}
 type alias Assignment =
-    ( String, String )
+    ( Category, SearchTerm )
 
 
 {-| "Graphical Web browsers typically scroll to position pages so that the top of the element
@@ -206,7 +228,7 @@ the application to the restrictive framework.
 type UrlCmd
     = Set Assignment
     | Add Assignment
-    | Clear String
+    | Clear Category
 
 
 
@@ -292,37 +314,37 @@ toggleFlag flag =
 integrateAssignment : UrlCmd -> State -> State
 integrateAssignment urlCommand =
     case urlCommand of
-        Set ( k, v ) ->
-            replaceAssignment k v
+        Set assignment ->
+            replaceAssignment assignment
 
-        Add ( k, v ) ->
-            addAssignment k v
+        Add assignment ->
+            addAssignment assignment
 
         Clear k ->
             removeAssignments [ k ]
 
 
 {-| -}
-addAssignment : String -> String -> State -> State
-addAssignment key value =
-    mapQuery <| \q -> { q | assignments = ( key, value ) :: q.assignments }
+addAssignment : Assignment -> State -> State
+addAssignment assignment =
+    mapQuery <| \q -> { q | assignments = assignment :: q.assignments }
 
 
 {-| -}
-replaceAssignment : String -> String -> State -> State
-replaceAssignment key value =
-    mapQuery <| \q -> { q | assignments = ( key, value ) :: List.filter (\( k, _ ) -> k /= key) q.assignments }
+replaceAssignment : Assignment -> State -> State
+replaceAssignment (( category, _ ) as assignment) =
+    mapQuery <| \q -> { q | assignments = assignment :: List.filter (\( key, _ ) -> key /= category) q.assignments }
 
 
 {-| -}
-removeAssignments : List String -> State -> State
-removeAssignments keys =
+removeAssignments : List Category -> State -> State
+removeAssignments categories =
     mapQuery <|
         \q ->
             { q
                 | assignments =
                     List.filter
-                        (Tuple.first >> (\key -> not (List.member key keys)))
+                        (Tuple.first >> (\key -> not (List.member key categories)))
                         q.assignments
             }
 
@@ -392,7 +414,12 @@ hasAssignment ( key, value ) =
     hasFlag (key ++ "=" ++ value)
 
 
-hasCategory : String -> State -> Bool
+hasError : String -> State -> Bool
+hasError m =
+    hasAssignment ( "e", m )
+
+
+hasCategory : Category -> State -> Bool
 hasCategory category =
     getFlags >> List.filterMap (String.split "=" >> List.head) >> List.member category
 
@@ -435,20 +462,21 @@ getFlags =
     .query >> parseQueryString >> .flags >> Set.toList
 
 
-getValueOf : String -> State -> Maybe String
-getValueOf category =
-    .query
-        >> parseQueryString
-        >> .assignments
-        >> List.filterMap
-            (\( k, v ) ->
-                if k == category then
-                    Just v
+getAssignments : State -> List Assignment
+getAssignments =
+    .query >> parseQueryString >> .assignments
 
-                else
-                    Nothing
-            )
-        >> List.head
+
+getLastAssignmentOf : Category -> State -> Maybe Assignment
+getLastAssignmentOf category =
+    getAssignments
+        >> List.find (\( key, _ ) -> key == category)
+
+
+getSearchTermOf : Category -> State -> Maybe SearchTerm
+getSearchTermOf category =
+    getLastAssignmentOf category
+        >> Maybe.map Tuple.second
 
 
 
@@ -573,10 +601,10 @@ mapLinkStyle fu linkStyle =
 -}
 type alias Templates html =
     { link :
-        { url : String, label : html, isCurrent : Bool }
+        { href : String, label : html, isCurrent : Bool }
         -> html
     , switch :
-        { url : String, label : html, isChecked : Bool }
+        { href : String, label : html, isChecked : Bool }
         -> html
     , search :
         { assignment : Assignment, label : html, isCurrent : Bool }
@@ -637,7 +665,7 @@ view region url elements { isInline, label } link =
         case link of
             Toggle _ flag ->
                 elements.switch
-                    { url = linkToString link
+                    { href = linkToString link
                     , label = label
                     , isChecked = hasFlag flag url
                     }
@@ -651,7 +679,7 @@ view region url elements { isInline, label } link =
 
             _ ->
                 elements.link
-                    { url = linkToString link
+                    { href = linkToString link
                     , label = label
                     , isCurrent = unwrapDestination link == Just (getLocation url)
                     }
@@ -937,11 +965,11 @@ toStateTransition link =
                         toggleFlag f
                    )
 
-        Filter ( key, value ) ->
-            addAssignment key value
+        Filter assignment ->
+            addAssignment assignment
 
         ErrorMessage e ->
-            addAssignment "errorMessage" e
+            addAssignment ( "errorMessage", e )
 
 
 {-| Try to create an UrlString.

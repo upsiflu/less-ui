@@ -382,9 +382,9 @@ viewUi state layout region =
                         linkStyle
                         link
                     , case
-                        ( State.linkStatus link state.current
-                        , Maybe.map (State.linkStatus link) state.previous
-                        , State.linkData link state.current
+                        ( State.linkStatus state.current link
+                        , Maybe.map (\s -> State.linkStatus s link) state.previous
+                        , State.linkData state.current link
                         )
                       of
                         ( True, Just False, linkData ) ->

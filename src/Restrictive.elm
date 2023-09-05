@@ -41,8 +41,7 @@ This opens two possible pitfalls:
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (Html)
-import Restrictive.Msg exposing (Msg(..))
-import Restrictive.State as State exposing (State)
+import Restrictive.State as State exposing (Msg(..), State)
 import Restrictive.Ui as Ui exposing (Layout, Ui)
 import Url
 
