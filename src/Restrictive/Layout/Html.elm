@@ -41,7 +41,7 @@ import Html.Keyed
 import Html.Lazy
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
-import Restrictive.State as State exposing (Msg(..))
+import Restrictive.Link as State exposing (Msg(..))
 import Restrictive.Ui as Ui
 
 
@@ -178,7 +178,7 @@ type Wrapper narrowMsg msg
             }
             -> HtmlList (Msg msg)
         }
-    | Link (State.Templates (HtmlList (Msg msg))) (State.LinkStyle (HtmlList (Msg msg))) State.Link (Maybe State.LinkData -> Ui narrowMsg msg)
+    | Link (State.Templates (HtmlList (Msg msg))) (State.Style (HtmlList (Msg msg))) State.Link (Maybe State.Data -> Ui narrowMsg msg)
     | Keyed (List ( String, HtmlList (Msg msg) ) -> HtmlList (Msg msg)) (List ( String, Ui narrowMsg msg ))
 
 

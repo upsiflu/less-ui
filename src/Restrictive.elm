@@ -41,7 +41,7 @@ This opens two possible pitfalls:
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (Html)
-import Restrictive.State as State exposing (Msg(..), State)
+import Restrictive.Link as State exposing (Msg(..), State)
 import Restrictive.Ui as Ui exposing (Layout, Ui)
 import Url
 
@@ -118,17 +118,17 @@ application config =
                         let
                             next : State
                             next =
-                                State.next link current
+                                State.applyTransition current link
                         in
                         ( ( key, { current = next, previous = Just current }, model )
                         , if current == next then
                             Cmd.none
 
                           else if next.path == current.path && next.fragment == current.fragment then
-                            Nav.replaceUrl key (State.toString next)
+                            Nav.replaceUrl key (State.stateToString next)
 
                           else
-                            Nav.pushUrl key (State.toString next)
+                            Nav.pushUrl key (State.stateToString next)
                         )
                 in
                 case msg of
@@ -137,7 +137,7 @@ application config =
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            State.getLink url current
+                            State.fromTransition url current
                                 |> updateUrl
 
                     LinkClicked (Browser.Internal url) ->
@@ -145,8 +145,8 @@ application config =
                             ( ( key, state, model ), Cmd.none )
 
                         else
-                            State.getLink url current
-                                |> State.relative
+                            State.fromTransition url current
+                                |> State.makeRelative
                                 |> updateUrl
 
                     LinkClicked (Browser.External href) ->
@@ -162,10 +162,10 @@ application config =
                     UrlCmds assignments ->
                         ( ( key, state, model )
                         , List.foldl
-                            State.integrateAssignment
+                            State.stateIntegrateUrlCmd
                             current
                             assignments
-                            |> State.toString
+                            |> State.stateToString
                             |> Nav.replaceUrl key
                         )
 

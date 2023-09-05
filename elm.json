@@ -8,7 +8,7 @@
         "Restrictive",
         "Restrictive.Ui",
         "Restrictive.Get",
-        "Restrictive.State",
+        "Restrictive.Link",
         "Restrictive.Layout.Html",
         "Restrictive.Layout.Region"
     ],

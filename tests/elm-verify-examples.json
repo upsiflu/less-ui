@@ -4,8 +4,8 @@
     "Restrictive",
     "Restrictive.Ui",
     "Restrictive.Get",
-    "Restrictive.State",
-    "Restrictive.Layout",
-    "Restrictive.Layout.Region"
+    "Restrictive.Link",
+    "Restrictive.Layout.Region",
+    "Restrictive.Layout.Html"
   ]
 }

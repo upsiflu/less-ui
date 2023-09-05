@@ -97,7 +97,7 @@ The following exports have no application and may be removed in the next release
 import List.Extra as List
 import Restrictive.Get as Get exposing (Get)
 import Restrictive.Layout.Region exposing (OrHeader(..))
-import Restrictive.State as State exposing (State)
+import Restrictive.Link as State exposing (State)
 
 
 {-| -}
@@ -153,8 +153,8 @@ at region =
 
     singleton [1008] ++ singleton [2004] ++ singleton [1007]
         |> indexedMapList (\i -> (++) (singleton [i]))
-        |> toList
-            --> [0, 1008, 1, 2004, 2, 1007]
+        |> List.length
+            --> 6
 
 -}
 indexedMapList : (Int -> Ui region html wrapper -> Ui region html wrapper) -> Ui region html wrapper -> Ui region html wrapper
@@ -301,7 +301,7 @@ type Wrapper region narrowHtml html narrowWrapper wrapper
         , narrowLayout : Layout region narrowHtml narrowHtml narrowWrapper narrowWrapper
         , combine : { makeInnerHtml : Ui region narrowHtml narrowWrapper -> Maybe narrowHtml } -> html
         }
-    | Link (State.Templates html) (State.LinkStyle html) State.Link (Maybe State.LinkData -> Ui region html wrapper)
+    | Link (State.Templates html) (State.Style html) State.Link (Maybe State.Data -> Ui region html wrapper)
     | Keyed (List ( String, html ) -> html) (List ( String, Ui region html wrapper ))
 
 
@@ -382,9 +382,9 @@ viewUi state layout region =
                         linkStyle
                         link
                     , case
-                        ( State.linkStatus state.current link
-                        , Maybe.map (\s -> State.linkStatus s link) state.previous
-                        , State.linkData state.current link
+                        ( State.isActive state.current link
+                        , Maybe.map (\s -> State.isActive s link) state.previous
+                        , State.getCurrentData state.current link
                         )
                       of
                         ( True, Just False, linkData ) ->
