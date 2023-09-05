@@ -82,6 +82,7 @@ config =
             , ReviewPipelineStyles.Premade.noPipelinesWithSimpleInputs
             , ReviewPipelineStyles.Premade.noRepeatedParentheticalApplication
             , ReviewPipelineStyles.Premade.noPipelinesWithConfusingNonCommutativeFunctions
+            , ReviewPipelineStyles.Premade.noSemanticallyInfixFunctionsInLeftPipelines
             ]
     , OnlyAllSingleUseTypeVarsEndWith_.rule
     , CognitiveComplexity.rule 15

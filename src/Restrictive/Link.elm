@@ -3,7 +3,7 @@ module Restrictive.Link exposing
     , goTo, bounce, toggle, filter, err
     , fromTransition
     , makeRelative
-    , Msg(..), UrlCmd(..), stateIntegrateUrlCmd
+    , Msg(..)
     , isActive
     , getCurrentData, Data(..)
     , toString
@@ -53,7 +53,7 @@ module Restrictive.Link exposing
 
 # Msg
 
-@docs Msg, UrlCmd, stateIntegrateUrlCmd
+@docs Msg
 
 
 # Query
@@ -123,7 +123,7 @@ type Link
     = GoTo ( Maybe Path, Fragment )
     | Bounce { isAbsolute : Bool } { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) }
     | Toggle { isAbsolute : Bool } Flag
-    | Filter Assignment
+    | Filter (List Assignment)
     | ErrorMessage String
 
 
@@ -183,7 +183,7 @@ toggle =
 
 
 {-| -}
-filter : Assignment -> Link
+filter : List Assignment -> Link
 filter =
     Filter
 
@@ -210,6 +210,7 @@ In the following tests, we assume a previous path of "/"
         Maybe.map2 fromTransition
             (Url.fromString ("http://localhost"++str))
             (Url.fromString ("http://localhost/"))
+                |> Maybe.join
                 |> Maybe.withDefault (err "Url.fromString failed")
 
     --Bounce
@@ -272,18 +273,23 @@ In the following tests, we assume a previous path of "/"
         --> goTo (Nothing, Just "?fragment")
 
 -}
-fromTransition : State -> State -> Link
+fromTransition : State -> State -> Maybe Link
 fromTransition new current =
-    Url.Codec.parseUrl codecs
-        { new
-            | path =
-                if current.path == new.path then
-                    ""
+    if new == current then
+        Nothing
 
-                else
-                    new.path
-        }
-        |> Result.extract fromParseError
+    else
+        Url.Codec.parseUrl codecs
+            { new
+                | path =
+                    if current.path == new.path then
+                        ""
+
+                    else
+                        new.path
+            }
+            |> Result.extract fromParseError
+            |> Just
 
 
 fromParseError : ParseError -> Link
@@ -345,7 +351,7 @@ type Msg modelMsg
     = UrlChanged Url
     | LinkClicked Browser.UrlRequest
     | AppMsg modelMsg
-    | UrlCmds (List UrlCmd)
+    | UrlCmds (List Assignment)
 
 
 
@@ -365,8 +371,11 @@ isActive state l =
         Toggle _ f ->
             stateHasFlag f state
 
-        Filter ( category, _ ) ->
-            stateHasCategory category state
+        Filter [] ->
+            True
+
+        Filter (( category, _ ) :: more) ->
+            stateHasCategory category state && isActive state (Filter more)
 
         ErrorMessage m ->
             stateHasError m state
@@ -389,8 +398,11 @@ getCurrentData url l =
         Toggle _ _ ->
             Nothing
 
-        Filter ( category, _ ) ->
-            Maybe.map Filtered (getStateSearchTermOf category url)
+        Filter assignments ->
+            List.map (\( category, _ ) -> getStateSearchTermOf category url) assignments
+                |> Maybe.values
+                |> Filtered
+                |> Just
 
         ErrorMessage _ ->
             Nothing
@@ -529,7 +541,7 @@ toString =
 {-| The data that a link emits in the context of a given Url.
 -}
 type Data
-    = Filtered String
+    = Filtered (List String)
 
 
 {-| **Progressive disclosure**: Turning off a `Flag` renders all corresponding bits
@@ -595,22 +607,6 @@ the Browser may not update the focus, so it's safer to add a `focus-me` custom e
 -}
 type alias Fragment =
     Maybe String
-
-
-{-| Manage the assignments your app keeps in the Url.
-
-`Set (a, b)` will delete all instances of `a=..` and replace them with `a=b`
-`Add (a, b)` will append `a=b` to the end if it's not yet there
-`Clear (a, _)` will delete all instances of `a=..`
-
-**Outlook:** In the longer run, this type supports any message we want to send from
-the application to the restrictive framework.
-
--}
-type UrlCmd
-    = Set Assignment
-    | Add Assignment
-    | Clear Category
 
 
 
@@ -703,29 +699,17 @@ stateToggleFlag flag =
 
 
 {-| -}
-stateIntegrateUrlCmd : UrlCmd -> Transition
-stateIntegrateUrlCmd urlCommand =
-    case urlCommand of
-        Set assignment ->
-            stateReplaceAssignment assignment
-
-        Add assignment ->
-            stateAddAssignment assignment
-
-        Clear k ->
-            stateRemoveAssignments [ k ]
-
-
-{-| -}
 stateAddAssignment : Assignment -> Transition
 stateAddAssignment assignment =
     stateMapQuery <| \q -> { q | assignments = assignment :: q.assignments }
 
 
-{-| -}
-stateReplaceAssignment : Assignment -> Transition
-stateReplaceAssignment (( category, _ ) as assignment) =
-    stateMapQuery <| \q -> { q | assignments = assignment :: List.filter (\( key, _ ) -> key /= category) q.assignments }
+
+{-
+   stateReplaceAssignment : Assignment -> Transition
+   stateReplaceAssignment (( category, _ ) as assignment) =
+       stateMapQuery <| \q -> { q | assignments = assignment :: List.filter (\( key, _ ) -> key /= category) q.assignments }
+-}
 
 
 {-| -}
@@ -783,7 +767,9 @@ stateHasError m =
 
 stateHasCategory : Category -> State -> Bool
 stateHasCategory category =
-    getStateFlags >> List.filterMap (String.split "=" >> List.head) >> List.member category
+    getStateFlags
+        >> List.filterMap (String.split "=" >> List.head)
+        >> List.member category
 
 
 
@@ -821,12 +807,17 @@ type alias Query =
 
 getStateFlags : State -> List Flag
 getStateFlags =
-    .query >> parseQueryString >> .flags >> Set.toList
+    .query
+        >> parseQueryString
+        >> .flags
+        >> Set.toList
 
 
 getStateAssignments : State -> List Assignment
 getStateAssignments =
-    .query >> parseQueryString >> .assignments
+    .query
+        >> parseQueryString
+        >> .assignments
 
 
 getStateLastAssignmentOf : Category -> State -> Maybe Assignment
@@ -906,25 +897,25 @@ view region state elements { isInline, label } link =
         )
     <|
         case link of
-            Toggle _ flag ->
+            Toggle _ _ ->
                 elements.switch
                     { href = toString link
                     , label = label
-                    , isChecked = stateHasFlag flag state
+                    , isChecked = isActive state link
                     }
 
-            Filter assignment ->
+            Filter assignments ->
                 elements.search
-                    { assignment = assignment
+                    { assignments = assignments
                     , label = label
-                    , isCurrent = stateHasAssignment assignment state
+                    , isCurrent = isActive state link
                     }
 
             _ ->
                 elements.link
                     { href = toString link
                     , label = label
-                    , isCurrent = getDestination link == Just (getStateLocation state)
+                    , isCurrent = isActive state link
                     }
 
 
@@ -957,7 +948,7 @@ type alias Templates html =
         { href : String, label : html, isChecked : Bool }
         -> html
     , search :
-        { assignment : Assignment, label : html, isCurrent : Bool }
+        { assignments : List Assignment, label : html, isCurrent : Bool }
         -> html
     }
 
@@ -977,8 +968,8 @@ type alias Templates html =
 Note that any flag will de-activate path and fragment.
 
 -}
-buildLink : Path -> Fragment -> Maybe String -> Maybe Flag -> Maybe String -> Bool -> Link
-buildLink pathString maybeFragment reroute maybeFlag errorMessage isAbsolute =
+buildLink : Path -> Fragment -> Maybe String -> Maybe Flag -> List String -> Maybe String -> Bool -> Link
+buildLink pathString maybeFragment reroute maybeFlag maybeAssignments errorMessage isAbsolute =
     let
         myPath : Maybe Path
         myPath =
@@ -995,7 +986,15 @@ buildLink pathString maybeFragment reroute maybeFlag errorMessage isAbsolute =
             Toggle { isAbsolute = isAbsolute } flag
 
         _ ->
-            GoTo ( myPath, maybeFragment )
+            case maybeAssignments of
+                [] ->
+                    GoTo ( myPath, maybeFragment )
+
+                _ ->
+                    Filter
+                        (List.map queryParseAssignment maybeAssignments
+                            |> Maybe.values
+                        )
 
 
 codecs : List (Codec Link)
@@ -1015,41 +1014,49 @@ codecs =
                         _ ->
                             False
 
-        getError : Url.Codec.CodecInProgress Link (Maybe String -> Bool -> parseResult) -> Url.Codec.CodecInProgress Link (Bool -> parseResult)
+        getError : Url.Codec.CodecInProgress Link (Maybe String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
         getError =
-            Url.Codec.queryString "error"
-                (\l ->
+            Url.Codec.queryString "error" <|
+                \l ->
                     case l of
                         ErrorMessage e ->
                             Just e
 
                         _ ->
                             Nothing
-                )
 
-        getReroute : Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Maybe String -> Bool -> parseResult) -> Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Bool -> parseResult)
+        getFilter : Url.Codec.CodecInProgress Link (List String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
+        getFilter =
+            Url.Codec.queryStrings "q" <|
+                \l ->
+                    case l of
+                        Filter assignments ->
+                            List.map querySerialiseAssignment assignments
+
+                        _ ->
+                            []
+
+        getReroute : Url.Codec.CodecInProgress Link (Maybe String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
         getReroute =
-            Url.Codec.queryString "reroute"
-                (\l ->
+            Url.Codec.queryString "reroute" <|
+                \l ->
                     case l of
                         Bounce _ { here } ->
                             Just (querySerialiseLocation here)
 
                         _ ->
                             Nothing
-                )
 
-        getToggle : Url.Codec.CodecInProgress Link (Maybe String -> Maybe String -> Bool -> parseResult) -> Url.Codec.CodecInProgress Link (Maybe String -> Bool -> parseResult)
+        getToggle : Url.Codec.CodecInProgress Link (Maybe String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
         getToggle =
-            Url.Codec.queryString "toggle"
-                (\l ->
+            Url.Codec.queryString "toggle" <|
+                \l ->
                     case l of
                         Toggle _ flag ->
                             Just flag
 
                         _ ->
                             Nothing
-                )
     in
     [ Url.Codec.succeed buildLink
         (\_ -> True)
@@ -1061,6 +1068,7 @@ codecs =
             (Url.Codec.fragment getFragment
                 >> getReroute
                 >> getToggle
+                >> getFilter
                 >> getError
                 >> getAbsoluteFlag
             )
@@ -1103,8 +1111,14 @@ toTransition link =
                         stateToggleFlag f
                    )
 
-        Filter assignment ->
-            stateAddAssignment assignment
+        Filter assignments ->
+            List.foldl
+                (\ass acc ->
+                    acc
+                        >> stateAddAssignment ass
+                )
+                identity
+                assignments
 
         ErrorMessage e ->
             stateAddAssignment ( "errorMessage", e )
@@ -1141,6 +1155,11 @@ toTransition link =
 querySerialiseLocation : ( Maybe Path, Fragment ) -> String
 querySerialiseLocation ( maybePath, fragment ) =
     querySerialisePath maybePath ++ Maybe.unwrap "" (String.cons '~') fragment
+
+
+querySerialiseAssignment : Assignment -> String
+querySerialiseAssignment =
+    \( key, value ) -> key ++ "=" ++ value
 
 
 serialisePath : Maybe Path -> String
@@ -1210,6 +1229,14 @@ queryParseLocation str =
 
         path :: fragment ->
             ( parsePath path, upTo "#" <| String.join "~" fragment )
+
+
+queryParseAssignment : String -> Maybe Assignment
+queryParseAssignment =
+    String.split "="
+        >> List.uncons
+        >> Maybe.map
+            (Tuple.mapSecond (String.join "="))
 
 
 serializeQuery : Query -> Maybe String

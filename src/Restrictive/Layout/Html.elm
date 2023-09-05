@@ -95,27 +95,28 @@ toggle attrs { flag, isInline, label } =
 filter :
     List (Html.Attribute Never)
     ->
-        { category : State.Flag
+        { category : State.Category
         , isInline : Bool
         , label : HtmlList msg
+        , value : State.SearchTerm
         }
-    -> (String -> Ui narrowMsg msg)
+    -> (List String -> Ui narrowMsg msg)
     -> Ui narrowMsg msg
-filter attrs { category, isInline, label } conditionalUi =
+filter attrs { category, isInline, label, value } conditionalUi =
     (\linkData ->
         case linkData of
-            Just (State.Filtered str) ->
-                conditionalUi str
+            Just (State.Filtered strs) ->
+                conditionalUi strs
 
             Nothing ->
-                conditionalUi ""
+                conditionalUi []
     )
         |> Link
             (getTemplates attrs)
             { isInline = isInline
             , label = List.map (Html.map AppMsg) label
             }
-            (State.filter ( category, category ))
+            (State.filter [ ( category, value ) ])
         |> Ui.wrap
 
 
@@ -395,25 +396,25 @@ getTemplates attrs =
                 label
             ]
     , search =
-        \{ assignment, label, isCurrent } ->
+        \{ assignments, label, isCurrent } ->
             let
-                ( category, searchTerm ) =
-                    assignment
-            in
-            Html.input
-                (Attr.value searchTerm
-                    :: Events.onInput
-                        (\newSearchTerm -> UrlCmds [ State.Set ( category, newSearchTerm ) ])
-                    :: Attr.title category
-                    :: Attr.attribute "aria-current"
-                        (if isCurrent then
-                            "page"
+                drawInput : ( State.Category, State.SearchTerm ) -> Html (Msg modelMsg)
+                drawInput ( category, searchTerm ) =
+                    Html.input
+                        (Attr.value searchTerm
+                            :: Events.onInput
+                                (\newSearchTerm -> UrlCmds [ ( category, newSearchTerm ) ])
+                            :: Attr.title category
+                            :: Attr.attribute "aria-current"
+                                (if isCurrent then
+                                    "page"
 
-                         else
-                            "false"
+                                 else
+                                    "false"
+                                )
+                            :: List.map (Attr.map never) attrs
                         )
-                    :: List.map (Attr.map never) attrs
-                )
-                []
-                :: label
+                        []
+            in
+            label ++ List.map drawInput assignments
     }

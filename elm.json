@@ -15,6 +15,7 @@
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "Chadtech/elm-bool-extra": "2.4.2 <= v < 3.0.0",
+        "Fresheyeball/elm-return": "7.1.0 <= v < 8.0.0",
         "Janiczek/elm-url-codec": "1.0.0 <= v < 2.0.0",
         "edkelly303/elm-any-type-forms": "5.0.0 <= v < 6.0.0",
         "elm/browser": "1.0.2 <= v < 2.0.0",

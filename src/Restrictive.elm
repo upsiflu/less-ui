@@ -41,14 +41,19 @@ This opens two possible pitfalls:
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (Html)
-import Restrictive.Link as State exposing (Msg(..), State)
+import Restrictive.Link as Link exposing (Link, Msg(..), State)
 import Restrictive.Ui as Ui exposing (Layout, Ui)
-import Url
+import Return exposing (Return, return)
+import Url exposing (Url)
+
+
+type alias ApplicationState model =
+    ( Nav.Key, { current : State, previous : Maybe State }, model )
 
 
 {-| -}
 type alias Application model modelMsg =
-    Program () ( Nav.Key, { current : State, previous : Maybe State }, model ) (Msg modelMsg)
+    Program () (ApplicationState model) (Msg modelMsg)
 
 
 {-| Parametrizes [Browser.Document](https://package.elm-lang.org/packages/elm/browser/latest/Browser#Document)
@@ -89,7 +94,7 @@ mapDocument toHtml document =
 -}
 application :
     { init : ( model, Cmd modelMsg )
-    , update : modelMsg -> model -> ( model, Cmd modelMsg )
+    , update : modelMsg -> model -> Return modelMsg model
     , view : model -> ({ current : State, previous : Maybe State } -> Browser.Document modelMsg)
     }
     -> Application model modelMsg
@@ -113,73 +118,53 @@ application config =
         , update =
             \msg ( key, { current } as state, model ) ->
                 let
-                    updateUrl : State.Link -> ( ( Nav.Key, { current : State, previous : Maybe State }, model ), Cmd msg )
-                    updateUrl link =
+                    followLink : Link -> Return msg (ApplicationState model)
+                    followLink link =
                         let
                             next : State
                             next =
-                                State.applyTransition current link
+                                Link.applyTransition current link
+
+                            setUrl : Cmd msg
+                            setUrl =
+                                if next.path == current.path && next.fragment == current.fragment then
+                                    Nav.replaceUrl key (Link.stateToString next)
+
+                                else
+                                    Nav.pushUrl key (Link.stateToString next)
                         in
-                        ( ( key, { current = next, previous = Just current }, model )
-                        , if current == next then
-                            Cmd.none
+                        return ( key, { current = next, previous = Just current }, model ) setUrl
 
-                          else if next.path == current.path && next.fragment == current.fragment then
-                            Nav.replaceUrl key (State.stateToString next)
+                    followUrl : Url -> { modifyLink : Link -> Link } -> Return msg (ApplicationState model)
+                    followUrl url { modifyLink } =
+                        Link.fromTransition url current
+                            |> Maybe.map (modifyLink >> followLink)
+                            |> Maybe.withDefault noOp
 
-                          else
-                            Nav.pushUrl key (State.stateToString next)
-                        )
+                    noOp : Return msg (ApplicationState model)
+                    noOp =
+                        ( ( key, state, model ), Cmd.none )
                 in
                 case msg of
                     UrlChanged url ->
-                        if url == current then
-                            ( ( key, state, model ), Cmd.none )
-
-                        else
-                            State.fromTransition url current
-                                |> updateUrl
+                        followUrl url { modifyLink = identity }
 
                     LinkClicked (Browser.Internal url) ->
-                        if url == current then
-                            ( ( key, state, model ), Cmd.none )
-
-                        else
-                            State.fromTransition url current
-                                |> State.makeRelative
-                                |> updateUrl
+                        followUrl url { modifyLink = Link.makeRelative }
 
                     LinkClicked (Browser.External href) ->
-                        ( ( key, state, model ), Nav.load href )
+                        Return.command (Nav.load href) noOp
 
                     AppMsg modelMsg ->
                         let
                             ( updatedModel, modelCmd ) =
                                 config.update modelMsg model
                         in
-                        ( ( key, state, updatedModel ), Cmd.map AppMsg modelCmd )
+                        return ( key, state, updatedModel ) modelCmd
+                            |> Return.mapCmd AppMsg
 
                     UrlCmds assignments ->
-                        ( ( key, state, model )
-                        , List.foldl
-                            State.stateIntegrateUrlCmd
-                            current
-                            assignments
-                            |> State.stateToString
-                            |> Nav.replaceUrl key
-                        )
-
-        {-
-           Field `view` expected
-
-           `( Key, { current : Url, previous : Maybe State }, model )
-               -> Document (Msg modelMsg)`
-
-           , found
-
-           `( Key, State, model )
-               -> { title : String, body : List (Html (Msg modelMsg)) }`
-        -}
+                        followLink (Link.filter assignments)
         , view =
             \( _, state, model ) ->
                 let
