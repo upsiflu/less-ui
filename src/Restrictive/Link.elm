@@ -1,31 +1,80 @@
 module Restrictive.Link exposing
-    ( Link
-    , goTo, bounce, toggle, filter, err
-    , fromTransition
-    , makeRelative
+    ( Link(..)
+    , fromUrl
+    , toHref, apply
+    , getStateSearchTerms
+    , Mutation(..), mutationFromTwoStates
     , Msg(..)
-    , isActive
-    , getCurrentData, Data(..)
-    , toString
-    , Flag, Path, Assignment, Category, SearchTerm, Fragment
-    , State, stateToString, Transition
-    , Query
-    , view
-    , Style, mapStyle
-    , Templates
-    , applyTransition
-    , upTo, querySerialiseLocation, queryParseLocation, stateFromString
-    , stateSetPath, stateSetFragment, stateTurnOnFlag, stateToggleFlag
-    , stateAddAssignment, stateRemoveAssignments
-    , stateHasFlag, getStateFragment, getStatePath, getStateLocation
+    , State
+    , Location, parseLocation
+    , Flag, Category, SearchTerm
     )
 
-{-| We use the Url query to keep track of the Ui state. This makes sharing a Ui state as easy as copying the Url.
+{-|
 
 @docs Link
 
 
-# Create
+## Create
+
+@docs fromUrl
+
+
+## Deconstruct
+
+@docs toHref, apply
+@docs getStateSearchTerms
+
+
+## Mutations
+
+@docs Mutation, mutationFromTwoStates
+
+
+## Msg
+
+@docs Msg
+
+
+# State
+
+@docs State
+
+             ╔═══════════════════════Location═══════════════════╗
+     ╔══Path═╩╗                                                ╔╩Fragment═╗
+    /over/there?animalName=violetFerret&bigLeg&cat0=cat10=val2#rightHindLeg
+                ╠Category╝→╚SearchTerm╣ ║    ║ ╠C.╝→╚S.═║═║══╣
+                ║                     ║ ║    ║ ╠Category╝→╚S.╣
+                ╚═══════Flag══════════╝ ╚Flag╝ ╚════Flag═════╝
+
+@docs Location, parseLocation
+@docs Flag, Category, SearchTerm
+
+-}
+
+import Browser
+import List.Extra as List
+import Set exposing (Set)
+import Set.Extra as Set
+import String.Extra as String
+import Url exposing (Url)
+
+
+
+---- Update ----
+
+
+{-| Handles your message type (`modelMsg`) as well as changes to the Ui state (Url).
+-}
+type Msg modelMsg
+    = UrlChanged Url
+    | LinkClicked Browser.UrlRequest
+    | AppMsg modelMsg
+    | UrlCmd Link
+
+
+{-| Relative changes to the Url are only applied when a link opens in the same tab.
+Otherwise, absolute changes are applied by the Elm runtime.
 
   - Jump Navigation
       - [x]  [With a single target (goTo)](#goTo)
@@ -39,509 +88,281 @@ module Restrictive.Link exposing
   - Dynamic Links
       - [x]  [Search or Filter](#filter) a [Category](#Category) by [user-input Data](#Data)
 
----
-
-@docs goTo, bounce, toggle, filter, err
-
-@docs fromTransition
-
-
-# Map
-
-@docs makeRelative
-
-
-# Msg
-
-@docs Msg
-
-
-# Query
-
-@docs isActive
-
-
-# Deconstruct
-
-@docs getCurrentData, Data
-@docs toString
-
-@docs Flag, Path, Assignment, Category, SearchTerm, Fragment
-
-
-# State transitions
-
-@docs State, stateToString, Transition
-
-
-# Query and Deconstruct State
-
-@docs Query
-
-
-# View
-
-@docs view
-@docs Style, mapStyle
-@docs Templates
-
-
-# Apply
-
-@docs applyTransition
-
-
-# Internals
-
-Test these functions with `elm-verify-examples` (see the Readme)
-
-@docs upTo, querySerialiseLocation, queryParseLocation, stateFromString
-
-@docs stateSetPath, stateSetFragment, stateTurnOnFlag, stateToggleFlag
-@docs stateAddAssignment, stateRemoveAssignments
-
-@docs stateHasFlag, getStateFragment, getStatePath, getStateLocation
-
--}
-
-import Browser
-import List.Extra as List
-import Maybe.Extra as Maybe
-import Restrictive.Get as Get exposing (Get)
-import Restrictive.Layout.Region exposing (OrHeader(..))
-import Result.Extra as Result
-import Set exposing (Set)
-import Set.Extra as Set
-import String.Extra as String
-import Url exposing (Url)
-import Url.Codec exposing (Codec, ParseError(..))
-
-
-{-| Encodes an intended transition of [the Ui State](#State)
 -}
 type Link
-    = GoTo ( Maybe Path, Fragment )
-    | Bounce { isAbsolute : Bool } { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) }
-    | Toggle { isAbsolute : Bool } Flag
-    | Filter (List Assignment)
-    | ErrorMessage String
-
-
-
----- Create ----
-
-
-{-| Change the path in the Url for the next `view`
-
-    a   -> b -> b
-    a?f -> b -> b?f
-
-```css
-a:active, a:link:active, a:visited:active {}
-```
-
-Note that `(Nothing, Nothing)` is coerced into `(Just "", Nothing)` (is it What happens if not?)
-
--}
-goTo : ( Maybe Path, Fragment ) -> Link
-goTo =
-    GoTo
-
-
-{-| If you are `there`, go `here`, else go `there`.
-Use for expanding/collapsing nodes, or for tree-shaped scenes in general (in which case, "here" is the parent path).
-
-`Bounce {"there" "here"}` yields an `Internal` request of `there?reroute=here`
-
-    a -> b?reroute=c -> b
-    c -> b?reroute=c -> b
-    b -> b?reroute=c -> c
-
-```css
-a:active, a:link:active, a:visited:active {}
-a.bounce {}
-```
-
--}
-bounce : { there : ( Maybe Path, Fragment ), here : ( Maybe Path, Fragment ) } -> Link
-bounce =
-    Bounce { isAbsolute = True }
-
-
-{-| Turn a flag on or off
-
-    a?f -> ?toggle=f -> a
-
-```css
-a[role="switch"]:aria-checked {}
-```
-
--}
-toggle : Flag -> Link
-toggle =
-    Toggle { isAbsolute = True }
+    = GoTo ParsedLocation
+    | Toggle Flag
+    | Bounce
+        { there : ParsedLocation
+        , here : ParsedLocation
+        }
+    | Filter
+        { category : Category
+        , searchTerm : SearchTerm
+        }
 
 
 {-| -}
-filter : List Assignment -> Link
-filter =
-    Filter
+fromUrl : Url -> Maybe Link
+fromUrl url =
+    let
+        getLastSearchTermOf : Category -> State -> Maybe SearchTerm
+        getLastSearchTermOf category =
+            .query
+                >> Maybe.andThen
+                    (String.split "&"
+                        >> List.find (String.startsWith (category ++ "="))
+                    )
+    in
+    case getLastSearchTermOf "toggle" url of
+        Just flag ->
+            Just (Toggle flag)
 
+        Nothing ->
+            case getLastSearchTermOf "bounce" url of
+                Just escapedLocation ->
+                    case String.split "<>" escapedLocation of
+                        there :: here ->
+                            Just
+                                (Bounce
+                                    { there = parseLocation (String.replace "%23" "#" there)
+                                    , here =
+                                        String.join "<>" here
+                                            |> String.replace "%23" "#"
+                                            |> parseLocation
+                                    }
+                                )
 
-{-| -}
-err : String -> Link
-err =
-    ErrorMessage
-
-
-{-| Generates a Link, given the current path.
-
-Note that in Elm, an absolute Url path always starts with a slash.
-To check if the path is intended to be relative, we compare it with the previous path first.
-This is not absolutely necessary because the Elm runtime does the same check. However, it gives terser and more expressive Hrefs.
-
-In the following tests, we assume a previous path of "/"
-
-    import Url
-
-
-    testFromUrl : String -> Link
-    testFromUrl str =
-        Maybe.map2 fromTransition
-            (Url.fromString ("http://localhost"++str))
-            (Url.fromString ("http://localhost/"))
-                |> Maybe.join
-                |> Maybe.withDefault (err "Url.fromString failed")
-
-    --Bounce
-
-    (testFromUrl) "/there?reroute=here~f2#f1"
-        -->  bounce { there = (Just "there", Just "f1"), here = (Just "here", Just "f2") } |> makeRelative
-
-
-    (testFromUrl) "/there?reroute=/~f2#f1"
-        -->  bounce { there = (Just "there", Just "f1"), here = (Just "", Just "f2") } |> makeRelative
-
-    (testFromUrl) "/there?reroute=~f2#f1"
-        -->  bounce { there = (Just "there", Just "f1"), here = (Nothing, Just "f2") } |> makeRelative
-
-
-    (testFromUrl) "/there?reroute=#f1"
-        -->  bounce  { there = (Just "there", Just "f1"), here = (Nothing, Nothing) } |> makeRelative
-
-
-    (testFromUrl) "/?reroute=here~f2#f1"
-        --> bounce { there = (Nothing, Just "f1"), here = (Just "here", Just "f2") } |> makeRelative
-
-
-    (testFromUrl) "/?reroute=here~f2"
-        --> bounce  { there = (Nothing, Nothing), here = (Just "here", Just "f2") } |> makeRelative
-
-
-    (testFromUrl) "/?reroute=~"
-        --> bounce { there = (Nothing, Nothing), here = (Nothing, Nothing) } |> makeRelative
-
-
-
-    --Toggle
-
-    (testFromUrl) "?toggle=flag"
-        --> toggle "flag" |> makeRelative
-
-    (testFromUrl) "?toggle=flag&!"
-        --> toggle "flag"
-
-
-    --GoTo
-
-    testFromUrl "/path#"
-        --> goTo (Just "path", Just "")
-
-    testFromUrl "/path#fragment"
-        --> goTo (Just "path", Just "fragment")
-
-    testFromUrl "/path"
-        --> goTo (Just "path", Nothing)
-
-    testFromUrl "/path/"
-        --> goTo (Just "path", Nothing)
-
-    testFromUrl "/#fragment"
-        --> goTo (Nothing, Just "fragment")
-
-    testFromUrl "/#?fragment"
-        --> goTo (Nothing, Just "?fragment")
-
--}
-fromTransition : State -> State -> Maybe Link
-fromTransition new current =
-    if new == current then
-        Nothing
-
-    else
-        Url.Codec.parseUrl codecs
-            { new
-                | path =
-                    if current.path == new.path then
-                        ""
-
-                    else
-                        new.path
-            }
-            |> Result.extract fromParseError
-            |> Just
-
-
-fromParseError : ParseError -> Link
-fromParseError e =
-    ErrorMessage <|
-        String.join ", " <|
-            case e of
-                SegmentMismatch { expected, available } ->
-                    [ "SegmentMismatch: expected", expected, "available", available ]
-
-                SegmentNotAvailable ->
-                    [ "SegmentNotAvailable" ]
-
-                DidNotConsumeEverything strList ->
-                    "DidNotConsumeEverything" :: strList
-
-                NeededSingleQueryParameterValueGotMultiple { key, got } ->
-                    [ "NeededSingleQueryParameterValueGotMultiple", key ] ++ got
+                        _ ->
+                            Nothing
 
                 _ ->
-                    [ "other link parse error" ]
-
-
-
----- Map ----
-
-
-{-| By default, links render absolute, which means they don't respect
-the current state. This is the desired behavior when sharing links.
-
-For example, if you share a toggle, you want the receiver to
-experience the "on" state; for a bounce, you want the "there" location,
-regardless of the current state of their application.
-
-When clicking a link in an application, a transition relative to the
-current state is desired, so `Application.update` makes internal links relative.
-
--}
-makeRelative : Link -> Link
-makeRelative link =
-    case link of
-        Bounce _ location ->
-            Bounce { isAbsolute = False } location
-
-        Toggle _ flag ->
-            Toggle { isAbsolute = False } flag
-
-        _ ->
-            link
-
-
-
----- Update ----
-
-
-{-| Handles your message type (`modelMsg`) as well as changes to the Ui state (Url).
--}
-type Msg modelMsg
-    = UrlChanged Url
-    | LinkClicked Browser.UrlRequest
-    | AppMsg modelMsg
-    | UrlCmds (List Assignment)
-
-
-
----- Query ----
+                    Nothing
 
 
 {-| -}
-isActive : State -> Link -> Bool
-isActive state l =
-    case l of
-        GoTo ( maybePath, _ ) ->
-            maybePath == Just state.path
-
-        Bounce _ { there } ->
-            isActive state (GoTo there)
-
-        Toggle _ f ->
-            stateHasFlag f state
-
-        Filter [] ->
-            True
-
-        Filter (( category, _ ) :: more) ->
-            stateHasCategory category state && isActive state (Filter more)
-
-        ErrorMessage m ->
-            stateHasError m state
-
-
-
----- Deconstruct ----
-
-
-{-| -}
-getCurrentData : State -> Link -> Maybe Data
-getCurrentData url l =
-    case l of
-        GoTo _ ->
-            Nothing
-
-        Bounce _ _ ->
-            Nothing
-
-        Toggle _ _ ->
-            Nothing
-
-        Filter assignments ->
-            List.map (\( category, _ ) -> getStateSearchTermOf category url) assignments
-                |> Maybe.values
-                |> Filtered
-                |> Just
-
-        ErrorMessage _ ->
-            Nothing
-
-
-getDestination : Link -> Maybe ( Maybe Path, Fragment )
-getDestination link =
-    case link of
+toHref : Link -> String
+toHref relativeChange =
+    case relativeChange of
         GoTo location ->
-            Just location
+            encodeLocation location
 
-        Bounce _ { there } ->
-            Just there
+        Toggle flag ->
+            "?" ++ flag ++ "&toggle=" ++ flag
 
-        _ ->
-            Nothing
+        Bounce parsedLocations ->
+            let
+                ( there, here ) =
+                    ( encodeLocation parsedLocations.there, encodeLocation parsedLocations.here )
+            in
+            there ++ "?bounce=" ++ String.replace "#" "%23" (there ++ "<>" ++ here)
 
-
-getPath : Link -> Maybe Path
-getPath =
-    getDestination
-        >> Maybe.andThen Tuple.first
-        >> serialisePath
-        >> Just
-
-
-getFragment : Link -> Fragment
-getFragment =
-    getDestination
-        >> Maybe.andThen Tuple.second
+        Filter filter ->
+            "?" ++ filter.category ++ "=" ++ filter.searchTerm
 
 
-{-| Try to create an UrlString.
-
-    --Bounce
-
-    bounce
-        { there = (Just "there", Just "f1")
-        , here = (Just "here", Just "f2")
-        }
-        |> makeRelative
-        |> toString
-        --> "/there?reroute=here~f2#f1"
-
-    bounce
-        { there = (Just "there", Just "f1")
-        , here = (Just "", Just "f2")
-        }
-        |> makeRelative
-        |> toString
-        --> "/there?reroute=/~f2#f1"
-
-    bounce
-        { there = (Just "there", Just "f1")
-        , here = (Just "", Nothing)
-        }
-        |> makeRelative
-        |> toString
-        --> "/there?reroute=/#f1"
-
-    bounce
-        { there = (Just "", Just "f1")
-        , here = (Just "here", Just "f2")
-        }
-        |> makeRelative
-        |> toString
-        --> "/?reroute=here~f2#f1"
-
-    bounce
-        { there = (Just "", Nothing)
-        , here = (Just "here", Just "f2")
-        }
-        |> makeRelative
-        |> toString
-        --> "/?reroute=here~f2"
-
-    bounce
-        { there = (Nothing, Just "f1")
-        , here = (Just "here", Just "f2")
-        }
-        |> makeRelative
-        |> toString
-        --> "?reroute=here~f2#f1"
-
-    bounce
-        { there = (Nothing, Nothing)
-        , here = (Just "here", Just "f2")
-        }
-        |> makeRelative
-        |> toString
-        --> "?reroute=here~f2"
+{-| -}
+type Mutation
+    = StateEntered String
+    | StateInside String
+    | StateLeft String
+    | StateOutside String
+    | SwitchedOn
+    | StillOn
+    | SwitchedOff
+    | StillOff
 
 
-    --Toggle
+{-| -}
+mutationFromTwoStates : { current : State, previous : Maybe State } -> Link -> Maybe String -> Mutation
+mutationFromTwoStates { current, previous } link maybeSetName =
+    let
+        {-
 
-    toggle "flag"
-        |> makeRelative
-        |> toString
-        --> "?toggle=flag"
+           import Set
+           import Url
 
-    toggle "flag"
-        |> toString
-        --> "?toggle=flag&!"
+           Url.fromString "http://a/?x"
+               |> Maybe.map (stateHasFlag "y")
+               --> Just False
+
+           Url.fromString "http://a/?y&z"
+               |> Maybe.map (stateHasFlag "y")
+               --> Just True
+
+           Url.fromString "http://a/?y="
+               |> Maybe.map (stateHasFlag "y")
+               --> Just False
+
+           Url.fromString "http://a/?y="
+               |> Maybe.map (stateHasFlag "y=")
+               --> Just True
+
+           Url.fromString "http://a/?y=1&y=2&y=3"
+               |> Maybe.map (stateHasFlag "y=")
+               --> Just False
+
+           Url.fromString "http://a/?y=1&y=2&y=3"
+               |> Maybe.map (stateHasFlag "y=2")
+               --> Just True
+
+        -}
+        predicate : State -> Bool
+        predicate state =
+            case link of
+                GoTo location ->
+                    locationIsSubsetOf state location
+
+                Toggle flag ->
+                    Maybe.withDefault "" state.query
+                        |> String.split "&"
+                        |> List.member flag
+
+                Bounce { here } ->
+                    locationIsSubsetOf state here
+
+                Filter { category } ->
+                    Maybe.withDefault "" state.query
+                        |> (\q -> String.startsWith (category ++ "=") q || String.contains ("&" ++ category ++ "=") q)
+
+        locationIsSubsetOf : State -> ParsedLocation -> Bool
+        locationIsSubsetOf state location =
+            case ( location, getLocation state ) of
+                ( OnlyPath innerPath, OnlyPath path ) ->
+                    innerPath == path
+
+                ( OnlyPath innerPath, PathAndFragment path _ ) ->
+                    innerPath == path
+
+                ( OnlyFragment innerFragment, PathAndFragment _ fragment ) ->
+                    innerFragment == fragment
+
+                ( PathAndFragment innerPath innerFragment, PathAndFragment path fragment ) ->
+                    innerFragment == fragment && innerPath == path
+
+                _ ->
+                    False
+
+        getLocation : State -> ParsedLocation
+        getLocation url =
+            case ( getPath url, getFragment url ) of
+                ( path, Just fragment ) ->
+                    PathAndFragment path fragment
+
+                ( path, Nothing ) ->
+                    OnlyPath path
+
+        getFragment : State -> Maybe Fragment
+        getFragment =
+            .fragment
+
+        getPath : State -> Path
+        getPath { path } =
+            String.dropLeft 1 path
+    in
+    case ( predicate current, predicate (Maybe.withDefault current previous), maybeSetName ) of
+        ( True, True, Just set ) ->
+            StateInside set
+
+        ( True, True, Nothing ) ->
+            StillOn
+
+        ( True, False, Just set ) ->
+            StateEntered set
+
+        ( True, False, Nothing ) ->
+            SwitchedOn
+
+        ( False, True, Just set ) ->
+            StateLeft set
+
+        ( False, True, Nothing ) ->
+            SwitchedOff
+
+        ( False, False, Just set ) ->
+            StateOutside set
+
+        ( False, False, Nothing ) ->
+            StillOff
 
 
-    --GoTo
+{-| -}
+apply : Link -> State -> ( { pushHistoryState : Bool }, State )
+apply link =
+    let
+        mapFlags : (Set Flag -> Set Flag) -> State -> State
+        mapFlags fu state =
+            { state
+                | query =
+                    Maybe.withDefault "" state.query
+                        |> String.split "&"
+                        |> Set.fromList
+                        |> fu
+                        |> Set.toList
+                        |> String.join "&"
+                        |> String.nonEmpty
+            }
 
-    goTo (Just "path", Just "fragment")
-        |> toString
-        --> "/path#fragment"
+        replaceAssignment : Category -> SearchTerm -> State -> State
+        replaceAssignment category searchTerm =
+            mapFlags (Set.filter (String.startsWith (category ++ "=") >> not))
+                >> insertFlag (category ++ "=" ++ searchTerm)
 
-    goTo (Just "path", Nothing)
-        |> toString
-        --> "/path"
+        insertFlag : Flag -> State -> State
+        insertFlag =
+            Set.insert >> mapFlags
 
-    goTo (Nothing, Just "fragment")
-        |> toString
-        --> "#fragment"
+        setFragment : Fragment -> State -> State
+        setFragment fragment state =
+            { state | fragment = Just fragment }
 
-    goTo (Nothing, Nothing)
-        |> toString
-        --> ""
+        setPath : Path -> State -> State
+        setPath path state =
+            { state | path = "/" ++ path }
 
-    goTo (Nothing, Just "")
-        |> toString
-        --> "#"
+        withHistory : b -> ( { pushHistoryState : Bool }, b )
+        withHistory =
+            Tuple.pair { pushHistoryState = True }
 
--}
-toString : Link -> String
-toString =
-    Url.Codec.toString codecs
-        >> Maybe.andThen Url.percentDecode
-        >> Maybe.withDefault "?errorMessage=Error converting link to string"
+        withoutHistory : b -> ( { pushHistoryState : Bool }, b )
+        withoutHistory =
+            Tuple.pair { pushHistoryState = True }
+    in
+    case link of
+        GoTo parsedLocation ->
+            withHistory
+                << (case parsedLocation of
+                        OnlyPath path ->
+                            setPath path
 
+                        OnlyFragment fragment ->
+                            setFragment fragment
 
-{-| The data that a link emits in the context of a given Url.
--}
-type Data
-    = Filtered (List String)
+                        PathAndFragment path fragment ->
+                            setPath path >> setFragment fragment
+                   )
+
+        Toggle flag ->
+            mapFlags (Set.toggle flag)
+                >> withoutHistory
+
+        Bounce parsedLocations ->
+            let
+                ( there, here ) =
+                    ( encodeLocation parsedLocations.there, encodeLocation parsedLocations.here )
+            in
+            withHistory
+                << (\state ->
+                        if String.startsWith there (String.dropLeft 1 state.path) then
+                            setPath here state
+
+                        else
+                            setPath there state
+                   )
+
+        Filter { category, searchTerm } ->
+            replaceAssignment category searchTerm
+                >> withoutHistory
 
 
 {-| **Progressive disclosure**: Turning off a `Flag` renders all corresponding bits
@@ -570,6 +391,66 @@ type alias Path =
     String
 
 
+{-| (`/`)[`<Path>`](#Path)`#`[`<Fragment>`](#Fragment)
+-}
+type alias Location =
+    String
+
+
+{-| -}
+type ParsedLocation
+    = OnlyPath Path
+    | OnlyFragment Fragment
+    | PathAndFragment Path Fragment
+
+
+{-| -}
+parseLocation : Location -> ParsedLocation
+parseLocation location =
+    case String.split "#" location of
+        "" :: fragment ->
+            OnlyFragment (String.join "#" fragment)
+
+        path :: fragment ->
+            PathAndFragment path (String.join "#" fragment)
+
+        _ ->
+            OnlyPath location
+
+
+encodeLocation : ParsedLocation -> Location
+encodeLocation parsedLocation =
+    case parsedLocation of
+        OnlyPath path ->
+            "/" ++ path
+
+        OnlyFragment fragment ->
+            "#" ++ fragment
+
+        PathAndFragment path fragment ->
+            encodeLocation (OnlyPath path) ++ encodeLocation (OnlyFragment fragment)
+
+
+{-| returns True if the inner location string is a subset of the given outer Url's location
+-}
+getStateAssignmentFlags : Category -> Url -> List Flag
+getStateAssignmentFlags category =
+    .query
+        >> Maybe.map
+            (String.split "&"
+                >> List.filter (String.startsWith (category ++ "="))
+            )
+        >> Maybe.withDefault []
+
+
+{-| returns True if the inner location string is a subset of the given outer Url's location
+-}
+getStateSearchTerms : Category -> Url -> List SearchTerm
+getStateSearchTerms category =
+    getStateAssignmentFlags category
+        >> List.map (stripPrefix "=")
+
+
 {-| Distinguish parallel search inputs on a screen.
 -}
 type alias Category =
@@ -580,18 +461,6 @@ type alias Category =
 -}
 type alias SearchTerm =
     String
-
-
-{-| **Viewmode**: Assign a value to a key.
-
-**Search**: Assign a searchTerm to a category.
-
-Assignments are parallelly treated as Flags! So `?a=b` is both an assignment `(a, b)`
-and a flag `"a=b"`.
-
--}
-type alias Assignment =
-    ( Category, SearchTerm )
 
 
 {-| "Graphical Web browsers typically scroll to position pages so that the top of the element
@@ -606,7 +475,7 @@ the Browser may not update the focus, so it's safer to add a `focus-me` custom e
 
 -}
 type alias Fragment =
-    Maybe String
+    String
 
 
 
@@ -618,665 +487,9 @@ type alias State =
     Url
 
 
-{-| Only use for testing!
--}
-stateFromString : String -> Maybe State
-stateFromString =
-    Url.fromString
-
-
-
----- Create State Transitions ----
-
-
-{-| -}
-type alias Transition =
-    State -> State
-
-
-{-| -}
-stateSetPath : Path -> Transition
-stateSetPath path state =
-    { state | path = "/" ++ path }
-
-
-{-| -}
-stateSetFragment : Fragment -> Transition
-stateSetFragment fragment state =
-    { state | fragment = fragment }
-
-
-{-| -}
-stateSetLocation : ( Maybe Path, Fragment ) -> Transition
-stateSetLocation destination =
-    case destination of
-        ( Just path, fragment ) ->
-            stateSetPath path >> stateSetFragment fragment
-
-        ( Nothing, fragment ) ->
-            stateSetFragment fragment
-
-
-{-| -}
-stateTurnOnFlag : Flag -> Transition
-stateTurnOnFlag flag =
-    if flag == "" then
-        identity
-
-    else
-        stateMapQuery <| \q -> { q | flags = Set.insert flag q.flags }
-
-
-{-|
-
-    import Url exposing (Url)
-
-    testQuery : String -> (Url -> Url) -> String
-    testQuery query fu =
-        "http://localhost/?" ++ query
-            |> Url.fromString
-            |> Maybe.andThen (fu >> .query)
-            |> Maybe.withDefault "Url.fromString or .query failed"
-
-
-    stateToggleFlag "g"
-       |> testQuery "f&g&h&a=b&c=d=e"
-                --> "f&h&a=b&c=d=e"
-
-
-    stateToggleFlag "g"
-       |> testQuery "f&h&a=b&c=d=e"
-                --> "f&g&h&a=b&c=d=e"
-
--}
-stateToggleFlag : Flag -> Transition
-stateToggleFlag flag =
-    if flag == "" then
-        identity
-
-    else
-        stateMapQuery <| \q -> { q | flags = Set.toggle flag q.flags }
-
-
-{-| -}
-stateAddAssignment : Assignment -> Transition
-stateAddAssignment assignment =
-    stateMapQuery <| \q -> { q | assignments = assignment :: q.assignments }
-
-
-
-{-
-   stateReplaceAssignment : Assignment -> Transition
-   stateReplaceAssignment (( category, _ ) as assignment) =
-       stateMapQuery <| \q -> { q | assignments = assignment :: List.filter (\( key, _ ) -> key /= category) q.assignments }
--}
-
-
-{-| -}
-stateRemoveAssignments : List Category -> Transition
-stateRemoveAssignments categories =
-    stateMapQuery <|
-        \q ->
-            { q
-                | assignments =
-                    List.filter
-                        (Tuple.first >> (\key -> not (List.member key categories)))
-                        q.assignments
-            }
-
-
-stateMapQuery : (Query -> Query) -> Transition
-stateMapQuery fu state =
-    { state | query = (parseQueryString >> fu >> serializeQuery) state.query }
-
-
-
----- Query State ----
-
-
-{-|
-
-    import Set
-    import Url
-
-    "http://a/?y"
-        |> Url.fromString
-        |> Maybe.map (stateHasFlag "z")
-        --> Just False
-
-    "http://a/?y&z"
-        |> Url.fromString
-        |> Maybe.map (stateHasFlag "z")
-        --> Just True
-
--}
-stateHasFlag : Flag -> State -> Bool
-stateHasFlag flag =
-    getStateFlags >> List.member flag
-
-
-stateHasAssignment : Assignment -> State -> Bool
-stateHasAssignment ( key, value ) =
-    stateHasFlag (key ++ "=" ++ value)
-
-
-stateHasError : String -> State -> Bool
-stateHasError m =
-    stateHasAssignment ( "e", m )
-
-
-stateHasCategory : Category -> State -> Bool
-stateHasCategory category =
-    getStateFlags
-        >> List.filterMap (String.split "=" >> List.head)
-        >> List.member category
-
-
 
 ---- Deconstruct State ----
-
-
-{-| -}
-stateToString : State -> String
-stateToString =
-    Url.toString
-
-
-{-| -}
-getStateFragment : State -> Fragment
-getStateFragment =
-    .fragment
-
-
-{-| -}
-getStatePath : State -> Path
-getStatePath { path } =
-    String.dropLeft 1 path
-
-
-{-| -}
-getStateLocation : State -> ( Maybe Path, Fragment )
-getStateLocation url =
-    ( String.nonEmpty (getStatePath url), getStateFragment url )
-
-
-{-| -}
-type alias Query =
-    { flags : Set Flag, assignments : List Assignment }
-
-
-getStateFlags : State -> List Flag
-getStateFlags =
-    .query
-        >> parseQueryString
-        >> .flags
-        >> Set.toList
-
-
-getStateAssignments : State -> List Assignment
-getStateAssignments =
-    .query
-        >> parseQueryString
-        >> .assignments
-
-
-getStateLastAssignmentOf : Category -> State -> Maybe Assignment
-getStateLastAssignmentOf category =
-    getStateAssignments
-        >> List.find (\( key, _ ) -> key == category)
-
-
-getStateSearchTermOf : Category -> State -> Maybe SearchTerm
-getStateSearchTermOf category =
-    getStateLastAssignmentOf category
-        >> Maybe.map Tuple.second
-
-
-
----- View ----
--- {-| -}
--- preset :
---     { global : List (Html.Attribute Never) -> List (Html Never) -> ( CustomHtml (Html msg) (Html.Attribute msg), Renderer aspect (Html msg) (Html.Attribute msg) )
---     , inline : List (Html.Attribute Never) -> List (Html Never) -> ( CustomHtml (Html msg) (Html.Attribute msg), Renderer aspect (Html msg) (Html.Attribute msg) )
---     , nav : List (Html.Attribute Never) -> List (Html Never) -> ( CustomHtml (Html msg) (Html.Attribute msg), Renderer aspect (Html msg) (Html.Attribute msg) )
---     , tab : List (Html.Attribute Never) -> List (Html Never) -> ( CustomHtml (Html msg) (Html.Attribute msg), Renderer aspect (Html msg) (Html.Attribute msg) )
---     }
--- preset =
---     { global = \att con -> ( defaultHtml, { empty | attributes = List.map (Attr.map never) att, label = List.map (Html.map never) con, isInline = False } )
---     , inline = \att con -> ( defaultHtml, { empty | attributes = List.map (Attr.map never) att, label = List.map (Html.map never) con, isInline = True } )
---     , nav = \att con -> ( { defaultHtml | element = Html.input }, { empty | attributes = Attr.type_ "radio" :: List.map (Attr.map never) att, label = List.map (Html.map never) con, isInline = False } )
---     , tab = \att con -> ( { defaultHtml | element = Html.input }, { empty | attributes = Attr.type_ "radio" :: List.map (Attr.map never) att, label = List.map (Html.map never) con, isInline = True } )
---     }
--- Reformulate link and switch as Wrapper? No because then one could `wrap` in a link or a switch.
--- {-| textual header link
--- -}
--- headerLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
--- headerLink link =
---     let
---         ( customHtml, renderer ) =
---             preset.global [] [ Html.text (toId link) ]
---     in
---     view customHtml renderer link
--- {-| textual inline link
--- -}
--- inlineLink : Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, Html msg )), occlude : Mask region a })
--- inlineLink link =
---     let
---         ( customHtml, renderer ) =
---             preset.inline [] [ Html.text (toId link) ]
---     in
---     view customHtml renderer link
--- {-| inline link with custom Html
--- -}
--- inlineLink_ : CustomHtml html attribute -> List attribute -> List html -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a })
--- inlineLink_ customHtml att con =
---     view customHtml { empty | attributes = att, label = con, isInline = True }
--- {-| header link with custom Html
--- -}
--- headerLink_ : CustomHtml html attribute -> List attribute -> List html -> Link -> (( OrHeader region, Url ) -> { linkHtml : Get (OrHeader region) (List ( String, html )), occlude : Mask region a })
--- headerLink_ customHtml att con =
---     view customHtml { empty | attributes = att, label = con, isInline = True }
-
-
-{-| Accepts a Renderer and a Link and the current region and url.
--}
-view :
-    OrHeader region
-    -> State
-    -> Templates html
-    -> Style html
-    -> Link
-    -> Get (OrHeader region) html
-view region state elements { isInline, label } link =
-    Get.singleton
-        (if isInline then
-            region
-
-         else
-            Header
-        )
-    <|
-        case link of
-            Toggle _ _ ->
-                elements.switch
-                    { href = toString link
-                    , label = label
-                    , isChecked = isActive state link
-                    }
-
-            Filter assignments ->
-                elements.search
-                    { assignments = assignments
-                    , label = label
-                    , isCurrent = isActive state link
-                    }
-
-            _ ->
-                elements.link
-                    { href = toString link
-                    , label = label
-                    , isCurrent = isActive state link
-                    }
-
-
-{-| `isInline` : Draw the Link itself at the current region, otherwise in the `Header` region.
--}
-type alias Style html =
-    { isInline : Bool
-    , label : html
-    }
-
-
-{-| -}
-mapStyle : (html -> html2) -> Style html -> Style html2
-mapStyle fu linkStyle =
-    { isInline = linkStyle.isInline
-    , label = fu linkStyle.label
-    }
-
-
-{-| Use this if you are working with `Styled Html`, `elm-ui` and friends
-
-(Future: Add radio for tabs and exclusive ViewMode toggles)
-
--}
-type alias Templates html =
-    { link :
-        { href : String, label : html, isCurrent : Bool }
-        -> html
-    , switch :
-        { href : String, label : html, isChecked : Bool }
-        -> html
-    , search :
-        { assignments : List Assignment, label : html, isCurrent : Bool }
-        -> html
-    }
-
-
-
----- Codecs ----
-
-
-{-|
-
-    buildLink "Path" (Just "Fragment") Nothing Nothing Nothing True
-        -> goTo (Just "Path", Just "Fragment")
-
-    buildLink "Path" Nothing Nothing Nothing Nothing True
-        -> goTo (Just "Path", Nothing)
-
-Note that any flag will de-activate path and fragment.
-
--}
-buildLink : Path -> Fragment -> Maybe String -> Maybe Flag -> List String -> Maybe String -> Bool -> Link
-buildLink pathString maybeFragment reroute maybeFlag maybeAssignments errorMessage isAbsolute =
-    let
-        myPath : Maybe Path
-        myPath =
-            parsePath pathString
-    in
-    case ( errorMessage, reroute, maybeFlag ) of
-        ( Just e, _, _ ) ->
-            err e
-
-        ( _, Just here, _ ) ->
-            Bounce { isAbsolute = isAbsolute } { there = ( myPath, maybeFragment ), here = queryParseLocation here }
-
-        ( _, _, Just flag ) ->
-            Toggle { isAbsolute = isAbsolute } flag
-
-        _ ->
-            case maybeAssignments of
-                [] ->
-                    GoTo ( myPath, maybeFragment )
-
-                _ ->
-                    Filter
-                        (List.map queryParseAssignment maybeAssignments
-                            |> Maybe.values
-                        )
-
-
-codecs : List (Codec Link)
-codecs =
-    let
-        getAbsoluteFlag : Url.Codec.CodecInProgress Link (Bool -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
-        getAbsoluteFlag =
-            Url.Codec.queryFlag "!" <|
-                \l ->
-                    case l of
-                        Bounce { isAbsolute } _ ->
-                            isAbsolute
-
-                        Toggle { isAbsolute } _ ->
-                            isAbsolute
-
-                        _ ->
-                            False
-
-        getError : Url.Codec.CodecInProgress Link (Maybe String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
-        getError =
-            Url.Codec.queryString "error" <|
-                \l ->
-                    case l of
-                        ErrorMessage e ->
-                            Just e
-
-                        _ ->
-                            Nothing
-
-        getFilter : Url.Codec.CodecInProgress Link (List String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
-        getFilter =
-            Url.Codec.queryStrings "q" <|
-                \l ->
-                    case l of
-                        Filter assignments ->
-                            List.map querySerialiseAssignment assignments
-
-                        _ ->
-                            []
-
-        getReroute : Url.Codec.CodecInProgress Link (Maybe String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
-        getReroute =
-            Url.Codec.queryString "reroute" <|
-                \l ->
-                    case l of
-                        Bounce _ { here } ->
-                            Just (querySerialiseLocation here)
-
-                        _ ->
-                            Nothing
-
-        getToggle : Url.Codec.CodecInProgress Link (Maybe String -> parseResult) -> Url.Codec.CodecInProgress Link parseResult
-        getToggle =
-            Url.Codec.queryString "toggle" <|
-                \l ->
-                    case l of
-                        Toggle _ flag ->
-                            Just flag
-
-                        _ ->
-                            Nothing
-    in
-    [ Url.Codec.succeed buildLink
-        (\_ -> True)
-        |> Url.Codec.string getPath
-    , Url.Codec.succeed (buildLink "")
-        (\_ -> True)
-    ]
-        |> List.map
-            (Url.Codec.fragment getFragment
-                >> getReroute
-                >> getToggle
-                >> getFilter
-                >> getError
-                >> getAbsoluteFlag
-            )
-
-
-
 ---- Apply ----
-
-
-{-| -}
-applyTransition : State -> Link -> State
-applyTransition current link =
-    toTransition link current
-
-
-toTransition : Link -> Transition
-toTransition link =
-    case link of
-        GoTo destination ->
-            stateSetLocation destination
-
-        Bounce { isAbsolute } { there, here } ->
-            \state ->
-                if
-                    isAbsolute
-                        || (there == getStateLocation state)
-                        || (Tuple.first there == Nothing && Tuple.second there == Tuple.second (getStateLocation state))
-                then
-                    stateSetLocation here state
-
-                else
-                    stateSetLocation there state
-
-        Toggle { isAbsolute } f ->
-            stateRemoveAssignments [ "toggle", "reroute" ]
-                >> (if isAbsolute then
-                        stateTurnOnFlag f
-
-                    else
-                        stateToggleFlag f
-                   )
-
-        Filter assignments ->
-            List.foldl
-                (\ass acc ->
-                    acc
-                        >> stateAddAssignment ass
-                )
-                identity
-                assignments
-
-        ErrorMessage e ->
-            stateAddAssignment ( "errorMessage", e )
-
-
-
----- InternalHelpers ----
-
-
-{-| Use in encoding a query assignment for contextual linking.
-
-    querySerialiseLocation (Just "", Nothing)
-        --> "/"
-
-    querySerialiseLocation (Nothing, Nothing)        -- Perhaps we need to prevent this case
-        --> ""
-
-    querySerialiseLocation (Nothing, Just "f")
-        --> "~f"
-
-    querySerialiseLocation (Nothing, Just "~")
-        --> "~~"
-
-    querySerialiseLocation (Just "~", Nothing)
-        --> "%7E"
-
-    querySerialiseLocation (Just "p", Nothing)
-        --> "p"
-
-    querySerialiseLocation (Just "p", Just "f")
-        --> "p~f"
-
--}
-querySerialiseLocation : ( Maybe Path, Fragment ) -> String
-querySerialiseLocation ( maybePath, fragment ) =
-    querySerialisePath maybePath ++ Maybe.unwrap "" (String.cons '~') fragment
-
-
-querySerialiseAssignment : Assignment -> String
-querySerialiseAssignment =
-    \( key, value ) -> key ++ "=" ++ value
-
-
-serialisePath : Maybe Path -> String
-serialisePath maybePath_ =
-    case maybePath_ of
-        Just nonEmpty ->
-            "/" ++ String.replace "~" "%7E" nonEmpty
-
-        Nothing ->
-            ""
-
-
-querySerialisePath : Maybe Path -> String
-querySerialisePath maybePath_ =
-    case maybePath_ of
-        Just "" ->
-            "/"
-
-        Just nonEmpty ->
-            String.replace "~" "%7E" nonEmpty
-
-        Nothing ->
-            ""
-
-
-{-|
-
-    queryParseLocation ""
-        --> (Nothing, Nothing)
-
-    queryParseLocation "/"
-        --> (Just "", Nothing)
-
-    queryParseLocation "~"
-        --> (Nothing, Nothing)    -- Path may need to be coerced to ""
-
-    queryParseLocation "~f"
-        --> (Nothing, Just "f")
-
-    queryParseLocation "/~f"
-        --> (Just "", Just "f")
-
-    queryParseLocation "~~"
-        --> (Nothing, Just "~")
-
-    queryParseLocation "p"
-        --> (Just "p", Nothing)
-
-    queryParseLocation "p~"       -- Will be sanitised to "p"
-        --> (Just "p", Nothing)
-
-    queryParseLocation "p~f"
-        --> (Just "p", Just "f")
-
--}
-queryParseLocation : String -> ( Maybe Path, Fragment )
-queryParseLocation str =
-    case String.split "~" str of
-        [] ->
-            ( Nothing, Nothing )
-
-        [ path ] ->
-            ( upTo "#" path
-                |> Maybe.andThen parsePath
-            , Nothing
-            )
-
-        path :: fragment ->
-            ( parsePath path, upTo "#" <| String.join "~" fragment )
-
-
-queryParseAssignment : String -> Maybe Assignment
-queryParseAssignment =
-    String.split "="
-        >> List.uncons
-        >> Maybe.map
-            (Tuple.mapSecond (String.join "="))
-
-
-serializeQuery : Query -> Maybe String
-serializeQuery query =
-    Set.toList query.flags
-        ++ List.map (\( k, v ) -> k ++ "=" ++ v) query.assignments
-        |> String.join "&"
-        |> String.nonEmpty
-
-
-parseQueryString : Maybe String -> Query
-parseQueryString =
-    Maybe.withDefault ""
-        >> String.split "&"
-        >> List.foldr
-            (\entry query ->
-                case String.split "=" entry of
-                    [] ->
-                        query
-
-                    [ "" ] ->
-                        query
-
-                    [ flag ] ->
-                        { query | flags = Set.insert flag query.flags }
-
-                    ass :: ignment ->
-                        { query | assignments = ( ass, String.join "=" ignment ) :: query.assignments }
-            )
-            { flags = Set.empty, assignments = [] }
-
-
-parsePath : String -> Maybe Path
-parsePath str =
-    case str of
-        "" ->
-            Nothing
-
-        nonEmpty ->
-            (stripPrefix "/" >> String.replace "%7E" "~" >> Just) nonEmpty
 
 
 stripPrefix : String -> String -> String
@@ -1287,22 +500,3 @@ stripPrefix prefix str =
 
         _ ->
             str
-
-
-{-|
-
-    upTo "?" ""
-        --> Nothing
-
-    upTo "?" "!"
-        --> Just "!"
-
-    upTo "?" "!?1234"
-        --> Just "!"
-
--}
-upTo : String -> String -> Maybe String
-upTo searchString =
-    String.split searchString
-        >> List.head
-        >> Maybe.andThen String.nonEmpty

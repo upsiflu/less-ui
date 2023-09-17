@@ -43,8 +43,8 @@ import Browser.Navigation as Nav
 import Html exposing (Html)
 import Restrictive.Link as Link exposing (Link, Msg(..), State)
 import Restrictive.Ui as Ui exposing (Layout, Ui)
-import Return exposing (Return, return)
-import Url exposing (Url)
+import Return exposing (Return)
+import Url
 
 
 type alias ApplicationState model =
@@ -69,10 +69,10 @@ mapDocument :
     -> { body : Ui region html wrapper, layout : Layout region narrowHtml_ html narrowWrapper_ wrapper, title : String }
     -> Document msg
 mapDocument toHtml document =
-    \state ->
+    \states ->
         { title = document.title
         , body =
-            Ui.view state document.layout document.body
+            Ui.view (Ui.applyStates states document.layout) document.body
                 |> toHtml
         }
 
@@ -116,55 +116,53 @@ application config =
         , onUrlRequest = LinkClicked
         , subscriptions = \_ -> Sub.none
         , update =
-            \msg ( key, { current } as state, model ) ->
+            \msg ->
                 let
-                    followLink : Link -> Return msg (ApplicationState model)
-                    followLink link =
+                    applyLink : Link -> ApplicationState model -> Return msg_ (ApplicationState model)
+                    applyLink link ( key, { current } as state, model ) =
                         let
-                            next : State
-                            next =
-                                Link.applyTransition current link
-
-                            setUrl : Cmd msg
-                            setUrl =
-                                if next.path == current.path && next.fragment == current.fragment then
-                                    Nav.replaceUrl key (Link.stateToString next)
-
-                                else
-                                    Nav.pushUrl key (Link.stateToString next)
+                            ( { pushHistoryState }, newState ) =
+                                Link.apply link current
                         in
-                        return ( key, { current = next, previous = Just current }, model ) setUrl
+                        nextState newState ( key, state, model )
+                            |> Return.command
+                                (if pushHistoryState then
+                                    Nav.pushUrl key (Url.toString newState)
 
-                    followUrl : Url -> { modifyLink : Link -> Link } -> Return msg (ApplicationState model)
-                    followUrl url { modifyLink } =
-                        Link.fromTransition url current
-                            |> Maybe.map (modifyLink >> followLink)
-                            |> Maybe.withDefault noOp
+                                 else
+                                    Nav.replaceUrl key (Url.toString newState)
+                                )
 
-                    noOp : Return msg (ApplicationState model)
-                    noOp =
-                        ( ( key, state, model ), Cmd.none )
-                in
-                case msg of
-                    UrlChanged url ->
-                        followUrl url { modifyLink = identity }
+                    nextState : State -> ApplicationState model -> Return msg_ (ApplicationState model)
+                    nextState newUrl ( key, { current }, model ) =
+                        Return.singleton ( key, { current = newUrl, previous = Just current }, model )
 
-                    LinkClicked (Browser.Internal url) ->
-                        followUrl url { modifyLink = Link.makeRelative }
-
-                    LinkClicked (Browser.External href) ->
-                        Return.command (Nav.load href) noOp
-
-                    AppMsg modelMsg ->
+                    updateModel : modelMsg -> ApplicationState model -> Return (Msg modelMsg) (ApplicationState model)
+                    updateModel modelMsg ( key, state, model ) =
                         let
                             ( updatedModel, modelCmd ) =
                                 config.update modelMsg model
                         in
-                        return ( key, state, updatedModel ) modelCmd
-                            |> Return.mapCmd AppMsg
+                        Return.return ( key, state, updatedModel ) (Cmd.map AppMsg modelCmd)
+                in
+                case msg of
+                    UrlChanged url ->
+                        nextState url
 
-                    UrlCmds assignments ->
-                        followLink (Link.filter assignments)
+                    LinkClicked (Browser.Internal url) ->
+                        Link.fromUrl url
+                            |> Maybe.map applyLink
+                            |> Maybe.withDefault Return.singleton
+
+                    LinkClicked (Browser.External href) ->
+                        Return.singleton
+                            >> Return.command (Nav.load href)
+
+                    AppMsg modelMsg ->
+                        updateModel modelMsg
+
+                    UrlCmd link ->
+                        applyLink link
         , view =
             \( _, state, model ) ->
                 let
