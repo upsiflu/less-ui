@@ -13,7 +13,7 @@ module Restrictive.Layout.Html exposing
 
 # Create Links
 
-_For use cases, read [the Create Links section in the State module](Restrictive-State#create-links)_
+[Read more in the `Link` module.](Restrictive.Link)
 
 @docs toggle, goTo, bounce, filter
 
@@ -28,7 +28,7 @@ _For use cases, read [the Create Links section in the State module](Restrictive-
 @docs layout
 
 
-### Costruct your own:
+### Assemble your own layout record:
 
 @docs wrap, arrange, concat
 
@@ -69,7 +69,8 @@ singleton =
 ---- Create links ----
 
 
-{-| Toggle a `flag` and show/hide the nested `Ui` accordingly.
+{-| Toggle a `Flag` and show/hide the associated `Ui` accordingly.
+Will add the flag when the link is opened in a new tab or shared, no matter its state in the current tab.
 -}
 toggle :
     List (Html.Attribute Never)
@@ -85,7 +86,7 @@ toggle attributes config =
         >> Ui.wrap
 
 
-{-| Toggle a `flag` and show/hide the nested `Ui` accordingly.
+{-| Filter or search a `Category`, then show a `Ui` according to the given `SearchTerm`(s).
 -}
 filter :
     List (Html.Attribute Never)
@@ -118,6 +119,7 @@ goTo attributes config =
 
 
 {-| Navigate to `there`, and from there, back `here`.
+Will navigate `there` when the link is opened in a new tab or shared.
 -}
 bounce :
     List (Html.Attribute Never)
@@ -221,8 +223,8 @@ keyedNode tagName attrs =
 For example, if you want to extend a widget or form generator (`elm-any-type-forms`) that can only output Html
 with `Ui` elements that alter and respond to the Url, then you need
 
-  - a way to convert from `Ui` to `html` -> `view`
-  - a way to convert from `html` to `Ui` -> `singleton`
+  - a way to convert from `Ui (Msg narrowMsg)` to `Html (Msg narrowMsg)` nested inside the widget -> `makeInnerHtml`
+  - a way to convert from the widget `Html (Msg msg)` to `Ui (Msg msg)` -> `combine`
   - a way to forward the current state to the nested `Ui`
 
 Here is how you use this function:
@@ -230,18 +232,18 @@ Here is how you use this function:
 1.  Write the `Ui` code for your widget extension.
     You can use all the local parameters your widget provides.
 
-2.  Convert it to `html` using the `makeInnerHtml` function. Just pretend it exists:
+2.  Convert it to `Html (Msg narrowMsg)` using `makeInnerHtml`
+    to make it fit inside your widget.
 
-    { makeInnerHtml } ->
-    Ui.singleton...
-    |> makeInnerHtml
+3.  Your widget will create `Html (Msg msg)`. The function you
+    wrote for drawing the widget is the `combine` function that
+    you can now `nest`.
 
-    Note that the inner html will not bubble any messages to your app, so you are limited to Url-based state.
+**Caution:** If you use this functionality, the `Ui` will contain functions and will no longer support equality checks and serialisation.
 
-3.  Your widget will create `Html msg`. This will be the parameter you provide `stateful`.
-    It will need a `Layout` to render `Ui (Html Never)` into `Html Never`.
-
-Caution: If you use this functionality, the `Ui` will contain functions and will no longer support equality checks and serialisation.
+**Note:** As of now, the type setup will limit you to **nest one layer deep**, i.e. the compiler will complain if you try to nest Ui in a widget that is part of the Ui nested in another widget.
+This is because the inside of the widget uses a different message type than the outside of the widget. As of now, I see no other way to mitigate than to use code generation
+in order to write out the `narrower` nested types. I've never done code generation, and I don't feel comfortable with long types, so I'll leave it to you.
 
 -}
 nest :
@@ -251,6 +253,8 @@ nest :
             -> Maybe (HtmlList (Link.Msg narrowMsg))
         }
         -> HtmlList (Link.Msg msg)
+
+    -- Plug it into your widget here
     }
     -> Ui narrowMsg msg
 nest config =

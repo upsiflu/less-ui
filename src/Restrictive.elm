@@ -47,13 +47,13 @@ import Return exposing (Return)
 import Url
 
 
-type alias ApplicationState model =
-    ( Nav.Key, { current : State, previous : Maybe State }, model )
-
-
 {-| -}
 type alias Application model modelMsg =
     Program () (ApplicationState model) (Msg modelMsg)
+
+
+type alias ApplicationState model =
+    ( Nav.Key, { current : State, previous : Maybe State }, model )
 
 
 {-| Parametrizes [Browser.Document](https://package.elm-lang.org/packages/elm/browser/latest/Browser#Document)
@@ -68,29 +68,16 @@ mapDocument :
     (html -> List (Html msg))
     -> { body : Ui region html wrapper, layout : Layout region narrowHtml_ html narrowWrapper_ wrapper, title : String }
     -> Document msg
-mapDocument toHtml document =
+mapDocument toHtml { body, layout, title } =
     \states ->
-        { title = document.title
+        { title = title
         , body =
-            Ui.view (Ui.applyStates states document.layout) document.body
+            Ui.view (Ui.applyStates states layout) body
                 |> toHtml
         }
 
 
-{-| Create a standalone `Html` application for the Elm Browser runtime.
-
-
-## App Lifecycle:
-
-    Opened Url
-    in new tab           -> init
-
-    Clicked
-    internal link        -> update Relative Link
-
-    Manually replaced
-    url                  -> update Absolute Link
-
+{-| Keeps the Ui state in the Url.
 -}
 application :
     { init : ( model, Cmd modelMsg )
@@ -173,23 +160,3 @@ application config =
                 , body = List.map (Html.map AppMsg) body
                 }
         }
-
-
-
-{- Use cases 1:
-
-   The user toggles a Ui handle, for example the avatar, to open or close a menu.
-
-   (a)
-   They decide to share the link of the handle, so they right-click on the toggle and choose 'copy link'.
-   Their friend opens the link and the handle is activated.
-
-   (b)
-   They copy the Url and paste it in another tab or browser or device.
-   The app loads and restores exactly the same Ui state.
-
-   In the case of (a), we share a href, which is a string.
-   The friend opens the link, and Elm turns it into the initial Url.
-   Now, `canonical.init` canonicalises the initial Url.
-
--}

@@ -76,6 +76,19 @@ type Msg modelMsg
 {-| Relative changes to the Url are only applied when a link opens in the same tab.
 Otherwise, absolute changes are applied by the Elm runtime.
 
+**Example:**
+
+The user clicks a menu (implemented as a `Toggle`) to open it, then clicks again to close it.
+
+(a)
+They decide to share the menu, so they right-click on the toggle and choose 'copy link'.
+Their friend opens the link and the handle is activated. Otherwise, the friend's Ui is at the default
+state. A toggle's `href` always points to the `open` state.
+
+(b)
+They copy the Url and paste it in another tab or browser or device.
+The app loads and restores exactly the same Ui state as in the original tab.
+
   - Jump Navigation
       - [x]  [With a single target (goTo)](#goTo)
       - [x]  [With two back-and-forth targets (bounce)](#bounce)
@@ -83,7 +96,7 @@ Otherwise, absolute changes are applied by the Elm runtime.
   - Progressive Disclosure
       - [x]  [Orthogonal; any number can be active (toggle)](#toggle)
       - [ ] Exactly one active at a given Ui node (tab) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8) ☞ [#2](https://github.com/upsiflu/restrictive/issues/2)
-      - [ ] One or zero active in the browser tab (dropdown, dialog) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8)
+      - [ ] One or zero active in the browser tab (dropdown, dialog, popover) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8)
 
   - Dynamic Links
       - [x]  [Search or Filter](#filter) a [Category](#Category) by [user-input Data](#Data)
@@ -177,36 +190,6 @@ type Mutation
 mutationFromTwoStates : { current : State, previous : Maybe State } -> Link -> Maybe String -> Mutation
 mutationFromTwoStates { current, previous } link maybeSetName =
     let
-        {-
-
-           import Set
-           import Url
-
-           Url.fromString "http://a/?x"
-               |> Maybe.map (stateHasFlag "y")
-               --> Just False
-
-           Url.fromString "http://a/?y&z"
-               |> Maybe.map (stateHasFlag "y")
-               --> Just True
-
-           Url.fromString "http://a/?y="
-               |> Maybe.map (stateHasFlag "y")
-               --> Just False
-
-           Url.fromString "http://a/?y="
-               |> Maybe.map (stateHasFlag "y=")
-               --> Just True
-
-           Url.fromString "http://a/?y=1&y=2&y=3"
-               |> Maybe.map (stateHasFlag "y=")
-               --> Just False
-
-           Url.fromString "http://a/?y=1&y=2&y=3"
-               |> Maybe.map (stateHasFlag "y=2")
-               --> Just True
-
-        -}
         predicate : State -> Bool
         predicate state =
             case link of
@@ -404,7 +387,21 @@ type ParsedLocation
     | PathAndFragment Path Fragment
 
 
-{-| -}
+{-|
+
+    parseLocation ""
+        -> OnlyPath ""
+
+    parseLocation "/"
+        -> OnlyPath ""
+
+    parseLocation "#"
+        -> OnlyFragment ""
+
+    parseLocation "/#"
+        -> PathAndFragment "" ""
+
+-}
 parseLocation : Location -> ParsedLocation
 parseLocation location =
     case String.split "#" location of
@@ -431,24 +428,32 @@ encodeLocation parsedLocation =
             encodeLocation (OnlyPath path) ++ encodeLocation (OnlyFragment fragment)
 
 
-{-| returns True if the inner location string is a subset of the given outer Url's location
+{-| Note that a `Category` may contain "=":
+
+    import Url
+
+    Url.fromString "http://test/?a=b=c"
+        |> Maybe.map (getStateSearchTerms "a")
+        --> Just ["b=c"]
+
+    Url.fromString "http://test/?a=b=c"
+        |> Maybe.map (getStateSearchTerms "a=")
+        --> Just []
+
+    Url.fromString "http://test/?a=b=c"
+        |> Maybe.map (getStateSearchTerms "a=b")
+        --> Just ["c"]
+
 -}
-getStateAssignmentFlags : Category -> Url -> List Flag
-getStateAssignmentFlags category =
+getStateSearchTerms : Category -> Url -> List SearchTerm
+getStateSearchTerms category =
     .query
         >> Maybe.map
             (String.split "&"
                 >> List.filter (String.startsWith (category ++ "="))
             )
         >> Maybe.withDefault []
-
-
-{-| returns True if the inner location string is a subset of the given outer Url's location
--}
-getStateSearchTerms : Category -> Url -> List SearchTerm
-getStateSearchTerms category =
-    getStateAssignmentFlags category
-        >> List.map (stripPrefix "=")
+        >> List.map (String.dropLeft (String.length category + 1))
 
 
 {-| Distinguish parallel search inputs on a screen.
@@ -457,7 +462,7 @@ type alias Category =
     String
 
 
-{-| Can represent a filter value or the search input.
+{-| Represent a filter value or the search input.
 -}
 type alias SearchTerm =
     String
@@ -485,18 +490,3 @@ type alias Fragment =
 {-| -}
 type alias State =
     Url
-
-
-
----- Deconstruct State ----
----- Apply ----
-
-
-stripPrefix : String -> String -> String
-stripPrefix prefix str =
-    case String.split prefix str of
-        _ :: r :: est ->
-            String.join prefix (r :: est)
-
-        _ ->
-            str
