@@ -1,6 +1,6 @@
 module Restrictive.Layout.Html exposing
     ( Ui, singleton
-    , toggle, goTo, bounce, filter
+    , toggle, goTo, bounce, filter, search
     , ol, ul, keyedNode, nest
     , layout
     , wrap, arrange, concat
@@ -15,7 +15,7 @@ module Restrictive.Layout.Html exposing
 
 [Read more in the `Link` module.](Restrictive.Link)
 
-@docs toggle, goTo, bounce, filter
+@docs toggle, goTo, bounce, filter, search
 
 
 # Wrap the DOM
@@ -71,6 +71,9 @@ singleton =
 
 {-| Toggle a `Flag` and show/hide the associated `Ui` accordingly.
 Will add the flag when the link is opened in a new tab or shared, no matter its state in the current tab.
+
+`Flag` is a string and may contain "=".
+
 -}
 toggle :
     List (Html.Attribute Never)
@@ -86,9 +89,45 @@ toggle attributes config =
         >> Ui.wrap
 
 
-{-| Filter or search a `Category`, then show a `Ui` according to the given `SearchTerm`(s).
+{-| Show a `Ui` according to what searchTerms are currently associated with a given category.
+
+    -- Show a token for each SearchTerm in category "search=a"
+    List.concatMap viewToken
+        |> filter "search"
+
 -}
 filter :
+    Link.Category
+    -> (List Link.SearchTerm -> Ui narrowMsg msg)
+    -> Ui narrowMsg msg
+filter category =
+    Filter category Nothing
+        >> Ui.wrap
+
+
+{-| Display a search box and show a `Ui` according to what searchTerms are currently associated with a given category.
+
+    singleton [ Html.h1 [] [ Html.text "Two Search Boxes" ] ]
+        ++ search []
+            { category = "search=a"
+            , isInline = True
+            , label = []
+            }
+            (\_ -> [])
+        ++ search []
+            { category = "search=b"
+            , isInline = True
+            , label = []
+            }
+            (\_ -> [])
+        ++ filter "search"
+            -- will receive a subset of ["a=...", "b=..."] as SearchTerms
+            (List.concatMap resultsPerSearchTerm
+                >> List.concatMap viewSeachResult
+            )
+
+-}
+search :
     List (Html.Attribute Never)
     ->
         { category : Link.Category
@@ -97,8 +136,14 @@ filter :
         }
     -> (List Link.SearchTerm -> Ui narrowMsg msg)
     -> Ui narrowMsg msg
-filter attributes config =
-    Filter attributes config
+search attributes config =
+    Filter config.category
+        (Just
+            { attributes = attributes
+            , isInline = config.isInline
+            , label = config.label
+            }
+        )
         >> Ui.wrap
 
 
@@ -159,11 +204,13 @@ type Wrapper narrowMsg msg
         }
         (Ui narrowMsg msg)
     | Filter
-        (List (Html.Attribute Never))
-        { category : Link.Category
-        , isInline : Bool
-        , label : HtmlList msg
-        }
+        Link.Category
+        (Maybe
+            { attributes : List (Html.Attribute Never)
+            , isInline : Bool
+            , label : HtmlList msg
+            }
+        )
         (List Link.SearchTerm -> Ui narrowMsg msg)
     | GoTo
         (List (Html.Attribute Never))
@@ -418,7 +465,7 @@ wrap states wrapper =
                     wrapByMutation mutation contingent
                 }
 
-        Filter attributes { category, isInline, label } contingent ->
+        Filter category maybeConfig contingent ->
             let
                 link : Link.SearchTerm -> Link
                 link newSearchTerm =
@@ -434,19 +481,26 @@ wrap states wrapper =
             in
             Ui.Stateful
                 { label =
-                    appHtml label
-                        ++ [ Html.input
-                                (Attr.value (String.join " " searchTerms)
-                                    :: Events.onInput
-                                        (\newSearchTerm ->
-                                            Link.UrlCmd (link newSearchTerm)
+                    case maybeConfig of
+                        Just { attributes, label } ->
+                            appHtml label
+                                ++ [ Html.input
+                                        (Attr.value (String.join " " searchTerms)
+                                            :: Events.onInput
+                                                (\newSearchTerm ->
+                                                    Link.UrlCmd (link newSearchTerm)
+                                                )
+                                            :: List.map (Attr.map Link.AppMsg) (Attr.title category :: attributesByMutation mutation)
+                                            ++ List.map (Attr.map never) attributes
                                         )
-                                    :: List.map (Attr.map Link.AppMsg) (Attr.title category :: attributesByMutation mutation)
-                                    ++ List.map (Attr.map never) attributes
-                                )
-                                []
-                           ]
-                , isInline = isInline
+                                        []
+                                   ]
+
+                        Nothing ->
+                            []
+                , isInline =
+                    Maybe.map .isInline maybeConfig
+                        |> Maybe.withDefault True
                 , contingent = wrapByMutation mutation (contingent searchTerms)
                 }
 
