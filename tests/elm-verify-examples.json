@@ -1,11 +1,11 @@
 {
   "root": "../src",
   "tests": [
-    "Restrictive",
-    "Restrictive.Ui",
-    "Restrictive.Get",
-    "Restrictive.Link",
-    "Restrictive.Layout.Region",
-    "Restrictive.Layout.Html"
+    "Less",
+    "Less.Ui",
+    "Less.Get",
+    "Less.Link",
+    "Less.Ui.Region",
+    "Less.Ui.Html"
   ]
 }

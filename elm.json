@@ -5,12 +5,12 @@
     "license": "MIT",
     "version": "0.5.0",
     "exposed-modules": [
-        "Restrictive",
-        "Restrictive.Ui",
-        "Restrictive.Get",
-        "Restrictive.Link",
-        "Restrictive.Layout.Html",
-        "Restrictive.Layout.Region"
+        "Less",
+        "Less.Ui",
+        "Less.Get",
+        "Less.Link",
+        "Less.Ui.Html",
+        "Less.Ui.Region"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {

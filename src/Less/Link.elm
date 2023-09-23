@@ -1,4 +1,4 @@
-module Restrictive.Link exposing
+module Less.Link exposing
     ( Link(..)
     , fromUrl
     , toHref, apply
@@ -350,24 +350,24 @@ apply link =
 
 {-| **Progressive disclosure**: Turning off a `Flag` renders all corresponding bits
 of `Ui` invisible.
-Example: [Layout.Html#toggle](Restrictive.Layout.Html#toggle).
+Example: [Ui.Html#toggle](Less.Ui.Html#toggle).
 
 **Parametric search:** Assignments such as `?a=b` may represent currently active Tabs
 or a search string.
-Example: [Layout.Html#search](Restrictive.Layout.Html#search).
+Example: [Ui.Html#search](Less.Ui.Html#search).
 
 -}
 type alias Flag =
     String
 
 
-{-| **Pages:** Jump through a `/`-delimited tree or a pool of exclusive pages. Example: [Layout.Html#bounce](Restrictive.Layout.Html#goTo)
+{-| **Pages:** Jump through a `/`-delimited tree or a pool of exclusive pages. Example: [Ui.Html#bounce](Less.Ui.Html#goTo)
 
 **Global Tabs**: Navigate between tabs using the global `nav` bar.
 
 **Items in a Set:** A path may represent a single item or group. Navigating to an Item will scroll it into the viewport.
 
-**Items in a Tree**: Here, each item has a `parent` item, which is activated when its link is clicked for the second time. Example: [Layout.Html#bounce](Restrictive.Layout.Html#bounce)
+**Items in a Tree**: Here, each item has a `parent` item, which is activated when its link is clicked for the second time. Example: [Ui.Html#bounce](Less.Ui.Html#bounce)
 
 -}
 type alias Path =
@@ -443,6 +443,8 @@ encodeLocation parsedLocation =
     Url.fromString "http://test/?a=b=c"
         |> Maybe.map (getStateSearchTerms "a=b")
         --> Just ["c"]
+
+Attention: Categories "toggle" and "bounce" are interpreted as redirect directives in relative links ([-> Link](#Link)).
 
 -}
 getStateSearchTerms : Category -> Url -> List SearchTerm

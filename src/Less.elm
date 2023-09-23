@@ -1,4 +1,4 @@
-module Restrictive exposing (application, Application, mapDocument, Document)
+module Less exposing (application, Application, mapDocument, Document)
 
 {-| Makes the `Url` the single source of truth for the state of your user interface,
 and hides the corresponding messages from your `update`.
@@ -41,8 +41,8 @@ This opens two possible pitfalls:
 import Browser
 import Browser.Navigation as Nav
 import Html exposing (Html)
-import Restrictive.Link as Link exposing (Link, Msg(..), State)
-import Restrictive.Ui as Ui exposing (Layout, Ui)
+import Less.Link as Link exposing (Link, Msg(..), State)
+import Less.Ui as Ui exposing (Layout, Ui)
 import Return exposing (Return)
 import Url
 
@@ -57,7 +57,7 @@ type alias ApplicationState model =
 
 
 {-| Parametrizes [Browser.Document](https://package.elm-lang.org/packages/elm/browser/latest/Browser#Document)
-over the current [`State`](Restrictive.State)
+over the current [`State`](Less.State)
 -}
 type alias Document msg =
     { current : State, previous : Maybe State } -> Browser.Document msg

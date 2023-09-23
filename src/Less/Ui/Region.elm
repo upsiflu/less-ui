@@ -1,4 +1,4 @@
-module Restrictive.Layout.Region exposing
+module Less.Ui.Region exposing
     ( Region(..)
     , allRegions
     , subtract
@@ -9,6 +9,8 @@ module Restrictive.Layout.Region exposing
     )
 
 {-| Categorise the parts of your [Ui item](Ui)
+
+Note: Much or all of this module is slated for removal.
 
 This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#toggle)
 
@@ -62,7 +64,7 @@ type OrAll region
     | AllExcept (List region)
 
 
-{-| Extend a sum type by a `Header` constructor. Every app in `Restrictive` has a Header.
+{-| Extend a sum type by a `Header` constructor. Every app in `Less` has a Header.
 -}
 type OrHeader region
     = Header

@@ -1,4 +1,4 @@
-module Restrictive.Ui exposing
+module Less.Ui exposing
     ( Ui, Item
     , singleton, wrap
     , at
@@ -94,10 +94,10 @@ The following exports have no application and may be removed in the next release
 
 -}
 
+import AssocList as Dict exposing (Dict)
+import Less.Link exposing (State)
+import Less.Ui.Region exposing (OrHeader(..))
 import List.Extra as List
-import Restrictive.Get as Get exposing (Get)
-import Restrictive.Layout.Region exposing (OrHeader(..))
-import Restrictive.Link exposing (State)
 
 
 {-| -}
@@ -122,7 +122,7 @@ singleton =
     Leaf >> List.singleton
 
 
-{-| Check out [the default wrappers in `Restrictive.Layout.Html`](Restrictive.Layout.Html#wrap-the-dom).
+{-| Check out [the default wrappers in `Less.Ui.Html`](Less.Ui.Html#wrap-the-dom).
 -}
 wrap : wrapper -> Ui region_ html_ wrapper
 wrap =
@@ -249,7 +249,7 @@ uncons =
 type alias Layout region narrowHtml html narrowWrapper customWrapper =
     { wrap : { current : State, previous : Maybe State } -> customWrapper -> Wrapper region narrowHtml html narrowWrapper customWrapper
     , concat : List html -> html
-    , arrange : Get (OrHeader region) html -> html
+    , arrange : Dict (OrHeader region) html -> html
     }
 
 
@@ -260,7 +260,7 @@ applyStates :
     -> CurrentLayout region narrowHtml html narrowWrapper customWrapper
 applyStates states layout =
     { wrap = layout.wrap states
-    , concat = layout.concat
+    , concat = dict.concatBy layout.concat
     , arrange = layout.arrange
     }
 
@@ -269,8 +269,8 @@ applyStates states layout =
 -}
 type alias CurrentLayout region narrowHtml html narrowWrapper customWrapper =
     { wrap : customWrapper -> Wrapper region narrowHtml html narrowWrapper customWrapper
-    , concat : List html -> html
-    , arrange : Get (OrHeader region) html -> html
+    , concat : List (Dict (OrHeader region) html) -> Dict (OrHeader region) html
+    , arrange : Dict (OrHeader region) html -> html
     }
 
 
@@ -290,7 +290,7 @@ You can either use the provided `Wrapper` or roll your own.
 Advantage of rolling your own `wrapper` type: You don't need to store functions in the Ui,
 which makes it comparable and serializable.
 
-See [`Layout.Html`](Layout.Html#Wrapper) for an example of a mostly defunctionalized wrapper.
+See [`Ui.Html`](Ui.Html#Wrapper) for an example of a mostly defunctionalized wrapper.
 
 -}
 type Wrapper region narrowHtml html narrowWrapper wrapper
@@ -330,7 +330,7 @@ viewOtherUi :
     CurrentLayout region narrowHtml_ html narrowWrapper_ wrapper
     -> OrHeader region
     -> Ui region html wrapper
-    -> Get (OrHeader region) html
+    -> Dict (OrHeader region) html
 viewOtherUi =
     viewUi
 
@@ -339,14 +339,14 @@ viewUi :
     CurrentLayout region narrowHtml_ html narrowWrapper_ wrapper
     -> OrHeader region
     -> Ui region html wrapper
-    -> Get (OrHeader region) html
+    -> Dict (OrHeader region) html
 viewUi layout region =
     let
-        viewItem : Item region html wrapper -> Get (OrHeader region) html
+        viewItem : Item region html wrapper -> Dict (OrHeader region) html
         viewItem item =
             case item of
                 Leaf html_ ->
-                    Get.singleton region html_
+                    Dict.singleton region html_
 
                 Wrap wrapper ->
                     viewWrapper wrapper
@@ -354,26 +354,26 @@ viewUi layout region =
                 At innerRegion elements ->
                     viewUi layout (Region innerRegion) elements
 
-        viewWrapper : wrapper -> Get (OrHeader region) html
+        viewWrapper : wrapper -> Dict (OrHeader region) html
         viewWrapper wrapper =
             case layout.wrap wrapper of
                 Wrapped fu elements ->
                     viewUi layout region elements
-                        |> Get.updateAt region fu
+                        |> Dict.update region (Maybe.map fu)
 
-                Keyed fu elementLists ->
+                Keyed fu elements ->
                     List.concatMap
                         (\( key, ui ) ->
                             List.indexedMap
                                 (\i item ->
                                     viewItem item
-                                        |> Get.map (\itm -> [ ( key ++ String.fromInt i, itm ) ])
+                                        |> Dict.map (\_ itm -> [ ( key ++ String.fromInt i, itm ) ])
                                 )
                                 ui
                         )
-                        elementLists
-                        |> Get.concat
-                        |> Get.map fu
+                        elements
+                        |> dict.concat
+                        |> Dict.map (\_ -> fu)
 
                 Nested { regions, narrowLayout, combine } ->
                     --Important: at this implementation, `Nest` throws away the elements!
@@ -390,22 +390,45 @@ viewUi layout region =
                                             at r
                                     )
                                         >> viewOtherUi narrowLayout soloRegion
-                                        >> Get.get soloRegion
+                                        >> Dict.get soloRegion
                                 }
                             )
                         )
                         (Header :: List.map Region regions)
-                        |> Get.fromList
+                        |> Dict.fromList
 
                 Stateful { label, isInline, contingent } ->
-                    Get.concatBy layout.concat
+                    layout.concat
                         [ if isInline then
-                            Get.singleton Header label
+                            Dict.singleton Header label
 
                           else
-                            Get.singleton region label
+                            Dict.singleton region label
                         , viewUi layout region contingent
                         ]
     in
     List.map viewItem
-        >> Get.concatBy layout.concat
+        >> layout.concat
+
+
+
+---- Helpers ----
+
+
+append : (List a -> a) -> Dict k a -> Dict k a -> Dict k a
+append flatten =
+    Dict.merge
+        Dict.insert
+        (\k a b -> Dict.insert k (flatten [ a, b ]))
+        Dict.insert
+        Dict.empty
+
+
+dict :
+    { concat : List (Dict k (List v)) -> Dict k (List v)
+    , concatBy : (List v -> v) -> List (Dict k v) -> Dict k v
+    }
+dict =
+    { concat = List.foldl (append List.concat) Dict.empty
+    , concatBy = \concatenator -> List.foldl (append concatenator) Dict.empty
+    }

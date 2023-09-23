@@ -1,4 +1,4 @@
-module Restrictive.Layout.Html exposing
+module Less.Ui.Html exposing
     ( Ui, singleton
     , toggle, goTo, bounce, filter, search
     , ol, ul, keyedNode, nest
@@ -6,14 +6,14 @@ module Restrictive.Layout.Html exposing
     , wrap, arrange, concat
     )
 
-{-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Restrictive.Ui`](Restrictive.Ui)
+{-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Less.Ui`](Less.Ui)
 
 @docs Ui, singleton
 
 
 # Create Links
 
-[Read more in the `Link` module.](Restrictive.Link)
+[Read more in the `Link` module.](Less.Link)
 
 @docs toggle, goTo, bounce, filter, search
 
@@ -34,15 +34,15 @@ module Restrictive.Layout.Html exposing
 
 -}
 
+import AssocList as Dict exposing (Dict)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Html.Keyed
 import Html.Lazy
-import Restrictive.Get as Get exposing (Get)
-import Restrictive.Layout.Region as Region exposing (OrHeader(..), Region(..), withHeader)
-import Restrictive.Link as Link exposing (Link, Mutation(..), State)
-import Restrictive.Ui as Ui
+import Less.Link as Link exposing (Link, Mutation(..), State)
+import Less.Ui as Ui
+import Less.Ui.Region exposing (OrHeader(..), Region(..))
 
 
 {-| -}
@@ -562,22 +562,21 @@ concat =
 
 
 {-| -}
-arrange : Get (OrHeader Region) (HtmlList msg) -> HtmlList msg
+arrange : Dict (OrHeader Region) (HtmlList msg) -> HtmlList msg
 arrange =
-    withHeader Region.allRegions
-        |> Get.toListBy
-            (Get.fromList
-                [ ( Header
-                  , Html.Lazy.lazy2 Html.header [ Attr.class "header" ]
-                  )
-                , ( Region Scene
-                  , Html.Lazy.lazy2 Html.main_ [ Attr.class "scene" ]
-                  )
-                , ( Region Control
-                  , Html.Lazy.lazy2 Html.div [ Attr.class "control" ]
-                  )
-                , ( Region Info
-                  , Html.Lazy.lazy2 Html.div [ Attr.class "info" ]
-                  )
-                ]
+    Dict.toList
+        >> List.map
+            (\item ->
+                case item of
+                    ( Header, html ) ->
+                        Html.Lazy.lazy2 Html.header [ Attr.class "header" ] html
+
+                    ( Region Scene, html ) ->
+                        Html.Lazy.lazy2 Html.main_ [ Attr.class "scene" ] html
+
+                    ( Region Info, html ) ->
+                        Html.Lazy.lazy2 Html.div [ Attr.class "info" ] html
+
+                    ( Region Control, html ) ->
+                        Html.Lazy.lazy2 Html.div [ Attr.class "control" ] html
             )
