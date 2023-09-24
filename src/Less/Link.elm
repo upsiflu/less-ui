@@ -53,6 +53,7 @@ module Less.Link exposing
 -}
 
 import Browser
+import Maybe.Extra as Maybe
 import Set exposing (Set)
 import Set.Extra as Set
 import String.Extra as String
@@ -116,32 +117,48 @@ type Link
 
 {-| This happens when a Link is clicked. We want to apply the relative change here.
 -}
-fromUrl : Url -> Maybe Link
+fromUrl : Url -> Link
 fromUrl url =
-    case getStateSearchTerms "toggle" url of
-        [] ->
-            case getStateSearchTerms "bounce" url of
-                [] ->
+    let
+        bounce : () -> Maybe Link
+        bounce () =
+            case
+                getStateSearchTerms "bounce" url
+                    |> List.head
+                    |> Maybe.map (String.split "<>")
+            of
+                Just (there :: here) ->
+                    Just
+                        (Bounce
+                            { there = parseLocation (String.replace "%23" "#" there)
+                            , here =
+                                String.join "<>" here
+                                    |> String.replace "%23" "#"
+                                    |> parseLocation
+                            }
+                        )
+
+                _ ->
                     Nothing
 
-                escapedLocation :: _ ->
-                    case String.split "<>" escapedLocation of
-                        there :: here ->
-                            Just
-                                (Bounce
-                                    { there = parseLocation (String.replace "%23" "#" there)
-                                    , here =
-                                        String.join "<>" here
-                                            |> String.replace "%23" "#"
-                                            |> parseLocation
-                                    }
-                                )
+        goTo : () -> Link
+        goTo () =
+            String.dropLeft 1 url.path
+                ++ (Maybe.map (\fragment -> "#" ++ fragment) url.fragment
+                        |> Maybe.withDefault ""
+                   )
+                |> parseLocation
+                |> GoTo
 
-                        _ ->
-                            Nothing
-
-        flag :: _ ->
-            Just (Toggle flag)
+        toggle : () -> Maybe Link
+        toggle () =
+            getStateSearchTerms "toggle" url
+                |> List.head
+                |> Maybe.map Toggle
+    in
+    toggle ()
+        |> Maybe.orElseLazy bounce
+        |> Maybe.withDefault (goTo ())
 
 
 {-| -}

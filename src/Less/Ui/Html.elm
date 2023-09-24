@@ -423,6 +423,7 @@ wrap states wrapper =
                     , Attr.tabindex -1
                     , Attr.style "opacity" "0"
                     , Attr.style "pointer-events" "none;"
+                    , Attr.style "font-size" "0"
                     ]
             in
             case mutation of

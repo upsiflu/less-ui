@@ -139,8 +139,7 @@ application config =
 
                     LinkClicked (Browser.Internal url) ->
                         Link.fromUrl url
-                            |> Maybe.map applyLink
-                            |> Maybe.withDefault Return.singleton
+                            |> applyLink
 
                     LinkClicked (Browser.External href) ->
                         Return.singleton
