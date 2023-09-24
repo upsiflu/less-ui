@@ -35,7 +35,7 @@ jobs:
         uses: jorelali/setup-elm@v5
         with:
           elm-version: 0.19.1
-      - run: elm make src/examples/src/Features.elm
+      - run: elm make examples/src/Features.elm
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
