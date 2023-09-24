@@ -58,7 +58,7 @@ view _ =
         showTab : String -> Ui -> Ui
         showTab str contents =
             Less.Ui.Html.toggle []
-                { flag = str
+                { flag = String.replace " " "+" str
                 , isInline = False
                 , label = [ Html.text str ]
                 }
@@ -67,12 +67,12 @@ view _ =
     Less.mapDocument identity
         { body =
             textLabel "Toggle the features on top of the page! "
-                ++ showTab "Flat Ui Layout"
+                ++ showTab "Flat-Ui-Layout"
                     ui
                 ++ showTab "Global Navbar"
                     globalNav
         , layout = Less.Ui.Html.layout
-        , title = "Less Ui feature test"
+        , title = "Less-Ui feature test"
         }
 
 

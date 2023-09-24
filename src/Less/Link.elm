@@ -115,25 +115,17 @@ type Link
         }
 
 
-{-| -}
+{-| This happens when a Link is clicked. We want to apply the relative change here.
+-}
 fromUrl : Url -> Maybe Link
 fromUrl url =
-    let
-        getLastSearchTermOf : Category -> State -> Maybe SearchTerm
-        getLastSearchTermOf category =
-            .query
-                >> Maybe.andThen
-                    (String.split "&"
-                        >> List.find (String.startsWith (category ++ "="))
-                    )
-    in
-    case getLastSearchTermOf "toggle" url of
-        Just flag ->
-            Just (Toggle flag)
+    case getStateSearchTerms "toggle" url of
+        [] ->
+            case getStateSearchTerms "bounce" url of
+                [] ->
+                    Nothing
 
-        Nothing ->
-            case getLastSearchTermOf "bounce" url of
-                Just escapedLocation ->
+                escapedLocation :: _ ->
                     case String.split "<>" escapedLocation of
                         there :: here ->
                             Just
@@ -149,8 +141,8 @@ fromUrl url =
                         _ ->
                             Nothing
 
-                _ ->
-                    Nothing
+        flag :: _ ->
+            Just (Toggle flag)
 
 
 {-| -}
@@ -197,7 +189,7 @@ mutationFromTwoStates { current, previous } link maybeSetName =
                     locationIsSubsetOf state location
 
                 Toggle flag ->
-                    Maybe.withDefault "" state.query
+                    Maybe.withDefault "" (Maybe.andThen Url.percentDecode state.query)
                         |> String.split "&"
                         |> List.member flag
 
@@ -289,11 +281,7 @@ apply link =
         replaceAssignment : Category -> SearchTerm -> State -> State
         replaceAssignment category searchTerm =
             mapFlags (Set.filter (String.startsWith (category ++ "=") >> not))
-                >> insertFlag (category ++ "=" ++ searchTerm)
-
-        insertFlag : Flag -> State -> State
-        insertFlag =
-            Set.insert >> mapFlags
+                >> (Set.insert >> mapFlags) (category ++ "=" ++ searchTerm)
 
         setFragment : Fragment -> State -> State
         setFragment fragment state =
@@ -326,7 +314,7 @@ apply link =
                    )
 
         Toggle flag ->
-            mapFlags (Set.toggle flag)
+            mapFlags (Set.toggle flag >> Set.remove ("toggle=" ++ flag))
                 >> withoutHistory
 
         Bounce parsedLocations ->

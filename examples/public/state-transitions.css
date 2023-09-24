@@ -26,7 +26,8 @@ Transitions between Ui states
     outline       : 0.5px dashed orangered;
 }
 
-.removed {
+.removed,
+*:has(>.removed:only-child) {
     animation: .05s hide .05s forwards;
 }
 

@@ -188,7 +188,7 @@ bounce attributes config =
 
 {-| -}
 type Wrapper narrowMsg msg
-    = Node String (List (Html.Attribute (Link.Msg msg))) (Ui narrowMsg msg)
+    = Node { onlyInCurrentRegion : Bool } String (List (Html.Attribute (Link.Msg msg))) (Ui narrowMsg msg)
     | Keyed (List ( String, HtmlList (Link.Msg msg) ) -> HtmlList (Link.Msg msg)) (List ( String, Ui narrowMsg msg ))
     | Nested
         { combine :
@@ -243,7 +243,11 @@ section attrs =
 {-| -}
 node : String -> List (Html.Attribute (Link.Msg msg)) -> Ui narrowMsg msg -> Ui narrowMsg msg
 node str attrs =
-    Node str attrs >> Ui.wrap
+    Node { onlyInCurrentRegion = True } str attrs >> Ui.wrap
+
+
+nodeInEachRegion str attrs =
+    Node { onlyInCurrentRegion = False } str attrs >> Ui.wrap
 
 
 applyKeyedFu : (List ( String, Html msg ) -> Html msg) -> (List ( String, HtmlList msg ) -> HtmlList msg)
@@ -353,8 +357,8 @@ wrap states wrapper =
         appHtml =
             List.map (Html.map Link.AppMsg)
 
-        attributesByMutation : Mutation -> List (Html.Attribute msg)
-        attributesByMutation mutation =
+        labelAttributesByMutation : Mutation -> List (Html.Attribute msg)
+        labelAttributesByMutation mutation =
             case mutation of
                 StateEntered currentSet ->
                     [ Attr.attribute "aria-current" currentSet
@@ -410,34 +414,43 @@ wrap states wrapper =
 
         wrapByMutation : Mutation -> Ui narrowMsg msg -> Ui narrowMsg msg
         wrapByMutation mutation =
+            let
+                removed =
+                    [ Attr.class "removed"
+                    , Attr.attribute "aria-hidden" "true"
+                    , Attr.tabindex -1
+                    , Attr.style "opacity" "0"
+                    , Attr.style "pointer-events" "none;"
+                    ]
+            in
             case mutation of
                 StateEntered _ ->
                     node "span" [ Attr.class "inserted removable" ]
 
                 StateInside _ ->
-                    node "span" [ Attr.class "removable" ]
+                    nodeInEachRegion "span" [ Attr.class "removable" ]
 
                 StateLeft _ ->
-                    node "span" [ Attr.class "removed", Attr.attribute "aria-hidden" "true", Attr.tabindex -1 ]
+                    nodeInEachRegion "span" removed
 
                 StateOutside _ ->
-                    \_ -> node "span" [ Attr.class "removed", Attr.attribute "aria-hidden" "true", Attr.tabindex -1 ] []
+                    \_ -> nodeInEachRegion "span" removed []
 
                 SwitchedOn ->
-                    node "span" [ Attr.class "inserted removable" ]
+                    nodeInEachRegion "span" [ Attr.class "inserted removable" ]
 
                 StillOn ->
-                    node "span" [ Attr.class "removable" ]
+                    nodeInEachRegion "span" [ Attr.class "removable" ]
 
                 SwitchedOff ->
-                    node "span" [ Attr.class "removed", Attr.attribute "aria-hidden" "true", Attr.tabindex -1 ]
+                    nodeInEachRegion "span" removed
 
                 StillOff ->
-                    \_ -> node "span" [ Attr.class "removed", Attr.attribute "aria-hidden" "true", Attr.tabindex -1 ] []
+                    \_ -> nodeInEachRegion "span" removed []
     in
     case wrapper of
-        Node str attrs elements ->
-            Ui.Wrapped (Html.node str attrs >> List.singleton) elements
+        Node config str attrs elements ->
+            Ui.Wrapped config (Html.node str attrs >> List.singleton) elements
 
         Keyed fu list ->
             Ui.Keyed fu list
@@ -464,7 +477,7 @@ wrap states wrapper =
                     appHtml
                         [ Html.a
                             (Attr.href (Link.toHref link)
-                                :: attributesByMutation mutation
+                                :: labelAttributesByMutation mutation
                                 ++ List.map (Attr.map never) attributes
                             )
                             label
@@ -499,7 +512,7 @@ wrap states wrapper =
                                                 (\newSearchTerm ->
                                                     Link.UrlCmd (link newSearchTerm)
                                                 )
-                                            :: List.map (Attr.map Link.AppMsg) (Attr.title category :: attributesByMutation mutation)
+                                            :: List.map (Attr.map Link.AppMsg) (Attr.title category :: labelAttributesByMutation mutation)
                                             ++ List.map (Attr.map never) attributes
                                         )
                                         []
@@ -528,7 +541,7 @@ wrap states wrapper =
                     appHtml
                         [ Html.a
                             (Attr.href destination
-                                :: attributesByMutation mutation
+                                :: labelAttributesByMutation mutation
                                 ++ List.map (Attr.map never) attributes
                             )
                             label
@@ -553,7 +566,7 @@ wrap states wrapper =
                     appHtml
                         [ Html.a
                             (Attr.href (Link.toHref link)
-                                :: attributesByMutation mutation
+                                :: labelAttributesByMutation mutation
                                 ++ List.map (Attr.map never) attributes
                             )
                             label

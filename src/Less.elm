@@ -111,10 +111,11 @@ application config =
                             ( { pushHistoryState }, newState ) =
                                 Link.apply link current
                         in
-                        nextState newState ( key, state, model )
+                        -- changing the Url will implicitly trigger `nextState`
+                        Return.singleton ( key, state, model )
                             |> Return.command
                                 (if pushHistoryState then
-                                    Nav.pushUrl key (Url.toString newState)
+                                    Nav.pushUrl key (Url.toString newState |> Debug.log "New History State")
 
                                  else
                                     Nav.replaceUrl key (Url.toString newState)
@@ -151,5 +152,5 @@ application config =
                     UrlCmd link ->
                         applyLink link
         , view =
-            \( _, state, model ) -> config.view model state
+            \( _, states, model ) -> config.view model (Debug.log "==================================================================\nLess.view -- states" states)
         }

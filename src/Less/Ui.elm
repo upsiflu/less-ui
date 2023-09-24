@@ -294,7 +294,7 @@ See [`Ui.Html`](Ui.Html#Wrapper) for an example of a mostly defunctionalized wra
 
 -}
 type Wrapper region narrowHtml html narrowWrapper wrapper
-    = Wrapped (html -> html) (Ui region html wrapper)
+    = Wrapped { onlyInCurrentRegion : Bool } (html -> html) (Ui region html wrapper)
     | Keyed (List ( String, html ) -> html) (List ( String, Ui region html wrapper ))
     | Nested
         { regions : List region
@@ -357,9 +357,14 @@ viewUi layout region =
         viewWrapper : wrapper -> Dict (OrHeader region) html
         viewWrapper wrapper =
             case layout.wrap wrapper of
-                Wrapped fu elements ->
+                Wrapped { onlyInCurrentRegion } fu elements ->
                     viewUi layout region elements
-                        |> Dict.update region (Maybe.map fu)
+                        |> (if onlyInCurrentRegion then
+                                Dict.update region (Maybe.map fu)
+
+                            else
+                                Dict.map (\_ -> fu)
+                           )
 
                 Keyed fu keyedElements ->
                     let
@@ -399,12 +404,17 @@ viewUi layout region =
                         |> Dict.fromList
 
                 Stateful { label, isInline, contingent } ->
-                    layout.concat
-                        [ if isInline then
-                            Dict.singleton Header label
+                    let
+                        labelRegion : OrHeader region
+                        labelRegion =
+                            if isInline then
+                                Header
 
-                          else
-                            Dict.singleton region label
+                            else
+                                region
+                    in
+                    layout.concat
+                        [ Dict.singleton labelRegion label
                         , viewUi layout region contingent
                         ]
     in
@@ -417,11 +427,13 @@ viewUi layout region =
 
 
 append : (List a -> a) -> Dict k a -> Dict k a -> Dict k a
-append howToFlatten =
+append howToFlatten dictA dictB =
     Dict.merge
         Dict.insert
         (\k a b -> Dict.insert k (howToFlatten [ a, b ]))
         Dict.insert
+        dictA
+        dictB
         Dict.empty
 
 

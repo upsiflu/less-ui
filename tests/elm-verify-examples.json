@@ -3,7 +3,6 @@
   "tests": [
     "Less",
     "Less.Ui",
-    "Less.Get",
     "Less.Link",
     "Less.Ui.Region",
     "Less.Ui.Html"
