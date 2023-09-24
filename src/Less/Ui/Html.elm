@@ -246,6 +246,7 @@ node str attrs =
     Node { onlyInCurrentRegion = True } str attrs >> Ui.wrap
 
 
+nodeInEachRegion : String -> List (Html.Attribute (Link.Msg msg)) -> Ui narrowMsg msg -> Ui.Ui region_ html_ (Wrapper narrowMsg msg)
 nodeInEachRegion str attrs =
     Node { onlyInCurrentRegion = False } str attrs >> Ui.wrap
 
@@ -357,6 +358,10 @@ wrap states wrapper =
         appHtml =
             List.map (Html.map Link.AppMsg)
 
+        getMutation : Link.Link -> Maybe String -> Mutation
+        getMutation =
+            Link.mutationFromTwoStates states
+
         labelAttributesByMutation : Mutation -> List (Html.Attribute msg)
         labelAttributesByMutation mutation =
             case mutation of
@@ -408,13 +413,10 @@ wrap states wrapper =
                     , Attr.class "state-outside"
                     ]
 
-        getMutation : Link.Link -> Maybe String -> Mutation
-        getMutation =
-            Link.mutationFromTwoStates states
-
         wrapByMutation : Mutation -> Ui narrowMsg msg -> Ui narrowMsg msg
         wrapByMutation mutation =
             let
+                removed : List (Html.Attribute (Link.Msg msg))
                 removed =
                     [ Attr.class "removed"
                     , Attr.attribute "aria-hidden" "true"

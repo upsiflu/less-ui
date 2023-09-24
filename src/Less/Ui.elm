@@ -388,17 +388,20 @@ viewUi layout region =
                             ( soloRegion
                             , combine
                                 { makeInnerHtml =
-                                    (case region of
-                                        Header ->
-                                            identity
-
-                                        Region r ->
-                                            at r
-                                    )
+                                    atRegionWhenNotHeader
                                         >> viewOtherUi narrowLayout soloRegion
                                         >> Dict.get soloRegion
                                 }
                             )
+
+                        atRegionWhenNotHeader : Ui region narrowHtml narrowWrapper -> Ui region narrowHtml narrowWrapper
+                        atRegionWhenNotHeader =
+                            case region of
+                                Header ->
+                                    identity
+
+                                Region r ->
+                                    at r
                     in
                     List.map renderHtml (Header :: List.map Region regions)
                         |> Dict.fromList

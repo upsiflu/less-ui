@@ -53,7 +53,6 @@ module Less.Link exposing
 -}
 
 import Browser
-import List.Extra as List
 import Set exposing (Set)
 import Set.Extra as Set
 import String.Extra as String
