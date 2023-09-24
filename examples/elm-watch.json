@@ -4,23 +4,11 @@
         "postprocess.js"
     ],
     "targets": {
-        "Main": {
-            "inputs": [
-                "src/Main.elm"
-            ],
-            "output": "public/build/Main.js"
-        },
         "Features": {
             "inputs": [
                 "src/Features.elm"
             ],
             "output": "public/build/Features.js"
-        },
-        "Garden": {
-            "inputs": [
-                "src/Garden.elm"
-            ],
-            "output": "public/build/Garden.js"
         }
     }
 }
