@@ -5,11 +5,11 @@ import Date
 import Html
 import Html.Attributes as Attr
 import Html.Events as Events
+import Less exposing (application)
+import Less.Ui as Ui
+import Less.Ui.Html as Html exposing (Ui)
+import Less.Ui.Region exposing (Region(..))
 import MultiTool
-import Restrictive exposing (application)
-import Restrictive.Layout.Html as Html exposing (Ui)
-import Restrictive.Layout.Region exposing (Region(..))
-import Restrictive.Ui as Ui
 import Tools.Control
 
 
@@ -295,25 +295,12 @@ getStringForm maybeFormState =
         { combine = makeOuterHtml }
 
 
-stringForm =
-    Control.form
-        { control = Control.string
-        , onUpdate = StringFormUpdated
-        , view = Html.fieldset []
-        }
-
-
 
 ----
 
 
-type Msg userDelta tupleIntStringDelta shapeDelta stringDelta counterDelta
+type Msg userDelta
     = UserFormUpdated userDelta
-    | TupleIntStringFormUpdated tupleIntStringDelta
-    | ShapeFormUpdated shapeDelta
-    | StringFormUpdated stringDelta
-    | CounterFormUpdated counterDelta
-    | FormSubmitted
 
 
 type alias User =
@@ -390,11 +377,7 @@ textLabel str =
 main =
     application
         { init =
-            ( { tupleIntStringState = tupleIntStringForm.init |> Tuple.first
-              , userState = userForm.init |> Tuple.first
-              , shapeState = shapeForm.init |> Tuple.first
-              , stringState = stringForm.init |> Tuple.first
-              , counterState = counterForm.init |> Tuple.first
+            ( { userState = userForm.init |> Tuple.first
               }
             , Cmd.none
             )
@@ -407,34 +390,6 @@ main =
                                 userForm.update delta model.userState
                         in
                         ( { model | userState = state }, cmd )
-
-                    TupleIntStringFormUpdated delta ->
-                        let
-                            ( state, cmd ) =
-                                tupleIntStringForm.update delta model.tupleIntStringState
-                        in
-                        ( { model | tupleIntStringState = state }, cmd )
-
-                    ShapeFormUpdated delta ->
-                        let
-                            ( state, cmd ) =
-                                shapeForm.update delta model.shapeState
-                        in
-                        ( { model | shapeState = state }, cmd )
-
-                    StringFormUpdated delta ->
-                        let
-                            ( state, cmd ) =
-                                stringForm.update delta model.stringState
-                        in
-                        ( { model | stringState = state }, cmd )
-
-                    CounterFormUpdated delta ->
-                        let
-                            ( state, cmd ) =
-                                counterForm.update delta model.counterState
-                        in
-                        ( { model | counterState = state }, cmd )
         , view =
             \model ->
                 { body =
@@ -478,5 +433,5 @@ main =
                 , layout = Html.layout
                 , title = "Hello World"
                 }
-                    |> Restrictive.mapDocument identity
+                    |> Less.mapDocument identity
         }

@@ -9,10 +9,10 @@ module Garden exposing (Garden, main, Msg)
 import Garden.Rhododendron as Rhododendron exposing (Rhododendron)
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Restrictive
-import Restrictive.Layout.Html.Keyed as Keyed exposing (Wrapper(..))
-import Restrictive.Layout.Region exposing (Region(..))
-import Restrictive.Ui as Ui
+import Less
+import Less.Ui as Ui
+import Less.Ui.Html
+import Less.Ui.Region exposing (Region(..))
 
 
 {-| -}
@@ -40,58 +40,56 @@ update msg garden =
 
 
 type alias Ui =
-    Keyed.Ui Msg Msg
+    Less.Ui.Html.Ui Msg Msg
 
 
-view : Garden -> Restrictive.Document Msg
+view : Garden -> Less.Document Msg
 view garden =
-    Restrictive.mapDocument Keyed.toHtml
+    Less.mapDocument identity
         { body =
             page
                 ++ Ui.at Scene
-                    (Keyed.toggle []
+                    (Less.Ui.Html.toggle []
                         { flag = "rhododendron"
                         , isInline = True
-                        , label = [ ( "Label", Html.text "Toggle Rhododendron" ) ]
+                        , label = [ Html.text "Toggle Rhododendron" ]
                         }
                         (Rhododendron.view RhododendronMsg garden.rhododendron)
                     )
-        , layout = Keyed.layout
+        , layout = Less.Ui.Html.layout
         , title = "Welcome to the Garden!"
         }
 
 
 page : Ui
 page =
-    Ui.singleton [ ( "constant", Html.text "Handle" ) ]
+    Ui.singleton [ Html.text "Handle" ]
         ++ myScene "Scene 1"
         ++ myScene "Scene 2"
         ++ Ui.at Control myControl
         ++ Ui.at Info myInfo
 
 
-square : String -> ( String, Html msg )
+square : String -> Html msg
 square color =
-    ( color
-    , Html.div
+    Html.div
         [ Attr.style "background" color
         , Attr.style "height" "200px"
         , Attr.style "width" "200px"
         ]
         []
-    )
 
 
 textLabel : String -> Ui
 textLabel str =
-    Ui.singleton [ ( str, Html.text str ) ]
+    Ui.singleton [ Html.text str ]
 
 
 myScene : String -> Ui
 myScene sId =
     Ui.singleton [ square "red" ]
         ++ Ui.singleton [ square "blue" ]
-        |> Ui.wrap (Node "section" [ Attr.id sId ])
+        |> Less.Ui.Html.section [ Attr.id sId ]
         |> Ui.at Scene
 
 
@@ -106,9 +104,9 @@ myInfo =
 
 
 {-| -}
-main : Restrictive.Application Garden Msg
+main : Less.Application Garden Msg
 main =
-    Restrictive.application
+    Less.application
         { init = init
         , update = update
         , view = view

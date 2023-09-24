@@ -60,12 +60,12 @@ type alias ApplicationState model =
 over the current [`State`](Less.State)
 -}
 type alias Document msg =
-    { current : State, previous : Maybe State } -> Browser.Document msg
+    { current : State, previous : Maybe State } -> Browser.Document (Msg msg)
 
 
 {-| -}
 mapDocument :
-    (html -> List (Html msg))
+    (html -> List (Html (Msg msg)))
     -> { body : Ui region html wrapper, layout : Layout region narrowHtml_ html narrowWrapper_ wrapper, title : String }
     -> Document msg
 mapDocument toHtml { body, layout, title } =
@@ -82,7 +82,7 @@ mapDocument toHtml { body, layout, title } =
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> Return modelMsg model
-    , view : model -> ({ current : State, previous : Maybe State } -> Browser.Document modelMsg)
+    , view : model -> ({ current : State, previous : Maybe State } -> Browser.Document (Msg modelMsg))
     }
     -> Application model modelMsg
 application config =
@@ -151,12 +151,5 @@ application config =
                     UrlCmd link ->
                         applyLink link
         , view =
-            \( _, state, model ) ->
-                let
-                    { title, body } =
-                        config.view model state
-                in
-                { title = title
-                , body = List.map (Html.map AppMsg) body
-                }
+            \( _, state, model ) -> config.view model state
         }

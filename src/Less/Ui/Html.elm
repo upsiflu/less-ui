@@ -1,6 +1,7 @@
 module Less.Ui.Html exposing
     ( Ui, singleton
     , toggle, goTo, bounce, filter, search
+    , section, node
     , ol, ul, keyedNode, nest
     , layout
     , wrap, arrange, concat
@@ -20,6 +21,7 @@ module Less.Ui.Html exposing
 
 # Wrap the DOM
 
+@docs section, node
 @docs ol, ul, keyedNode, nest
 
 
@@ -232,6 +234,18 @@ type alias HtmlList msg =
     List (Html msg)
 
 
+{-| -}
+section : List (Html.Attribute msg) -> Ui narrowMsg msg -> Ui narrowMsg msg
+section attrs =
+    node "section" (List.map (Attr.map Link.AppMsg) attrs)
+
+
+{-| -}
+node : String -> List (Html.Attribute (Link.Msg msg)) -> Ui narrowMsg msg -> Ui narrowMsg msg
+node str attrs =
+    Node str attrs >> Ui.wrap
+
+
 applyKeyedFu : (List ( String, Html msg ) -> Html msg) -> (List ( String, HtmlList msg ) -> HtmlList msg)
 applyKeyedFu fu =
     List.concatMap
@@ -252,11 +266,6 @@ ol attrs =
 ul : List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
 ul attrs =
     Keyed (applyKeyedFu (Html.Keyed.ul (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap
-
-
-node : String -> List (Html.Attribute (Link.Msg msg)) -> Ui narrowMsg msg -> Ui narrowMsg msg
-node str attrs =
-    Node str attrs >> Ui.wrap
 
 
 {-| -}

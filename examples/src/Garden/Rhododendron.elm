@@ -10,9 +10,9 @@ import Html exposing (Html, button, input, text)
 import Html.Attributes as Attr
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed
-import Restrictive.Layout.Html.Keyed as Keyed exposing (Wrapper(..))
-import Restrictive.Layout.Region exposing (Region(..))
-import Restrictive.Ui as Ui
+import Less.Ui as Ui
+import Less.Ui.Html
+import Less.Ui.Region exposing (Region(..))
 
 
 {-| -}
@@ -82,7 +82,7 @@ map toPath ((Rhododendron label descendants) as rhodo) =
 
 
 type alias Ui msg =
-    Keyed.Ui msg msg
+    Less.Ui.Html.Ui msg msg
 
 
 {-| -}
@@ -92,11 +92,11 @@ view howToMessage ((Rhododendron label _) as rhododendron) =
         controls : Ui msg
         controls =
             Ui.singleton
-                [ ( "label", text "Edit" )
-                , ( "edit", input [ onInput (Edit label >> howToMessage) ] [ Html.text label ] )
-                , ( "button", button [ onClick (Grow |> howToMessage) ] [ text "append" ] )
+                [ text "Edit"
+                , input [ onInput (Edit label >> howToMessage) ] [ Html.text label ]
+                , button [ onClick (Grow |> howToMessage) ] [ text "append" ]
                 ]
-                |> Ui.wrap (Node "fieldset" [])
+                |> Less.Ui.Html.node "fieldset" []
                 |> Ui.at Control
 
         scene : Rhododendron -> Ui msg

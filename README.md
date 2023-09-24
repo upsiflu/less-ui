@@ -92,37 +92,40 @@ This package can help you create predictable and pleasurable interfaces without 
 
 
 
-##Example
+## Use case
 
+In small apps, `less-ui` can reduce the `view` code. In the following example, `Html.toggle` adds state without cluttering the model, and `Ui.at` spreads a single view over separate screen regions (branches of the DOM).
 
   ```elm
-  
-  trees = 
-      [ ("Elm", "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/East_Coker_elm%2C_2.jpg/440px-East_Coker_elm%2C_2.jpg", "Its planky wood makes the Elm tree a hikers' favorite.")
-      , ("Yggdrasill", "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Om_Yggdrasil_by_Fr%C3%B8lich.jpg/440px-Om_Yggdrasil_by_Fr%C3%B8lich.jpg", "You cannot sleep here but you may find fruit and feathers.")
-      , ("Trie","https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Trie_example.svg/500px-Trie_example.svg.png", "The Trie is a noble pine wihtout wheels.")
-      ]
+  import Ui
+  import Ui.Html as Html
+  import Ui.Region exposing (Region(..))
+
+
 
   makeTab (name, src, description) =
       let
           photo =
-              Ui.singleton (Html.img [Attr.src photo] [])
+              Ui.singleton [Html.img [Attr.src photo] []]
 
           caption =
-              Ui.singleton (Html.text description)
+              Ui.singleton [Html.text description]
         
       in
       Ui.at Scene photo ++ Ui.at Info caption
-          |> Ui.toggle []
+          |> Html.toggle []
               { flag = name
               , isGlobal = True
               , label = Html.text name 
               }
-              (  )
 
   view =
-      Ui.singleton (Html.text "Look at these trees:")
-          ++ List.concatMap makeTab trees
+      Ui.singleton [Html.text "Look at these trees:"]
+          ++ List.concatMap makeTab
+            [ ("Elm", "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/East_Coker_elm%2C_2.jpg/440px-East_Coker_elm%2C_2.jpg", "Its planky wood makes the Elm tree a hikers' favorite.")
+            , ("Yggdrasill", "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Om_Yggdrasil_by_Fr%C3%B8lich.jpg/440px-Om_Yggdrasil_by_Fr%C3%B8lich.jpg", "You cannot sleep here but you may find fruit and feathers.")
+            , ("Trie","https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Trie_example.svg/500px-Trie_example.svg.png", "The Trie is a noble pine wihtout wheels.")
+            ]
 
   
   ```

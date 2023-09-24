@@ -345,8 +345,8 @@ viewUi layout region =
         viewItem : Item region html wrapper -> Dict (OrHeader region) html
         viewItem item =
             case item of
-                Leaf html_ ->
-                    Dict.singleton region html_
+                Leaf html ->
+                    Dict.singleton region html
 
                 Wrap wrapper ->
                     viewWrapper wrapper
@@ -361,24 +361,25 @@ viewUi layout region =
                     viewUi layout region elements
                         |> Dict.update region (Maybe.map fu)
 
-                Keyed fu elements ->
-                    List.concatMap
-                        (\( key, ui ) ->
+                Keyed fu keyedElements ->
+                    let
+                        distributeKey : ( String, Ui region html wrapper ) -> List (Dict (OrHeader region) (List ( String, html )))
+                        distributeKey ( key, ui ) =
                             List.indexedMap
                                 (\i item ->
                                     viewItem item
-                                        |> Dict.map (\_ itm -> [ ( key ++ String.fromInt i, itm ) ])
+                                        |> Dict.map (\_ html -> [ ( key ++ String.fromInt i, html ) ])
                                 )
                                 ui
-                        )
-                        elements
+                    in
+                    List.concatMap distributeKey keyedElements
                         |> dict.concat
                         |> Dict.map (\_ -> fu)
 
                 Nested { regions, narrowLayout, combine } ->
-                    --Important: at this implementation, `Nest` throws away the elements!
-                    List.map
-                        (\soloRegion ->
+                    let
+                        renderHtml : OrHeader region -> ( OrHeader region, html )
+                        renderHtml soloRegion =
                             ( soloRegion
                             , combine
                                 { makeInnerHtml =
@@ -393,8 +394,8 @@ viewUi layout region =
                                         >> Dict.get soloRegion
                                 }
                             )
-                        )
-                        (Header :: List.map Region regions)
+                    in
+                    List.map renderHtml (Header :: List.map Region regions)
                         |> Dict.fromList
 
                 Stateful { label, isInline, contingent } ->
@@ -412,14 +413,14 @@ viewUi layout region =
 
 
 
----- Helpers ----
+---- Dict Helpers ----
 
 
 append : (List a -> a) -> Dict k a -> Dict k a -> Dict k a
-append flatten =
+append howToFlatten =
     Dict.merge
         Dict.insert
-        (\k a b -> Dict.insert k (flatten [ a, b ]))
+        (\k a b -> Dict.insert k (howToFlatten [ a, b ]))
         Dict.insert
         Dict.empty
 
@@ -430,5 +431,5 @@ dict :
     }
 dict =
     { concat = List.foldl (append List.concat) Dict.empty
-    , concatBy = \concatenator -> List.foldl (append concatenator) Dict.empty
+    , concatBy = \howToFlatten -> List.foldl (append howToFlatten) Dict.empty
     }
