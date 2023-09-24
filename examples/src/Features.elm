@@ -8,11 +8,10 @@ module Features exposing (Features, main, Msg)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Restrictive
-import Restrictive.Layout.Html.Keyed as Keyed
-import Restrictive.Layout.Region exposing (Region(..))
-import Restrictive.State
-import Restrictive.Ui as Ui
+import Less
+import Less.Ui as Ui
+import Less.Ui.Html
+import Less.Ui.Region exposing (Region(..))
 
 
 {-| -}
@@ -45,35 +44,35 @@ update () features =
 
 
 type alias Ui =
-    Keyed.Ui Msg Msg
+    Less.Ui.Html.Ui Msg Msg
 
 
 textLabel : String -> Ui
 textLabel str =
-    Ui.singleton [ ( str, Html.text str ) ]
+    Ui.singleton [ Html.text str ]
 
 
-view : Features -> Restrictive.Document Msg
+view : Features -> Less.Document Msg
 view _ =
     let
         showTab : String -> Ui -> Ui
         showTab str contents =
-            Keyed.toggle []
+            Less.Ui.Html.toggle []
                 { flag = str
                 , isInline = False
-                , label = [ ( str, Html.text str ) ]
+                , label = [ Html.text str ]
                 }
                 contents
     in
-    Restrictive.mapDocument Keyed.toHtml
+    Less.mapDocument identity
         { body =
             textLabel "Toggle the features on top of the page! "
                 ++ showTab "Flat Ui Layout"
                     ui
                 ++ showTab "Global Navbar"
                     globalNav
-        , layout = Keyed.layout
-        , title = "Restrictive Ui feature test"
+        , layout = Less.Ui.Html.layout
+        , title = "Less Ui feature test"
         }
 
 
@@ -91,22 +90,22 @@ ui =
 -}
 paths : Ui
 paths =
-    Keyed.goTo []
-        { destination = ( Just "Path-1", Nothing )
+    Less.Ui.Html.goTo []
+        { destination = "Path-1"
         , isInline = True
-        , label = [ ( "label", Html.text "Path-1" ) ]
+        , label = [ Html.text "Path-1" ]
         }
         []
-        ++ Keyed.goTo []
-            { destination = ( Just "Path-2", Nothing )
+        ++ Less.Ui.Html.goTo []
+            { destination = "Path-2"
             , isInline = True
-            , label = [ ( "label", Html.text "Path-2" ) ]
+            , label = [ Html.text "Path-2" ]
             }
             []
-        ++ Keyed.goTo []
-            { destination = ( Nothing, Nothing )
+        ++ Less.Ui.Html.goTo []
+            { destination = ""
             , isInline = True
-            , label = [ ( "label", Html.text "Nothing" ) ]
+            , label = [ Html.text "Nothing" ]
             }
             []
 
@@ -116,10 +115,10 @@ globalNav =
     [ "Introduction", "First Steps", "Last Steps" ]
         |> List.concatMap
             (\title ->
-                Keyed.goTo []
-                    { destination = ( Just title, Nothing )
+                Less.Ui.Html.goTo []
+                    { destination = title
                     , isInline = False
-                    , label = [ ( title, Html.text title ) ]
+                    , label = [ Html.text title ]
                     }
                     (textLabel title)
             )
@@ -127,10 +126,10 @@ globalNav =
 
 {-| [Link](Ui.Link): Manage the Ui State as a URL
 -}
-fragments : Restrictive.State.Fragment -> Ui
+fragments : String -> Ui
 fragments fr =
     let
-        articles : List ( String, Html msg )
+        articles : List (Html msg)
         articles =
             [ Html.article [ Attr.id "1", Attr.tabindex 1 ]
                 [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
@@ -139,13 +138,12 @@ fragments fr =
             , Html.article [ Attr.id "3", Attr.tabindex 1 ]
                 [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
             ]
-                |> List.indexedMap (String.fromInt >> Tuple.pair)
     in
     Ui.singleton articles
-        ++ (Keyed.bounce []
-                { here = ( Nothing, Just "1" )
-                , label = [ ( "label", Html.text "Bounce between 1 and 3" ) ]
-                , there = ( Nothing, Just "3" )
+        ++ (Less.Ui.Html.bounce []
+                { here = "#1"
+                , label = [ Html.text "Bounce between 1 and 3" ]
+                , there = "#3"
                 }
                 (textLabel "Number Three - this is visible only when `there` is active!")
                 |> Ui.at Control
@@ -153,9 +151,9 @@ fragments fr =
 
 
 {-| -}
-main : Restrictive.Application Features Msg
+main : Less.Application Features Msg
 main =
-    Restrictive.application
+    Less.application
         { init = init
         , update = update
         , view = view
