@@ -388,7 +388,7 @@ wrap states wrapper =
         appHtml =
             List.map (Html.map Link.AppMsg)
 
-        getMutation : Link.Link -> Maybe String -> Mutation
+        getMutation : Link -> Maybe String -> Mutation
         getMutation =
             Link.mutationFromTwoStates states
 

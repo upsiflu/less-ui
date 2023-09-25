@@ -435,6 +435,7 @@ encodeLocation parsedLocation =
             "#" ++ fragment
 
         PathAndFragment path fragment ->
+            -- Todo: Tail Call Optimize
             encodeLocation (OnlyPath path) ++ encodeLocation (OnlyFragment fragment)
 
 

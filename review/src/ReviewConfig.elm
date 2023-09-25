@@ -43,6 +43,11 @@ import ReviewPipelineStyles.Premade
 import OnlyAllSingleUseTypeVarsEndWith_
 import CognitiveComplexity
 import VariablesBetweenCaseOf.AccessInCases
+import NoUnoptimizedRecursion
+import NoInconsistentAliases
+import NoModuleOnExposedNames
+import NoUnmatchedUnit
+
 
 
 config : List Rule
@@ -63,6 +68,9 @@ config =
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule
     , Simplify.rule Simplify.defaults
+
+    -- Consistent use of the syntax
+    , NoUnmatchedUnit.rule
     , NoUnsortedCases.rule
         (NoUnsortedCases.defaults
             |> NoUnsortedCases.sortListPatternsByLength
@@ -87,7 +95,19 @@ config =
             , ReviewPipelineStyles.Premade.noPipelinesWithConfusingNonCommutativeFunctions
             , ReviewPipelineStyles.Premade.noSemanticallyInfixFunctionsInLeftPipelines
             ]
+
+    -- Naming
     , OnlyAllSingleUseTypeVarsEndWith_.rule
+    , NoInconsistentAliases.config
+        [ ( "Html.Attributes", "Attr" )
+        , ( "Json.Decode", "Decode" )
+        , ( "Json.Encode", "Encode" )
+        ]
+        |> NoInconsistentAliases.noMissingAliases
+        |> NoInconsistentAliases.rule
+    , NoModuleOnExposedNames.rule
+
+    -- Higher locality for lower cognitive load
     , CognitiveComplexity.rule 15
     , VariablesBetweenCaseOf.AccessInCases.forbid
     
@@ -99,4 +119,9 @@ config =
     , Docs.ReviewLinksAndSections.rule
     , Docs.ReviewAtDocs.rule
     , Docs.UpToDateReadmeLinks.rule
+
+    -- Performance
+    --, NoUnoptimizedRecursion.rule (NoUnoptimizedRecursion.optOutWithComment "IGNORE TCO")
+
+
     ]

@@ -205,6 +205,8 @@ mapEach fu =
 
 ⚠️ If you can, build up your Ui with the final `html` type.
 
+-- Todo: Tail Call Optimize.
+
 -}
 map : (html -> html2) -> Ui region html wrapper -> Ui region html2 wrapper
 map fu =
@@ -218,6 +220,7 @@ map fu =
                     Wrap wrapper
 
                 At innerRegion elements ->
+                    -- Todo: Tail Call Optimize.
                     At innerRegion (map fu elements)
         )
 
@@ -239,6 +242,7 @@ mapWrapper fu =
                     Wrap (fu wrapper)
 
                 At innerRegion elements ->
+                    -- Todo: Tail Call Optimize.
                     At innerRegion (mapWrapper fu elements)
         )
 
