@@ -249,7 +249,7 @@ uncons =
 type alias Layout region narrowHtml html narrowWrapper customWrapper =
     { wrap : { current : State, previous : Maybe State } -> customWrapper -> Wrapper region narrowHtml html narrowWrapper customWrapper
     , concat : List html -> html
-    , arrange : Dict (OrHeader region) html -> html
+    , arrange : { header : Maybe html, region : region -> Maybe html } -> html
     }
 
 
@@ -270,7 +270,7 @@ applyStates states layout =
 type alias CurrentLayout region narrowHtml html narrowWrapper customWrapper =
     { wrap : customWrapper -> Wrapper region narrowHtml html narrowWrapper customWrapper
     , concat : List (Dict (OrHeader region) html) -> Dict (OrHeader region) html
-    , arrange : Dict (OrHeader region) html -> html
+    , arrange : { header : Maybe html, region : region -> Maybe html } -> html
     }
 
 
@@ -319,6 +319,11 @@ view :
     -> html
 view layout =
     viewUi layout Header
+        >> (\d ->
+                { header = Dict.get Header d
+                , region = \region -> Dict.get (Region region) d
+                }
+           )
         >> layout.arrange
 
 
@@ -446,5 +451,5 @@ dict :
     }
 dict =
     { concat = List.foldl (append List.concat) Dict.empty
-    , concatBy = \howToFlatten -> List.foldl (append howToFlatten) Dict.empty
+    , concatBy = \howToFlatten -> List.foldr (append howToFlatten) Dict.empty
     }

@@ -4,7 +4,7 @@ module Less.Ui.Html exposing
     , section, node
     , ol, ul, keyedNode, nest
     , layout
-    , wrap, arrange, concat
+    , arrangeOverDefaultRegions
     )
 
 {-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Less.Ui`](Less.Ui)
@@ -29,14 +29,8 @@ module Less.Ui.Html exposing
 
 @docs layout
 
-
-### Assemble your own layout record:
-
-@docs wrap, arrange, concat
-
 -}
 
-import AssocList as Dict exposing (Dict)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
@@ -45,23 +39,24 @@ import Html.Lazy
 import Less.Link as Link exposing (Link, Mutation(..), State)
 import Less.Ui as Ui
 import Less.Ui.Region exposing (OrHeader(..), Region(..))
+import Maybe.Extra as Maybe
 
 
 {-| -}
-type alias Ui narrowMsg msg =
+type alias Ui region narrowMsg msg =
     Ui.Ui
-        Region
+        region
         (HtmlList (Link.Msg msg))
-        (Wrapper narrowMsg msg)
+        (Wrapper region narrowMsg msg)
 
 
 {-| -}
-type alias NarrowUi narrowMsg =
-    Ui narrowMsg narrowMsg
+type alias NarrowUi region narrowMsg =
+    Ui region narrowMsg narrowMsg
 
 
 {-| -}
-singleton : List (Html msg) -> Ui narrowMsg_ msg
+singleton : List (Html msg) -> Ui region narrowMsg_ msg
 singleton =
     List.map (Html.map Link.AppMsg)
         >> Ui.singleton
@@ -84,8 +79,8 @@ toggle :
         , isInline : Bool
         , label : HtmlList msg
         }
-    -> Ui narrowMsg msg
-    -> Ui narrowMsg msg
+    -> Ui region narrowMsg msg
+    -> Ui region narrowMsg msg
 toggle attributes config =
     Toggle attributes config
         >> Ui.wrap
@@ -100,8 +95,8 @@ toggle attributes config =
 -}
 filter :
     Link.Category
-    -> (List Link.SearchTerm -> Ui narrowMsg msg)
-    -> Ui narrowMsg msg
+    -> (List Link.SearchTerm -> Ui region narrowMsg msg)
+    -> Ui region narrowMsg msg
 filter category =
     Filter category Nothing
         >> Ui.wrap
@@ -136,8 +131,8 @@ search :
         , isInline : Bool
         , label : HtmlList msg
         }
-    -> (List Link.SearchTerm -> Ui narrowMsg msg)
-    -> Ui narrowMsg msg
+    -> (List Link.SearchTerm -> Ui region narrowMsg msg)
+    -> Ui region narrowMsg msg
 search attributes config =
     Filter config.category
         (Just
@@ -158,8 +153,8 @@ goTo :
         , isInline : Bool
         , label : HtmlList msg
         }
-    -> Ui narrowMsg msg
-    -> Ui narrowMsg msg
+    -> Ui region narrowMsg msg
+    -> Ui region narrowMsg msg
 goTo attributes config =
     GoTo attributes config
         >> Ui.wrap
@@ -175,8 +170,8 @@ bounce :
         , here : Link.Location
         , label : HtmlList msg
         }
-    -> Ui narrowMsg msg
-    -> Ui narrowMsg msg
+    -> Ui region narrowMsg msg
+    -> Ui region narrowMsg msg
 bounce attributes config =
     Bounce attributes config
         >> Ui.wrap
@@ -187,13 +182,14 @@ bounce attributes config =
 
 
 {-| -}
-type Wrapper narrowMsg msg
-    = Node { onlyInCurrentRegion : Bool } String (List (Html.Attribute (Link.Msg msg))) (Ui narrowMsg msg)
-    | Keyed (List ( String, HtmlList (Link.Msg msg) ) -> HtmlList (Link.Msg msg)) (List ( String, Ui narrowMsg msg ))
+type Wrapper region narrowMsg msg
+    = Node { onlyInCurrentRegion : Bool } String (List (Html.Attribute (Link.Msg msg))) (Ui region narrowMsg msg)
+    | Keyed (List ( String, HtmlList (Link.Msg msg) ) -> HtmlList (Link.Msg msg)) (List ( String, Ui region narrowMsg msg ))
     | Nested
-        { combine :
+        { regions : List region
+        , combine :
             { makeInnerHtml :
-                NarrowUi narrowMsg
+                NarrowUi region narrowMsg
                 -> Maybe (HtmlList (Link.Msg narrowMsg))
             }
             -> HtmlList (Link.Msg msg)
@@ -204,7 +200,7 @@ type Wrapper narrowMsg msg
         , isInline : Bool
         , label : HtmlList msg
         }
-        (Ui narrowMsg msg)
+        (Ui region narrowMsg msg)
     | Filter
         Link.Category
         (Maybe
@@ -213,21 +209,21 @@ type Wrapper narrowMsg msg
             , label : HtmlList msg
             }
         )
-        (List Link.SearchTerm -> Ui narrowMsg msg)
+        (List Link.SearchTerm -> Ui region narrowMsg msg)
     | GoTo
         (List (Html.Attribute Never))
         { destination : Link.Location
         , isInline : Bool
         , label : HtmlList msg
         }
-        (Ui narrowMsg msg)
+        (Ui region narrowMsg msg)
     | Bounce
         (List (Html.Attribute Never))
         { there : Link.Location
         , here : Link.Location
         , label : HtmlList msg
         }
-        (Ui narrowMsg msg)
+        (Ui region narrowMsg msg)
 
 
 type alias HtmlList msg =
@@ -235,18 +231,18 @@ type alias HtmlList msg =
 
 
 {-| -}
-section : List (Html.Attribute msg) -> Ui narrowMsg msg -> Ui narrowMsg msg
+section : List (Html.Attribute msg) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
 section attrs =
     node "section" (List.map (Attr.map Link.AppMsg) attrs)
 
 
 {-| -}
-node : String -> List (Html.Attribute (Link.Msg msg)) -> Ui narrowMsg msg -> Ui narrowMsg msg
+node : String -> List (Html.Attribute (Link.Msg msg)) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
 node str attrs =
     Node { onlyInCurrentRegion = True } str attrs >> Ui.wrap
 
 
-nodeInEachRegion : String -> List (Html.Attribute (Link.Msg msg)) -> Ui narrowMsg msg -> Ui.Ui region_ html_ (Wrapper narrowMsg msg)
+nodeInEachRegion : String -> List (Html.Attribute (Link.Msg msg)) -> Ui region narrowMsg msg -> Ui.Ui region_ html_ (Wrapper region narrowMsg msg)
 nodeInEachRegion str attrs =
     Node { onlyInCurrentRegion = False } str attrs >> Ui.wrap
 
@@ -262,19 +258,19 @@ applyKeyedFu fu =
 
 
 {-| -}
-ol : List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
+ol : List (Html.Attribute msg) -> List ( String, Ui region narrowMsg msg ) -> Ui region narrowMsg msg
 ol attrs =
     Keyed (applyKeyedFu (Html.Keyed.ol (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap
 
 
 {-| -}
-ul : List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
+ul : List (Html.Attribute msg) -> List ( String, Ui region narrowMsg msg ) -> Ui region narrowMsg msg
 ul attrs =
     Keyed (applyKeyedFu (Html.Keyed.ul (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap
 
 
 {-| -}
-keyedNode : String -> List (Html.Attribute msg) -> List ( String, Ui narrowMsg msg ) -> Ui narrowMsg msg
+keyedNode : String -> List (Html.Attribute msg) -> List ( String, Ui region narrowMsg msg ) -> Ui region narrowMsg msg
 keyedNode tagName attrs =
     Keyed (applyKeyedFu (Html.Keyed.node tagName (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap
 
@@ -308,16 +304,17 @@ in order to write out the `narrower` nested types. I've never done code generati
 
 -}
 nest :
-    { combine :
+    { regions : List region
+    , combine :
         { makeInnerHtml :
-            NarrowUi narrowMsg
+            NarrowUi region narrowMsg
             -> Maybe (HtmlList (Link.Msg narrowMsg))
         }
         -> HtmlList (Link.Msg msg)
 
     -- Plug it into your widget here
     }
-    -> Ui narrowMsg msg
+    -> Ui region narrowMsg msg
 nest config =
     Ui.wrap (Nested config)
 
@@ -326,32 +323,39 @@ nest config =
 ----- LAYOUT -----
 
 
-{-| -}
+{-| Note: If you want to use screen `region`s, replace the `arrange` field.
+An example is given at [arrangeOverDefaultRegions](#arrangeOverDefaultRegions)
+
+    import Less.Ui.Html exposing (layout)
+
+    { layout | arrange = Less.Ui.Html.arrangeOverDefaultRegions }
+
+-}
 layout :
     Ui.Layout
-        Region
+        region
         (HtmlList (Link.Msg narrowMsg))
         (HtmlList (Link.Msg msg))
-        (Wrapper narrowMsg narrowMsg)
-        (Wrapper narrowMsg msg)
+        (Wrapper region narrowMsg narrowMsg)
+        (Wrapper region narrowMsg msg)
 layout =
     { wrap = wrap
     , concat = concat
-    , arrange = arrange
+    , arrange = \{ header } -> Maybe.withDefault [] header
     }
 
 
 {-| -}
 wrap :
     { current : State, previous : Maybe State }
-    -> Wrapper narrowMsg msg
+    -> Wrapper region narrowMsg msg
     ->
         Ui.Wrapper
-            Region
+            region
             (HtmlList (Link.Msg narrowMsg))
             (HtmlList (Link.Msg msg))
-            (Wrapper narrowMsg narrowMsg)
-            (Wrapper narrowMsg msg)
+            (Wrapper region narrowMsg narrowMsg)
+            (Wrapper region narrowMsg msg)
 wrap states wrapper =
     let
         appHtml : HtmlList msg -> HtmlList (Link.Msg msg)
@@ -413,7 +417,7 @@ wrap states wrapper =
                     , Attr.class "state-outside"
                     ]
 
-        wrapByMutation : Mutation -> Ui narrowMsg msg -> Ui narrowMsg msg
+        wrapByMutation : Mutation -> Ui region narrowMsg msg -> Ui region narrowMsg msg
         wrapByMutation mutation =
             let
                 removed : List (Html.Attribute (Link.Msg msg))
@@ -458,9 +462,9 @@ wrap states wrapper =
         Keyed fu list ->
             Ui.Keyed fu list
 
-        Nested { combine } ->
+        Nested { regions, combine } ->
             Ui.Nested
-                { regions = [ Scene, Control, Info ]
+                { regions = regions
                 , narrowLayout = Ui.applyStates states layout
                 , combine = combine
                 }
@@ -586,22 +590,37 @@ concat =
     List.concat
 
 
-{-| -}
-arrange : Dict (OrHeader Region) (HtmlList msg) -> HtmlList msg
-arrange =
-    Dict.toList
-        >> List.map
-            (\item ->
-                case item of
-                    ( Header, html ) ->
-                        Html.Lazy.lazy2 Html.header [ Attr.class "header" ] html
+{-|
 
-                    ( Region Scene, html ) ->
-                        Html.Lazy.lazy2 Html.main_ [ Attr.class "scene" ] html
+    Lays out a traditional application layout with a sticky `Header`,
+    scrolling `Scene`, and both `Control` and `Info` fixed to the bottom.
 
-                    ( Region Info, html ) ->
-                        Html.Lazy.lazy2 Html.div [ Attr.class "info" ] html
-
-                    ( Region Control, html ) ->
-                        Html.Lazy.lazy2 Html.div [ Attr.class "control" ] html
+-}
+arrangeOverDefaultRegions : { header : Maybe (List (Html msg)), region : Region -> Maybe (List (Html msg)) } -> List (Html msg)
+arrangeOverDefaultRegions rendered =
+    Maybe.values
+        [ Maybe.map
+            (Html.Lazy.lazy2
+                Html.header
+                [ Attr.class "header", Attr.style "position" "sticky" ]
             )
+            rendered.header
+        , Maybe.map
+            (Html.Lazy.lazy2
+                Html.main_
+                [ Attr.class "scene" ]
+            )
+            (rendered.region Scene)
+        , Maybe.map
+            (Html.Lazy.lazy2
+                Html.div
+                [ Attr.class "info", Attr.style "position" "fixed", Attr.style "bottom" "0", Attr.style "right" "0" ]
+            )
+            (rendered.region Info)
+        , Maybe.map
+            (Html.Lazy.lazy2
+                Html.div
+                [ Attr.class "control", Attr.style "position" "fixed", Attr.style "bottom" "0" ]
+            )
+            (rendered.region Control)
+        ]
