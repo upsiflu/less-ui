@@ -1,9 +1,9 @@
 {
     "type": "package",
-    "name": "upsiflu/restrictive",
+    "name": "upsiflu/less-ui",
     "summary": "Less power, less control, more restrictions to your Views!",
     "license": "MIT",
-    "version": "0.5.0",
+    "version": "0.9.0",
     "exposed-modules": [
         "Less",
         "Less.Ui",
