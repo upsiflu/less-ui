@@ -285,8 +285,8 @@ apply link =
         mapFlags fu state =
             { state
                 | query =
-                    Maybe.withDefault "" state.query
-                        |> String.split "&"
+                    Maybe.toList state.query
+                        |> List.concatMap (String.split "&")
                         |> Set.fromList
                         |> fu
                         |> Set.toList
@@ -330,7 +330,7 @@ apply link =
                    )
 
         Toggle flag ->
-            mapFlags (Set.toggle flag >> Set.remove ("toggle=" ++ flag))
+            mapFlags (Set.remove ("toggle=" ++ flag) >> Set.toggle (Debug.log "FLAG" flag))
                 >> withoutHistory
 
         Bounce parsedLocations ->
