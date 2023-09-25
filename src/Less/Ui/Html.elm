@@ -3,8 +3,7 @@ module Less.Ui.Html exposing
     , toggle, goTo, bounce, filter, search
     , section, node
     , ol, ul, keyedNode, nest
-    , layout
-    , arrangeOverDefaultRegions
+    , layout, arrangeOverDefaultRegions
     )
 
 {-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Less.Ui`](Less.Ui)
@@ -27,7 +26,7 @@ module Less.Ui.Html exposing
 
 # Layout
 
-@docs layout
+@docs layout, arrangeOverDefaultRegions
 
 -}
 
@@ -38,7 +37,7 @@ import Html.Keyed
 import Html.Lazy
 import Less.Link as Link exposing (Link, Mutation(..), State)
 import Less.Ui as Ui
-import Less.Ui.Region exposing (OrHeader(..), Region(..))
+import Less.Ui.Region exposing (Region(..))
 import Maybe.Extra as Maybe
 
 
@@ -56,7 +55,7 @@ type alias NarrowUi region narrowMsg =
 
 
 {-| -}
-singleton : List (Html msg) -> Ui region narrowMsg_ msg
+singleton : List (Html msg) -> Ui region_ narrowMsg_ msg
 singleton =
     List.map (Html.map Link.AppMsg)
         >> Ui.singleton
@@ -242,9 +241,9 @@ node str attrs =
     Node { onlyInCurrentRegion = True } str attrs >> Ui.wrap
 
 
-nodeInEachRegion : String -> List (Html.Attribute (Link.Msg msg)) -> Ui region narrowMsg msg -> Ui.Ui region_ html_ (Wrapper region narrowMsg msg)
-nodeInEachRegion str attrs =
-    Node { onlyInCurrentRegion = False } str attrs >> Ui.wrap
+nodeWithConfig : { onlyInCurrentRegion : Bool } -> String -> List (Html.Attribute (Link.Msg msg)) -> Ui region narrowMsg msg -> Ui.Ui region_ html_ (Wrapper region narrowMsg msg)
+nodeWithConfig config str attrs =
+    Node config str attrs >> Ui.wrap
 
 
 applyKeyedFu : (List ( String, Html msg ) -> Html msg) -> (List ( String, HtmlList msg ) -> HtmlList msg)
@@ -417,8 +416,8 @@ wrap states wrapper =
                     , Attr.class "state-outside"
                     ]
 
-        wrapByMutation : Mutation -> Ui region narrowMsg msg -> Ui region narrowMsg msg
-        wrapByMutation mutation =
+        wrapByMutation : { onlyInCurrentRegion : Bool } -> Mutation -> Ui region narrowMsg msg -> Ui region narrowMsg msg
+        wrapByMutation config mutation =
             let
                 removed : List (Html.Attribute (Link.Msg msg))
                 removed =
@@ -432,28 +431,28 @@ wrap states wrapper =
             in
             case mutation of
                 StateEntered _ ->
-                    node "span" [ Attr.class "inserted removable" ]
+                    nodeWithConfig config "span" [ Attr.class "inserted removable" ]
 
                 StateInside _ ->
-                    nodeInEachRegion "span" [ Attr.class "removable" ]
+                    nodeWithConfig config "span" [ Attr.class "removable" ]
 
                 StateLeft _ ->
-                    nodeInEachRegion "span" removed
+                    nodeWithConfig config "span" removed
 
                 StateOutside _ ->
-                    \_ -> nodeInEachRegion "span" removed []
+                    \_ -> nodeWithConfig config "span" removed []
 
                 SwitchedOn ->
-                    nodeInEachRegion "span" [ Attr.class "inserted removable" ]
+                    nodeWithConfig config "span" [ Attr.class "inserted removable" ]
 
                 StillOn ->
-                    nodeInEachRegion "span" [ Attr.class "removable" ]
+                    nodeWithConfig config "span" [ Attr.class "removable" ]
 
                 SwitchedOff ->
-                    nodeInEachRegion "span" removed
+                    nodeWithConfig config "span" removed
 
                 StillOff ->
-                    \_ -> nodeInEachRegion "span" removed []
+                    \_ -> nodeWithConfig config "span" removed []
     in
     case wrapper of
         Node config str attrs elements ->
@@ -491,7 +490,7 @@ wrap states wrapper =
                         ]
                 , isInline = isInline
                 , contingent =
-                    wrapByMutation mutation contingent
+                    wrapByMutation { onlyInCurrentRegion = isInline } mutation contingent
                 }
 
         Filter category maybeConfig contingent ->
@@ -507,6 +506,11 @@ wrap states wrapper =
                 searchTerms : List Link.SearchTerm
                 searchTerms =
                     Link.getStateSearchTerms category states.current
+
+                isInline : Bool
+                isInline =
+                    Maybe.map .isInline maybeConfig
+                        |> Maybe.withDefault True
             in
             Ui.Stateful
                 { label =
@@ -527,10 +531,8 @@ wrap states wrapper =
 
                         Nothing ->
                             []
-                , isInline =
-                    Maybe.map .isInline maybeConfig
-                        |> Maybe.withDefault True
-                , contingent = wrapByMutation mutation (contingent searchTerms)
+                , isInline = isInline
+                , contingent = wrapByMutation { onlyInCurrentRegion = isInline } mutation (contingent searchTerms)
                 }
 
         GoTo attributes { destination, isInline, label } contingent ->
@@ -555,7 +557,7 @@ wrap states wrapper =
                         ]
                 , isInline = isInline
                 , contingent =
-                    wrapByMutation mutation contingent
+                    wrapByMutation { onlyInCurrentRegion = False } mutation contingent
                 }
 
         Bounce attributes { there, here, label } contingent ->
@@ -580,7 +582,7 @@ wrap states wrapper =
                         ]
                 , isInline = False
                 , contingent =
-                    wrapByMutation mutation contingent
+                    wrapByMutation { onlyInCurrentRegion = False } mutation contingent
                 }
 
 
