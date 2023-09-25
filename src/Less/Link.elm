@@ -223,16 +223,16 @@ mutationFromTwoStates { current, previous } link maybeSetName =
         locationIsSubsetOf state location =
             case ( location, getLocation state ) of
                 ( OnlyPath innerPath, OnlyPath path ) ->
-                    innerPath == path
+                    String.contains innerPath path
 
                 ( OnlyPath innerPath, PathAndFragment path _ ) ->
-                    innerPath == path
+                    String.contains innerPath path
 
                 ( OnlyFragment innerFragment, PathAndFragment _ fragment ) ->
                     innerFragment == fragment
 
                 ( PathAndFragment innerPath innerFragment, PathAndFragment path fragment ) ->
-                    innerFragment == fragment && innerPath == path
+                    innerFragment == fragment && String.contains innerPath path
 
                 _ ->
                     False
