@@ -1,160 +1,84 @@
-module Features exposing (Features, main, Msg)
-
-{-|
-
-@docs Features, main, Msg
-
--}
+module Features exposing (main)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Less
-import Less.Ui as Ui
-import Less.Ui.Html
-import Less.Ui.Region exposing (Region(..))
+import Less.Ui
+import Less.Ui.Html exposing (layout)
+import Less.Ui.Region exposing (OrHeader(..))
 
 
-{-| -}
-type alias Msg =
-    ()
-
-
-{-| -}
-type alias Features =
-    {}
-
-
-init : ( Features, Cmd Msg )
-init =
-    ( {}, Cmd.none )
-
-
-update : Msg -> Features -> ( Features, Cmd Msg )
-update () features =
-    ( features, Cmd.none )
-
-
-
--- what happens is that when the state transitions to toggle off a feature,
--- then only the direct `Control` properly deprecates (poof) its elements
--- whereas all the others continue to be drawn.
---
--- The reason is that we implement hiding as `wrap`, which only
--- affects the `current Region`!
+type Region
+    = Toc
+    | Main
 
 
 type alias Ui =
-    Less.Ui.Html.Ui Msg Msg
+    Less.Ui.Html.Ui Region () ()
 
 
-textLabel : String -> Ui
-textLabel str =
-    Ui.singleton [ Html.text str ]
-
-
-view : Features -> Less.Document Msg
+view : () -> Less.Document ()
 view _ =
     let
-        showTab : String -> Ui -> Ui
-        showTab str contents =
+        chapter1 : Ui
+        chapter1 =
+            Less.Ui.singleton [ Html.text "Chapter 1" ]
+                |> Less.Ui.at Main
+                |> Less.Ui.Html.goTo []
+                    { destination = "chapter1"
+                    , isInline = True
+                    , label = [ Html.li [] [ Html.text "Chapter 1: GoTo and Toggle" ] ]
+                    }
+
+        chapter2 : Ui
+        chapter2 =
+            Less.Ui.singleton [ Html.text "Chapter 2" ]
+                |> Less.Ui.at Main
+                |> Less.Ui.Html.goTo []
+                    { destination = "chapter2"
+                    , isInline = True
+                    , label = [ Html.li [] [ Html.text "Chapter 2: GoTo and Toggle" ] ]
+                    }
+
+        body : Ui
+        body =
             Less.Ui.Html.toggle []
-                { flag = String.replace " " "+" str
-                , isInline = False
-                , label = [ Html.text str ]
+                { flag = "Toc"
+                , isInline = True
+                , label = [ Html.b [] [ Html.text "Table of Contents" ] ]
                 }
-                contents
+                (chapter1 ++ chapter2)
+                |> Less.Ui.at Toc
     in
     Less.mapDocument identity
-        { body =
-            textLabel "Toggle the features on top of the page! "
-                ++ showTab "Flat-Ui-Layout"
-                    ui
-                ++ showTab "Global Navbar"
-                    globalNav
-        , layout = Less.Ui.Html.layout
+        { body = body
+        , layout =
+            { layout
+                | arrange =
+                    \rendered ->
+                        let
+                            header =
+                                Maybe.withDefault [] rendered.header
+                                    |> Html.header [ Attr.class "header", Attr.style "position" "sticky" ]
+
+                            toc___ =
+                                Maybe.withDefault [] (rendered.region Toc)
+                                    |> Html.nav [ Attr.class "toc", Attr.style "position" "fixed", Attr.style "bottom" "0" ]
+
+                            main__ =
+                                Maybe.withDefault [] (rendered.region Main)
+                        in
+                        header :: toc___ :: main__
+            }
         , title = "Less-Ui feature test"
         }
 
 
-{-| [Ui](Ui): Flat layout instead of nested components
--}
-ui : Ui
-ui =
-    textLabel "--Handle--"
-        ++ Ui.at Scene (textLabel "--Scene--")
-        ++ Ui.at Control (textLabel "--Control--")
-        ++ Ui.at Info (textLabel "--Info--")
-
-
-{-| [Application](Ui.Application): Sever Route from Model
--}
-paths : Ui
-paths =
-    Less.Ui.Html.goTo []
-        { destination = "Path-1"
-        , isInline = True
-        , label = [ Html.text "Path-1" ]
-        }
-        []
-        ++ Less.Ui.Html.goTo []
-            { destination = "Path-2"
-            , isInline = True
-            , label = [ Html.text "Path-2" ]
-            }
-            []
-        ++ Less.Ui.Html.goTo []
-            { destination = ""
-            , isInline = True
-            , label = [ Html.text "Nothing" ]
-            }
-            []
-
-
-globalNav : Ui
-globalNav =
-    [ "Introduction", "First Steps", "Last Steps" ]
-        |> List.concatMap
-            (\title ->
-                Less.Ui.Html.goTo []
-                    { destination = title
-                    , isInline = False
-                    , label = [ Html.text title ]
-                    }
-                    (textLabel title)
-            )
-
-
-{-| [Link](Ui.Link): Manage the Ui State as a URL
--}
-fragments : String -> Ui
-fragments fr =
-    let
-        articles : List (Html msg)
-        articles =
-            [ Html.article [ Attr.id "1", Attr.tabindex 1 ]
-                [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
-            , Html.article [ Attr.id "2", Attr.tabindex 1 ]
-                [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
-            , Html.article [ Attr.id "3", Attr.tabindex 1 ]
-                [ Html.p [] [ Html.text "Officiis tractatos at sed. Vim ad ipsum ceteros. Posse adolescens ei eos, meliore albucius facilisi id vel, et vel tractatos partiendo. Cu has insolens constituam, sint ubique sit te, vim an legimus elaboraret. Omnes possim mei et. Equidem contentiones vituperatoribus ut vel, duis veri platonem vel ei, an integre consequat democritum qui." ] ]
-            ]
-    in
-    Ui.singleton articles
-        ++ (Less.Ui.Html.bounce []
-                { here = "#1"
-                , label = [ Html.text "Bounce between 1 and 3" ]
-                , there = "#3"
-                }
-                (textLabel "Number Three - this is visible only when `there` is active!")
-                |> Ui.at Control
-           )
-
-
 {-| -}
-main : Less.Application Features Msg
+main : Less.Application () ()
 main =
     Less.application
-        { init = init
-        , update = update
+        { init = ( (), Cmd.none )
+        , update = \() () -> ( (), Cmd.none )
         , view = view
         }
