@@ -115,7 +115,7 @@ application config =
                         Return.singleton ( key, state, model )
                             |> Return.command
                                 (if pushHistoryState then
-                                    Nav.pushUrl key (Url.toString newState |> Debug.log "New History State")
+                                    Nav.pushUrl key (Url.toString newState)
 
                                  else
                                     Nav.replaceUrl key (Url.toString newState)
@@ -151,5 +151,5 @@ application config =
                     UrlCmd link ->
                         applyLink link
         , view =
-            \( _, states, model ) -> config.view model (Debug.log "==================================================================\nLess.view -- states" states)
+            \( _, states, model ) -> config.view model states
         }

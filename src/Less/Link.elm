@@ -409,14 +409,17 @@ type ParsedLocation
 parseLocation : Location -> ParsedLocation
 parseLocation location =
     case String.split "#" location of
+        [] ->
+            OnlyPath ""
+
         "" :: fragment ->
             OnlyFragment (String.join "#" fragment)
 
+        [ path ] ->
+            OnlyPath path
+
         path :: fragment ->
             PathAndFragment path (String.join "#" fragment)
-
-        _ ->
-            OnlyPath location
 
 
 encodeLocation : ParsedLocation -> Location
