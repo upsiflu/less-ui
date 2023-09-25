@@ -109,6 +109,7 @@ application config =
                         let
                             ( { pushHistoryState }, newState ) =
                                 Link.apply link current
+                                    |> Debug.log "Apply link ->"
                         in
                         -- changing the Url will implicitly trigger `nextState`
                         Return.singleton ( key, state, model )
@@ -137,7 +138,8 @@ application config =
                         nextState url
 
                     LinkClicked (Browser.Internal url) ->
-                        Link.fromUrl url
+                        Link.fromUrl (Debug.log "Url" url)
+                            |> Debug.log "Link"
                             |> applyLink
 
                     LinkClicked (Browser.External href) ->

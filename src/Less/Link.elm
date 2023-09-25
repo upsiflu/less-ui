@@ -205,7 +205,7 @@ mutationFromTwoStates { current, previous } link maybeSetName =
         predicate state =
             case link of
                 GoTo location ->
-                    locationIsSubsetOf state location
+                    stateContainsLocation location state
 
                 Toggle flag ->
                     Maybe.withDefault "" (Maybe.andThen Url.percentDecode state.query)
@@ -213,14 +213,14 @@ mutationFromTwoStates { current, previous } link maybeSetName =
                         |> List.member flag
 
                 Bounce { here } ->
-                    locationIsSubsetOf state here
+                    stateContainsLocation here state
 
                 Filter { category } ->
                     Maybe.withDefault "" state.query
                         |> (\q -> String.startsWith (category ++ "=") q || String.contains ("&" ++ category ++ "=") q)
 
-        locationIsSubsetOf : State -> ParsedLocation -> Bool
-        locationIsSubsetOf state location =
+        stateContainsLocation : ParsedLocation -> State -> Bool
+        stateContainsLocation location state =
             case ( location, getLocation state ) of
                 ( OnlyPath innerPath, OnlyPath path ) ->
                     String.contains innerPath path
