@@ -495,6 +495,11 @@ wrap states wrapper =
 
         Filter category maybeConfig contingent ->
             let
+                isInline : Bool
+                isInline =
+                    Maybe.map .isInline maybeConfig
+                        |> Maybe.withDefault True
+
                 link : Link.SearchTerm -> Link
                 link newSearchTerm =
                     Link.Filter { category = category, searchTerm = newSearchTerm }
@@ -506,11 +511,6 @@ wrap states wrapper =
                 searchTerms : List Link.SearchTerm
                 searchTerms =
                     Link.getStateSearchTerms category states.current
-
-                isInline : Bool
-                isInline =
-                    Maybe.map .isInline maybeConfig
-                        |> Maybe.withDefault True
             in
             Ui.Stateful
                 { label =
