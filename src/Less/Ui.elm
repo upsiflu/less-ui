@@ -319,9 +319,9 @@ view :
     -> html
 view layout =
     viewUi layout Header
-        >> (\d ->
-                { header = Dict.get Header d
-                , region = \region -> Dict.get (Region region) d
+        >> (\rendered ->
+                { header = Dict.get Header rendered
+                , region = \region -> Dict.get (Region region) rendered
                 }
            )
         >> layout.arrange
@@ -416,10 +416,10 @@ viewUi layout region =
                         labelRegion : OrHeader region
                         labelRegion =
                             if isInline then
-                                Header
+                                region
 
                             else
-                                region
+                                Header
                     in
                     layout.concat
                         [ Dict.singleton labelRegion label
