@@ -94,9 +94,15 @@ application config =
                 let
                     ( initialModel, modelCmd ) =
                         config.init
+
+                    initialState =
+                        { current = Link.sanitize url, previous = Nothing }
                 in
-                ( ( key, { current = url, previous = Nothing }, initialModel )
-                , Cmd.map AppMsg modelCmd
+                ( ( key, initialState, initialModel )
+                , Cmd.batch
+                    [ Cmd.map AppMsg modelCmd
+                    , Nav.replaceUrl key (Url.toString initialState.current)
+                    ]
                 )
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked

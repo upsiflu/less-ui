@@ -8,6 +8,7 @@ module Less.Link exposing
     , State
     , Location, parseLocation
     , Flag, Category, SearchTerm
+    , sanitize
     )
 
 {-|
@@ -49,6 +50,10 @@ module Less.Link exposing
 
 @docs Location, parseLocation
 @docs Flag, Category, SearchTerm
+
+---
+
+@docs sanitize
 
 -}
 
@@ -285,19 +290,6 @@ mutationFromTwoStates { current, previous } link maybeSetName =
 apply : Link -> State -> ( { pushHistoryState : Bool }, State )
 apply link =
     let
-        mapFlags : (Set Flag -> Set Flag) -> State -> State
-        mapFlags fu state =
-            { state
-                | query =
-                    Maybe.toList state.query
-                        |> List.concatMap (String.split "&")
-                        |> Set.fromList
-                        |> fu
-                        |> Set.toList
-                        |> String.join "&"
-                        |> String.nonEmpty
-            }
-
         replaceAssignment : Category -> SearchTerm -> State -> State
         replaceAssignment category searchTerm =
             mapFlags (Set.filter (String.startsWith (category ++ "=") >> not))
@@ -497,7 +489,7 @@ type alias Fragment =
 
 
 
----- Create State ----
+---- State Helpers ----
 
 
 {-|
@@ -509,3 +501,28 @@ type alias Fragment =
 -}
 type alias State =
     Url
+
+
+mapFlags : (Set Flag -> Set Flag) -> State -> State
+mapFlags fu state =
+    { state
+        | query =
+            Maybe.toList state.query
+                |> List.concatMap (String.split "&")
+                |> Set.fromList
+                |> fu
+                |> Set.toList
+                |> String.join "&"
+                |> String.nonEmpty
+    }
+
+
+{-| Internal function to remove magical assignments ("toggle" and "bounce").
+-}
+sanitize : Url -> State
+sanitize =
+    (\flag ->
+        not (String.startsWith "toggle=" flag || String.startsWith "bounce=" flag)
+    )
+        |> Set.filter
+        |> mapFlags
