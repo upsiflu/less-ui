@@ -21,24 +21,28 @@ view _ =
     let
         chapters : List Ui
         chapters =
-            [
-             Less.Ui.singleton [ Html.text "Chapter 1" ]
+            [ Less.Ui.singleton [ Html.text "Chapter 1" ]
                 |> Less.Ui.at Content
                 |> Less.Ui.Html.goTo []
                     { destination = "chapter1"
                     , isInline = True
                     , label = [ Html.li [] [ Html.text "GoTo and Toggle" ] ]
                     }
-
-        
-             , Less.Ui.singleton [ Html.text "Chapter 2" ]
+            , Less.Ui.singleton [ Html.text "Chapter 2" ]
                 |> Less.Ui.at Content
                 |> Less.Ui.Html.goTo []
                     { destination = "chapter2"
                     , isInline = True
                     , label = [ Html.li [] [ Html.text "Filters" ] ]
                     }
-                    ]
+            , Less.Ui.singleton [ Html.a [ Attr.href "https://github.com/upsiflu/less-ui" ] [ Html.text "github.com/upsiflu/less-ui" ] ]
+                |> Less.Ui.at Content
+                |> Less.Ui.Html.goTo []
+                    { destination = "chapter3"
+                    , isInline = True
+                    , label = [ Html.li [] [ Html.text "Where to go next" ] ]
+                    }
+            ]
 
         body : Ui
         body =
