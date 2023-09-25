@@ -47,7 +47,8 @@ import Return exposing (Return)
 import Url
 
 
-{-| -}
+{-| 🐌
+-}
 type alias Application model modelMsg =
     Program () (ApplicationState model) (Msg modelMsg)
 
@@ -57,13 +58,14 @@ type alias ApplicationState model =
 
 
 {-| Parametrizes [Browser.Document](https://package.elm-lang.org/packages/elm/browser/latest/Browser#Document)
-over the current [`State`](Less.State)
+over the current and previous [`State`](Less-Link#State).
 -}
 type alias Document msg =
     { current : State, previous : Maybe State } -> Browser.Document (Msg msg)
 
 
-{-| -}
+{-| Render the document and map it to `Html`.
+-}
 mapDocument :
     (html -> List (Html (Msg msg)))
     -> { body : Ui region html wrapper, layout : Layout region narrowHtml_ html narrowWrapper_ wrapper, title : String }
@@ -90,14 +92,11 @@ application config =
         { init =
             \_ url key ->
                 let
-                    ( ( initialModel, modelCmd ), initialState ) =
-                        ( config.init, url )
+                    ( initialModel, modelCmd ) =
+                        config.init
                 in
-                ( ( key, { current = initialState, previous = Nothing }, initialModel )
-                , Cmd.batch
-                    [ Cmd.map AppMsg modelCmd
-                    , Nav.replaceUrl key (Url.toString initialState)
-                    ]
+                ( ( key, { current = url, previous = Nothing }, initialModel )
+                , Cmd.map AppMsg modelCmd
                 )
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked

@@ -90,16 +90,16 @@ They copy the Url and paste it in another tab or browser or device.
 The app loads and restores exactly the same Ui state as in the original tab.
 
   - Jump Navigation
-      - [x]  [With a single target (goTo)](#goTo)
-      - [x]  [With two back-and-forth targets (bounce)](#bounce)
+      - [x]  [With a single target (goTo)](Less-Ui-Html#goTo)
+      - [x]  [With two back-and-forth targets (bounce)](Less-Ui-Html#bounce)
 
   - Progressive Disclosure
-      - [x]  [Orthogonal; any number can be active (toggle)](#toggle)
+      - [x]  [Orthogonal; any number can be active (toggle)](Less-Ui-Html#toggle)
       - [ ] Exactly one active at a given Ui node (tab) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8) ☞ [#2](https://github.com/upsiflu/restrictive/issues/2)
       - [ ] One or zero active in the browser tab (dropdown, dialog, popover) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8)
 
   - Dynamic Links
-      - [x]  [Search or Filter](#filter) a [Category](#Category) by [user-input Data](#Data)
+      - [x]  [Search](Less-Ui-Html#search) or [Filter](Less-Ui-Html#filter) a [Category](#Category)
 
 -}
 type Link
@@ -161,7 +161,8 @@ fromUrl url =
         |> Maybe.withDefault (goTo ())
 
 
-{-| -}
+{-| Use with `Html.Attributes.href`. Will not include the current state. `Toggle` and `Bounce` will produce an extra flag enabling switchy changes.
+-}
 toHref : Link -> String
 toHref relativeChange =
     case relativeChange of
@@ -182,7 +183,8 @@ toHref relativeChange =
             "?" ++ filter.category ++ "=" ++ filter.searchTerm
 
 
-{-| -}
+{-| Marks the delta from the previous to the current state. A String can describe the Aria-"set" (such as "page") that the link refers to.
+-}
 type Mutation
     = StateEntered String
     | StateInside String
@@ -194,7 +196,8 @@ type Mutation
     | StillOff
 
 
-{-| -}
+{-| Probe the delta between two states against a [Link](#Link) and, with an optional Aria set name such as "page", generate a [Mutation](#Mutation).
+-}
 mutationFromTwoStates : { current : State, previous : Maybe State } -> Link -> Maybe String -> Mutation
 mutationFromTwoStates { current, previous } link maybeSetName =
     let
@@ -277,7 +280,8 @@ mutationFromTwoStates { current, previous } link maybeSetName =
             StillOff
 
 
-{-| -}
+{-| Think `update` in TEA.
+-}
 apply : Link -> State -> ( { pushHistoryState : Bool }, State )
 apply link =
     let
@@ -330,7 +334,7 @@ apply link =
                    )
 
         Toggle flag ->
-            mapFlags (Set.remove ("toggle=" ++ flag) >> Set.toggle (Debug.log "FLAG" flag))
+            mapFlags (Set.remove ("toggle=" ++ flag) >> Set.toggle flag)
                 >> withoutHistory
 
         Bounce parsedLocations ->
@@ -354,37 +358,36 @@ apply link =
 
 {-| **Progressive disclosure**: Turning off a `Flag` renders all corresponding bits
 of `Ui` invisible.
-Example: [Ui.Html#toggle](Less.Ui.Html#toggle).
+Example: [Ui.Html#toggle](Less-Ui-Html#toggle).
 
 **Parametric search:** Assignments such as `?a=b` may represent currently active Tabs
 or a search string.
-Example: [Ui.Html#search](Less.Ui.Html#search).
+Example: [Ui.Html#search](Less-Ui-Html#search).
 
 -}
 type alias Flag =
     String
 
 
-{-| **Pages:** Jump through a `/`-delimited tree or a pool of exclusive pages. Example: [Ui.Html#bounce](Less.Ui.Html#goTo)
+{-| **Pages:** Jump through a `/`-delimited tree or a pool of exclusive pages. Example: [Ui.Html#bounce](Less-Ui-Html#goTo)
 
 **Global Tabs**: Navigate between tabs using the global `nav` bar.
 
 **Items in a Set:** A path may represent a single item or group. Navigating to an Item will scroll it into the viewport.
 
-**Items in a Tree**: Here, each item has a `parent` item, which is activated when its link is clicked for the second time. Example: [Ui.Html#bounce](Less.Ui.Html#bounce)
+**Items in a Tree**: Here, each item has a `parent` item, which is activated when its link is clicked for the second time. Example: [Ui.Html#bounce](Less-Ui-Html#bounce)
 
 -}
 type alias Path =
     String
 
 
-{-| (`/`)[`<Path>`](#Path)`#`[`<Fragment>`](#Fragment)
+{-| (`/`)`<Path>`(``` #``<Fragment> ```)
 -}
 type alias Location =
     String
 
 
-{-| -}
 type ParsedLocation
     = OnlyPath Path
     | OnlyFragment Fragment
@@ -496,6 +499,12 @@ type alias Fragment =
 ---- Create State ----
 
 
-{-| -}
+{-|
+
+  - path : String
+  - query : Maybe String
+  - fragment : Maybe String
+
+-}
 type alias State =
     Url

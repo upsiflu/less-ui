@@ -1,30 +1,30 @@
 module Less.Ui.Html exposing
     ( Ui, singleton
     , toggle, goTo, bounce, filter, search
-    , section, node
+    , section, article, node
     , ol, ul, keyedNode, nest
     , layout, arrangeOverDefaultRegions, Region(..)
     )
 
-{-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Less.Ui`](Less.Ui)
+{-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Less.Ui`](Less-Ui)
 
 @docs Ui, singleton
 
 
 # Create Links
 
-[Read more in the `Link` module.](Less.Link)
+[Read more in the `Link` module.](Less-Link)
 
 @docs toggle, goTo, bounce, filter, search
 
 
 # Wrap the DOM
 
-@docs section, node
+@docs section, article, node
 @docs ol, ul, keyedNode, nest
 
 
-# Layout
+# Provide a Layout
 
 @docs layout, arrangeOverDefaultRegions, Region
 
@@ -40,7 +40,8 @@ import Less.Ui as Ui
 import Maybe.Extra as Maybe
 
 
-{-| -}
+{-| 🐌
+-}
 type alias Ui region narrowMsg msg =
     Ui.Ui
         region
@@ -53,7 +54,8 @@ type alias NarrowUi region narrowMsg =
     Ui region narrowMsg narrowMsg
 
 
-{-| -}
+{-| 🐌
+-}
 singleton : List (Html msg) -> Ui region_ narrowMsg_ msg
 singleton =
     List.map (Html.map Link.AppMsg)
@@ -228,13 +230,31 @@ type alias HtmlList msg =
     List (Html msg)
 
 
-{-| -}
+{-| From w3.org:
+
+> The section element represents a generic section of a document or application. A section, in this context, is a thematic grouping of content, typically with a heading.
+
+-}
 section : List (Html.Attribute msg) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
 section attrs =
     node "section" (List.map (Attr.map Link.AppMsg) attrs)
 
 
-{-| -}
+{-| From w3.org:
+
+> The article element represents a self-contained composition in a document, page, application, or site and that is, in principle, independently distributable or reusable, e.g. in syndication.
+
+-}
+article : List (Html.Attribute msg) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
+article attrs =
+    node "article" (List.map (Attr.map Link.AppMsg) attrs)
+
+
+{-| Wrap all parts of the Ui that are in the current region in an arbitrary Html node.
+
+    node "span" [] myUi
+
+-}
 node : String -> List (Html.Attribute (Link.Msg msg)) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
 node str attrs =
     Node { onlyInCurrentRegion = True } str attrs >> Ui.wrap
@@ -255,19 +275,27 @@ applyKeyedFu fu =
         >> List.singleton
 
 
-{-| -}
+{-| Ordered List
+-}
 ol : List (Html.Attribute msg) -> List ( String, Ui region narrowMsg msg ) -> Ui region narrowMsg msg
 ol attrs =
     Keyed (applyKeyedFu (Html.Keyed.ol (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap
 
 
-{-| -}
+{-| Unordered List
+-}
 ul : List (Html.Attribute msg) -> List ( String, Ui region narrowMsg msg ) -> Ui region narrowMsg msg
 ul attrs =
     Keyed (applyKeyedFu (Html.Keyed.ul (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap
 
 
-{-| -}
+{-| Key a node with `Tuple.pair "uniqueKey"` such that the vDom diffing algorithm preserves it even when it changes position in the list.
+
+Note [ul](#ul) and [ol](#ol).
+
+The functionality is taken directly from the standard library `Html.Keyed`.
+
+-}
 keyedNode : String -> List (Html.Attribute msg) -> List ( String, Ui region narrowMsg msg ) -> Ui region narrowMsg msg
 keyedNode tagName attrs =
     Keyed (applyKeyedFu (Html.Keyed.node tagName (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap

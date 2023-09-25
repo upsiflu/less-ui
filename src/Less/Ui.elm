@@ -8,12 +8,12 @@ module Less.Ui exposing
     , uncons
     , OrHeader(..)
     , map
-    , indexedMapList, mapList
+    , indexedMapList
     , mapEach
     , mapWrapper
     )
 
-{-| Separate [State](Ui.State) and [Layout](Ui.Layout) of interface elements from the main model
+{-| Separate [State](Less-Link#State) and [Layout](#Layout) of interface elements from the main model
 and build accessible patterns orthogonal to the Dom tree.
 
 @docs Ui, Item
@@ -34,7 +34,7 @@ and build accessible patterns orthogonal to the Dom tree.
 **[`a ++ b`](https://package.elm-lang.org/packages/elm/core/latest/Basics#++)**
 
 
-# View
+# Apply state
 
 @docs view
 
@@ -48,7 +48,7 @@ and build accessible patterns orthogonal to the Dom tree.
 @docs repeat
 
 In addition, many List functions directly work with `Ui`, for example `List.length`, `List.reverse` or `List.Extra.permutations`.
-Caveats are discussed in [Advanced Usage](advanced-usage)
+Caveats are discussed in [Advanced Usage](#advanced-usage)
 
 
 ### Decompose
@@ -64,9 +64,6 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 
 
 # Advanced Usage
-
-
-## Map
 
 @docs map
 
@@ -90,7 +87,7 @@ The big drawback when using `Ui`s as `List`s is that you cannot inspect (compare
 the `Item` type is opaque.
 It is usually easier to build exactly the `Ui` you need instead of altering and recombining them after the fact.
 
-@docs indexedMapList, mapList
+@docs indexedMapList
 @docs mapEach
 
 
@@ -107,12 +104,19 @@ import Less.Link exposing (State)
 import List.Extra as List
 
 
-{-| -}
+{-|
+
+    none : Ui region html wrapper
+    none =
+        []
+
+-}
 type alias Ui region html wrapper =
     List (Item region html wrapper)
 
 
-{-| -}
+{-| 🐚
+-}
 type Item region html wrapper
     = Leaf html
     | Wrap wrapper
@@ -123,13 +127,14 @@ type Item region html wrapper
 ---- CREATE ----
 
 
-{-| -}
+{-| 🐌
+-}
 singleton : html -> Ui region_ html wrapper_
 singleton =
     Leaf >> List.singleton
 
 
-{-| Check out [the default wrappers in `Less.Ui.Html`](Less.Ui.Html#wrap-the-dom).
+{-| Check out [the default wrappers in `Less.Ui.Html`](Less-Ui-Html#wrap-the-dom).
 -}
 wrap : wrapper -> Ui region_ html_ wrapper
 wrap =
@@ -180,12 +185,6 @@ repeat n =
     List.repeat n >> List.concat
 
 
-{-| -}
-mapList : (List (Ui region html wrapper) -> List (Ui region2 html2 wrapper2)) -> Ui region html wrapper -> Ui region2 html2 wrapper2
-mapList fu =
-    List.map List.singleton >> fu >> List.concat
-
-
 {-| Modify each descendent as a separate Ui and then recombine them.
 
     region html attribute wrapper   "A" ++ region html attribute wrapper   "B" ++ region html attribute wrapper   "C"
@@ -202,7 +201,11 @@ mapEach fu =
 ---- MAP ----
 
 
-{-| -}
+{-| Modify the type of `html` in the Ui.
+
+⚠️ If you can, build up your Ui with the final `html` type.
+
+-}
 map : (html -> html2) -> Ui region html wrapper -> Ui region html2 wrapper
 map fu =
     List.map
@@ -219,7 +222,11 @@ map fu =
         )
 
 
-{-| -}
+{-| Modify the type of `wrapper` in the Ui.
+
+⚠️ If you can, build up your Ui with the final `wrapper` type.
+
+-}
 mapWrapper : (wrapper -> wrapper2) -> Ui region html wrapper -> Ui region html wrapper2
 mapWrapper fu =
     List.map
@@ -240,7 +247,7 @@ mapWrapper fu =
 ---- DECOMPOSE ----
 
 
-{-| Attempt to separate the first descendant in the Ui
+{-| Attempt to separate the first descendant in the Ui.
 -}
 uncons : Ui region html wrapper -> Maybe ( Ui region html wrapper, Ui region html wrapper )
 uncons =
@@ -251,7 +258,7 @@ uncons =
 ---- LAYOUT ----
 
 
-{-| The layout is a rule for mapping a Ui to an html tree.
+{-| The layout is a rule for mapping a Ui to an `html` tree.
 -}
 type alias Layout region narrowHtml html narrowWrapper customWrapper =
     { wrap : { current : State, previous : Maybe State } -> customWrapper -> Wrapper region narrowHtml html narrowWrapper customWrapper
@@ -260,7 +267,8 @@ type alias Layout region narrowHtml html narrowWrapper customWrapper =
     }
 
 
-{-| -}
+{-| fix a Layout to the current states to make it ["current"](#CurrentLayout).
+-}
 applyStates :
     { current : State, previous : Maybe State }
     -> Layout region narrowHtml html narrowWrapper customWrapper
@@ -272,7 +280,8 @@ applyStates states layout =
     }
 
 
-{-| This type has its wrapper already applied
+{-| This type of Layout has its current and previous state already applied
+through [applyStates](#applyStates).
 -}
 type alias CurrentLayout region narrowHtml html narrowWrapper customWrapper =
     { wrap : customWrapper -> Wrapper region narrowHtml html narrowWrapper customWrapper
@@ -297,7 +306,7 @@ You can either use the provided `Wrapper` or roll your own.
 Advantage of rolling your own `wrapper` type: You don't need to store functions in the Ui,
 which makes it comparable and serializable.
 
-See [`Ui.Html`](Ui.Html#Wrapper) for an example of a mostly defunctionalized wrapper.
+See [`Ui.Html`](Less-Ui-Html) for an example of a mostly defunctionalized wrapper.
 
 -}
 type Wrapper region narrowHtml html narrowWrapper wrapper
@@ -319,7 +328,9 @@ type Wrapper region narrowHtml html narrowWrapper wrapper
 ---- VIEW ----
 
 
-{-| -}
+{-| ⚠️ If you can, prefer one of the functions in [Less](Less) such as
+[`application`](Less#application).
+-}
 view :
     CurrentLayout region narrowHtml_ html narrowWrapper_ wrapper
     -> Ui region html wrapper

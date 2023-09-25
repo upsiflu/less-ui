@@ -56,7 +56,7 @@ npm start
 ```
 
 Go to [localhost:8001](http://localhost:8001/) and open one of the examples.
-Read [examples/README.md](examples/README.md).
+Read [examples/README.md](http://features.localhost:8099/packages/upsiflu/less-ui/latest).
 
 ## Docs
 ```shell

@@ -1,16 +1,15 @@
 module Features exposing (main)
 
-import Html exposing (Html)
+import Html
 import Html.Attributes as Attr
 import Less
 import Less.Ui
 import Less.Ui.Html exposing (layout)
-import Less.Ui.Region exposing (OrHeader(..))
 
 
 type Region
     = Toc
-    | Main
+    | Content
 
 
 type alias Ui =
@@ -20,34 +19,35 @@ type alias Ui =
 view : () -> Less.Document ()
 view _ =
     let
-        chapter1 : Ui
-        chapter1 =
-            Less.Ui.singleton [ Html.text "Chapter 1" ]
-                |> Less.Ui.at Main
+        chapters : List Ui
+        chapters =
+            [
+             Less.Ui.singleton [ Html.text "Chapter 1" ]
+                |> Less.Ui.at Content
                 |> Less.Ui.Html.goTo []
                     { destination = "chapter1"
                     , isInline = True
-                    , label = [ Html.li [] [ Html.text "Chapter 1: GoTo and Toggle" ] ]
+                    , label = [ Html.li [] [ Html.text "GoTo and Toggle" ] ]
                     }
 
-        chapter2 : Ui
-        chapter2 =
-            Less.Ui.singleton [ Html.text "Chapter 2" ]
-                |> Less.Ui.at Main
+        
+             , Less.Ui.singleton [ Html.text "Chapter 2" ]
+                |> Less.Ui.at Content
                 |> Less.Ui.Html.goTo []
                     { destination = "chapter2"
                     , isInline = True
-                    , label = [ Html.li [] [ Html.text "Chapter 2: GoTo and Toggle" ] ]
+                    , label = [ Html.li [] [ Html.text "Filters" ] ]
                     }
+                    ]
 
         body : Ui
         body =
-            Less.Ui.Html.toggle []
-                { flag = "Toc"
-                , isInline = True
-                , label = [ Html.b [] [ Html.text "Table of Contents" ] ]
-                }
-                (chapter1 ++ chapter2)
+            List.concat chapters
+                |> Less.Ui.Html.toggle []
+                    { flag = "❡"
+                    , isInline = True
+                    , label = [ Html.b [] [ Html.text "❡ Chapters" ] ]
+                    }
                 |> Less.Ui.at Toc
     in
     Less.mapDocument identity
@@ -61,14 +61,14 @@ view _ =
                                 Maybe.withDefault [] rendered.header
                                     |> Html.header [ Attr.class "header", Attr.style "position" "sticky" ]
 
-                            toc___ =
+                            toc =
                                 Maybe.withDefault [] (rendered.region Toc)
-                                    |> Html.nav [ Attr.class "toc", Attr.style "position" "fixed", Attr.style "bottom" "0" ]
+                                    |> Html.nav [ Attr.class "❡", Attr.style "position" "fixed", Attr.style "bottom" "1em" ]
 
-                            main__ =
-                                Maybe.withDefault [] (rendered.region Main)
+                            content =
+                                Maybe.withDefault [] (rendered.region Content)
                         in
-                        header :: toc___ :: main__
+                        header :: toc :: content
             }
         , title = "Less-Ui feature test"
         }

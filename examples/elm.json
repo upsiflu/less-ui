@@ -9,7 +9,6 @@
         "direct": {
             "Chadtech/elm-bool-extra": "2.4.2",
             "Fresheyeball/elm-return": "7.1.0",
-            "Janiczek/elm-url-codec": "1.0.0",
             "edkelly303/elm-any-type-forms": "5.0.0",
             "edkelly303/elm-multitool": "3.0.0",
             "elm/browser": "1.0.2",

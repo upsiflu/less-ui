@@ -13,7 +13,10 @@ when inside the directory containing this file.
 
 
 import Review.Rule as Rule exposing (Rule)
+import Docs.NoMissing exposing (exposedModules, onlyExposed)
 import Docs.ReviewAtDocs
+import Docs.ReviewLinksAndSections
+import Docs.UpToDateReadmeLinks
 import NoDebug.Log
 import NoDebug.TodoOrToString
 import NoExposingEverything
@@ -39,12 +42,12 @@ import ReviewPipelineStyles
 import ReviewPipelineStyles.Premade
 import OnlyAllSingleUseTypeVarsEndWith_
 import CognitiveComplexity
+import VariablesBetweenCaseOf.AccessInCases
 
 
 config : List Rule
 config =
-    [ Docs.ReviewAtDocs.rule
-    , NoDebug.Log.rule
+    [ NoDebug.Log.rule
     , NoDebug.TodoOrToString.rule
         |> Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoExposingEverything.rule
@@ -86,4 +89,14 @@ config =
             ]
     , OnlyAllSingleUseTypeVarsEndWith_.rule
     , CognitiveComplexity.rule 15
+    , VariablesBetweenCaseOf.AccessInCases.forbid
+    
+    -- Docs
+    , Docs.NoMissing.rule
+        { document = onlyExposed
+        , from = exposedModules
+        }
+    , Docs.ReviewLinksAndSections.rule
+    , Docs.ReviewAtDocs.rule
+    , Docs.UpToDateReadmeLinks.rule
     ]
