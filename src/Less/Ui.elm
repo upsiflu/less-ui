@@ -6,6 +6,7 @@ module Less.Ui exposing
     , Layout, CurrentLayout, Wrapper(..), applyStates
     , repeat
     , uncons
+    , OrHeader(..)
     , map
     , indexedMapList, mapList
     , mapEach
@@ -55,6 +56,13 @@ Caveats are discussed in [Advanced Usage](advanced-usage)
 @docs uncons
 
 
+# Working with Regions
+
+@docs OrHeader
+
+---
+
+
 # Advanced Usage
 
 
@@ -96,7 +104,6 @@ The following exports have no application and may be removed in the next release
 
 import AssocList as Dict exposing (Dict)
 import Less.Link exposing (State)
-import Less.Ui.Region exposing (OrHeader(..))
 import List.Extra as List
 
 
@@ -428,6 +435,17 @@ viewUi layout region =
     in
     List.map viewItem
         >> layout.concat
+
+
+
+---- Working with Regions ----
+
+
+{-| Extend a sum type by a `Header` constructor. Every app in `Less` has a Header.
+-}
+type OrHeader region
+    = Header
+    | Region region
 
 
 

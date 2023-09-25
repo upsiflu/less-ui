@@ -3,7 +3,7 @@ module Less.Ui.Html exposing
     , toggle, goTo, bounce, filter, search
     , section, node
     , ol, ul, keyedNode, nest
-    , layout, arrangeOverDefaultRegions
+    , layout, arrangeOverDefaultRegions, Region(..)
     )
 
 {-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Less.Ui`](Less.Ui)
@@ -26,7 +26,7 @@ module Less.Ui.Html exposing
 
 # Layout
 
-@docs layout, arrangeOverDefaultRegions
+@docs layout, arrangeOverDefaultRegions, Region
 
 -}
 
@@ -37,7 +37,6 @@ import Html.Keyed
 import Html.Lazy
 import Less.Link as Link exposing (Link, Mutation(..), State)
 import Less.Ui as Ui
-import Less.Ui.Region exposing (Region(..))
 import Maybe.Extra as Maybe
 
 
@@ -493,7 +492,7 @@ wrap states wrapper =
                         ]
                 , isInline = isInline
                 , contingent =
-                    wrapByMutation { onlyInCurrentRegion = isInline } mutation (Debug.log "CONTINGENT" contingent)
+                    wrapByMutation { onlyInCurrentRegion = isInline } mutation contingent
                 }
 
         Filter category maybeConfig contingent ->
@@ -593,6 +592,23 @@ wrap states wrapper =
 concat : List (List a) -> List a
 concat =
     List.concat
+
+
+
+---- Default Regions ----
+
+
+{-| **Scene:** the Item's editable contents and overlays
+
+**Control:** Toolbar, Property sheet
+
+**Info:** Status bar, Help screen, Tooltip bubble, Snack bar
+
+-}
+type Region
+    = Scene
+    | Info
+    | Control
 
 
 {-|
