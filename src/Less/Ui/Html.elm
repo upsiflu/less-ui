@@ -419,10 +419,13 @@ wrap states wrapper =
         wrapByMutation : { onlyInCurrentRegion : Bool } -> Mutation -> Ui region narrowMsg msg -> Ui region narrowMsg msg
         wrapByMutation config mutation =
             let
-                removed : List (Html.Attribute (Link.Msg msg))
-                removed =
-                    [ Attr.class "removed"
-                    , Attr.attribute "aria-hidden" "true"
+                animated : List (Html.Attribute (Link.Msg msg))
+                animated =
+                    [ Attr.style "transition" "font-size .2s 0s, opacity .2s .1s" ]
+
+                hidden : List (Html.Attribute (Link.Msg msg))
+                hidden =
+                    [ Attr.attribute "aria-hidden" "true"
                     , Attr.tabindex -1
                     , Attr.style "opacity" "0"
                     , Attr.style "pointer-events" "none;"
@@ -431,28 +434,28 @@ wrap states wrapper =
             in
             case mutation of
                 StateEntered _ ->
-                    nodeWithConfig config "span" [ Attr.class "inserted removable" ]
+                    nodeWithConfig config "span" (Attr.class "state-entered" :: animated)
 
                 StateInside _ ->
-                    nodeWithConfig config "span" [ Attr.class "removable" ]
+                    nodeWithConfig config "span" (Attr.class "state-inside" :: animated)
 
                 StateLeft _ ->
-                    nodeWithConfig config "span" removed
+                    nodeWithConfig config "span" (Attr.class "state-left" :: hidden ++ animated)
 
                 StateOutside _ ->
-                    \_ -> nodeWithConfig config "span" removed []
+                    nodeWithConfig config "span" (Attr.class "state-outside" :: hidden ++ animated)
 
                 SwitchedOn ->
-                    nodeWithConfig config "span" [ Attr.class "inserted removable" ]
+                    nodeWithConfig config "span" (Attr.class "switched-on" :: animated)
 
                 StillOn ->
-                    nodeWithConfig config "span" [ Attr.class "removable" ]
+                    nodeWithConfig config "span" (Attr.class "still-on" :: animated)
 
                 SwitchedOff ->
-                    nodeWithConfig config "span" removed
+                    nodeWithConfig config "span" (Attr.class "switched-off" :: hidden ++ animated)
 
                 StillOff ->
-                    \_ -> nodeWithConfig config "span" removed []
+                    nodeWithConfig config "span" (Attr.class "still-off" :: hidden ++ animated)
     in
     case wrapper of
         Node config str attrs elements ->
@@ -490,7 +493,7 @@ wrap states wrapper =
                         ]
                 , isInline = isInline
                 , contingent =
-                    wrapByMutation { onlyInCurrentRegion = isInline } mutation contingent
+                    wrapByMutation { onlyInCurrentRegion = isInline } mutation (Debug.log "CONTINGENT" contingent)
                 }
 
         Filter category maybeConfig contingent ->
