@@ -314,18 +314,22 @@ See [`Ui.Html`](Less-Ui-Html) for an example of a mostly defunctionalized wrappe
 
 -}
 type Wrapper region narrowHtml html narrowWrapper wrapper
-    = Wrapped { onlyInCurrentRegion : Bool } (html -> html) (Ui region html wrapper)
-    | Keyed (List ( String, html ) -> html) (List ( String, Ui region html wrapper ))
+    = Wrapped
+        { howToWrapCurrentRegion : html -> html
+        , howToWrapOtherRegions : html -> html
+        }
+        (Ui region html wrapper)
+    | Keyed { howToWrap : List ( String, html ) -> html } (List ( String, Ui region html wrapper ))
     | Nested
         { regions : List region
         , narrowLayout : CurrentLayout region narrowHtml narrowHtml narrowWrapper narrowWrapper
         , combine : { makeInnerHtml : Ui region narrowHtml narrowWrapper -> Maybe narrowHtml } -> html
         }
-    | Stateful
+    | Labeled
         { label : html
         , isInline : Bool
-        , contingent : Ui region html wrapper
         }
+        (Ui region html wrapper)
 
 
 
@@ -384,16 +388,20 @@ viewUi layout region =
         viewWrapper : wrapper -> Dict (OrHeader region) html
         viewWrapper wrapper =
             case layout.wrap wrapper of
-                Wrapped { onlyInCurrentRegion } fu elements ->
-                    viewUi layout region elements
-                        |> (if onlyInCurrentRegion then
-                                Dict.update region (Maybe.map fu)
+                Wrapped { howToWrapCurrentRegion, howToWrapOtherRegions } elements ->
+                    let
+                        howToWrap : OrHeader region -> html -> html
+                        howToWrap innerRegion =
+                            if innerRegion == region then
+                                howToWrapCurrentRegion
 
                             else
-                                Dict.map (\_ -> fu)
-                           )
+                                howToWrapOtherRegions
+                    in
+                    viewUi layout region elements
+                        |> Dict.map howToWrap
 
-                Keyed fu keyedElements ->
+                Keyed { howToWrap } keyedElements ->
                     let
                         distributeKey : ( String, Ui region html wrapper ) -> List (Dict (OrHeader region) (List ( String, html )))
                         distributeKey ( key, ui ) =
@@ -406,34 +414,25 @@ viewUi layout region =
                     in
                     List.concatMap distributeKey keyedElements
                         |> dict.concat
-                        |> Dict.map (\_ -> fu)
+                        |> Dict.map (\_ -> howToWrap)
 
                 Nested { regions, narrowLayout, combine } ->
                     let
-                        renderHtml : OrHeader region -> ( OrHeader region, html )
+                        renderHtml : OrHeader region -> Dict (OrHeader region) html -> Dict (OrHeader region) html
                         renderHtml soloRegion =
-                            ( soloRegion
-                            , combine
+                            combine
                                 { makeInnerHtml =
-                                    atRegionWhenNotHeader
+                                    atCurrentRegion
                                         >> viewOtherUi narrowLayout soloRegion
                                         >> Dict.get soloRegion
                                 }
-                            )
-
-                        atRegionWhenNotHeader : Ui region narrowHtml narrowWrapper -> Ui region narrowHtml narrowWrapper
-                        atRegionWhenNotHeader =
-                            case region of
-                                Header ->
-                                    identity
-
-                                Region r ->
-                                    at r
+                                |> Dict.insert soloRegion
                     in
-                    List.map renderHtml (Header :: List.map Region regions)
-                        |> Dict.fromList
+                    Header
+                        :: List.map Region regions
+                        |> List.foldl renderHtml Dict.empty
 
-                Stateful { label, isInline, contingent } ->
+                Labeled { label, isInline } elements ->
                     let
                         labelRegion : OrHeader region
                         labelRegion =
@@ -445,8 +444,17 @@ viewUi layout region =
                     in
                     layout.concat
                         [ Dict.singleton labelRegion label
-                        , viewUi layout region contingent
+                        , viewUi layout region elements
                         ]
+
+        atCurrentRegion : Ui region narrowHtml narrowWrapper -> Ui region narrowHtml narrowWrapper
+        atCurrentRegion =
+            case region of
+                Header ->
+                    identity
+
+                Region r ->
+                    at r
     in
     List.map viewItem
         >> layout.concat

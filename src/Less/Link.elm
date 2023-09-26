@@ -260,6 +260,18 @@ apply link =
             mapFlags (Set.filter (String.startsWith (category ++ "=") >> not))
                 >> (Set.insert >> mapFlags) (category ++ "=" ++ searchTerm)
 
+        setLocation : ParsedLocation -> State -> State
+        setLocation parsedLocation =
+            case parsedLocation of
+                OnlyPath path ->
+                    setPath path
+
+                OnlyFragment fragment ->
+                    setFragment fragment
+
+                PathAndFragment path fragment ->
+                    setPath path >> setFragment fragment
+
         setFragment : Fragment -> State -> State
         setFragment fragment state =
             { state | fragment = Just fragment }
@@ -275,18 +287,6 @@ apply link =
         withoutHistory : b -> ( { pushHistoryState : Bool }, b )
         withoutHistory =
             Tuple.pair { pushHistoryState = True }
-
-        setLocation : ParsedLocation -> State -> State
-        setLocation parsedLocation =
-            case parsedLocation of
-                OnlyPath path ->
-                    setPath path
-
-                OnlyFragment fragment ->
-                    setFragment fragment
-
-                PathAndFragment path fragment ->
-                    setPath path >> setFragment fragment
     in
     case link of
         GoTo parsedLocation ->
@@ -420,29 +420,33 @@ encodeLocation parsedLocation =
 stateContainsLocation : ParsedLocation -> State -> Bool
 stateContainsLocation location state =
     let
+        bothAreHome : () -> Bool
+        bothAreHome () =
+            maybeLocationPath == Just "" && statePath == ""
+
+        bothFragmentsAreEqual : () -> Bool
+        bothFragmentsAreEqual () =
+            locationFragment == getFragment state
+
         getFragment : State -> Maybe Fragment
         getFragment =
             .fragment
 
-        getPath : State -> Path
-        getPath { path } =
-            String.dropLeft 1 path
+        locationIsFragmentOnly : () -> Bool
+        locationIsFragmentOnly () =
+            maybeLocationPath == Nothing
 
-        ( ( maybeLocationPath, locationFragment ), statePath ) =
-            ( getLocationParameters location, getPath state )
-
-        bothAreHome () =
-            maybeLocationPath == Just "" && statePath == ""
-
+        locationPathIsSegmentOfStatePath : () -> Bool
         locationPathIsSegmentOfStatePath () =
             Maybe.map (\locationPath -> String.contains ("/" ++ locationPath ++ "/") ("/" ++ statePath ++ "/")) maybeLocationPath
                 |> Maybe.withDefault False
 
-        locationIsFragmentOnly () =
-            maybeLocationPath == Nothing
+        ( ( maybeLocationPath, locationFragment ), statePath ) =
+            ( getLocationParameters location, getPath state )
 
-        bothFragmentsAreEqual () =
-            locationFragment == getFragment state
+        getPath : State -> Path
+        getPath { path } =
+            String.dropLeft 1 path
     in
     bothAreHome ()
         && bothFragmentsAreEqual ()

@@ -1,7 +1,7 @@
 module Less.Ui.Html exposing
     ( Ui, singleton
     , toggle, goTo, bounce, filter, search
-    , section, article, node
+    , section, article, block, inline
     , ol, ul, keyedNode, nest
     , layout, arrangeOverDefaultRegions, Region(..)
     )
@@ -20,7 +20,7 @@ module Less.Ui.Html exposing
 
 # Wrap the DOM
 
-@docs section, article, node
+@docs section, article, block, inline
 @docs ol, ul, keyedNode, nest
 
 
@@ -183,8 +183,11 @@ bounce attributes config =
 
 {-| -}
 type Wrapper region narrowMsg msg
-    = Node { onlyInCurrentRegion : Bool } String (List (Html.Attribute (Link.Msg msg))) (Ui region narrowMsg msg)
-    | Keyed (List ( String, HtmlList (Link.Msg msg) ) -> HtmlList (Link.Msg msg)) (List ( String, Ui region narrowMsg msg ))
+    = Block { onlyInCurrentRegion : Bool } String (List (Html.Attribute msg)) (Ui region narrowMsg msg)
+    | Inline { onlyInCurrentRegion : Bool } String (List (Html.Attribute msg)) (Ui region narrowMsg msg)
+    | Ol (List (Html.Attribute msg)) (List ( String, Ui region narrowMsg msg ))
+    | Ul (List (Html.Attribute msg)) (List ( String, Ui region narrowMsg msg ))
+    | KeyedNode String (List (Html.Attribute msg)) (List ( String, Ui region narrowMsg msg ))
     | Nested
         { regions : List region
         , combine :
@@ -236,8 +239,8 @@ type alias HtmlList msg =
 
 -}
 section : List (Html.Attribute msg) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
-section attrs =
-    node "section" (List.map (Attr.map Link.AppMsg) attrs)
+section =
+    block "section"
 
 
 {-| From w3.org:
@@ -246,47 +249,43 @@ section attrs =
 
 -}
 article : List (Html.Attribute msg) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
-article attrs =
-    node "article" (List.map (Attr.map Link.AppMsg) attrs)
+article =
+    block "article"
 
 
 {-| Wrap all parts of the Ui that are in the current region in an arbitrary Html node.
 
-    node "span" [] myUi
+    block "div" [] myUi
 
 -}
-node : String -> List (Html.Attribute (Link.Msg msg)) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
-node str attrs =
-    Node { onlyInCurrentRegion = True } str attrs >> Ui.wrap
+block : String -> List (Html.Attribute msg) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
+block str attrs =
+    Block { onlyInCurrentRegion = True } str attrs >> Ui.wrap
 
 
-nodeWithConfig : { onlyInCurrentRegion : Bool } -> String -> List (Html.Attribute (Link.Msg msg)) -> Ui region narrowMsg msg -> Ui.Ui region_ html_ (Wrapper region narrowMsg msg)
-nodeWithConfig config str attrs =
-    Node config str attrs >> Ui.wrap
+{-| Wrap all parts of the Ui that are in the current region in an arbitrary Html node.
+Distinguishing between inline and block helps showing nice transitions.
 
+    inline "span" [] myUi
 
-applyKeyedFu : (List ( String, Html msg ) -> Html msg) -> (List ( String, HtmlList msg ) -> HtmlList msg)
-applyKeyedFu fu =
-    List.concatMap
-        (\( key, items ) ->
-            List.indexedMap (\i a -> ( key ++ "." ++ String.fromInt i, a )) items
-        )
-        >> fu
-        >> List.singleton
+-}
+inline : String -> List (Html.Attribute msg) -> Ui region narrowMsg msg -> Ui region narrowMsg msg
+inline str attrs =
+    Inline { onlyInCurrentRegion = True } str attrs >> Ui.wrap
 
 
 {-| Ordered List
 -}
 ol : List (Html.Attribute msg) -> List ( String, Ui region narrowMsg msg ) -> Ui region narrowMsg msg
 ol attrs =
-    Keyed (applyKeyedFu (Html.Keyed.ol (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap
+    Ol attrs >> Ui.wrap
 
 
 {-| Unordered List
 -}
 ul : List (Html.Attribute msg) -> List ( String, Ui region narrowMsg msg ) -> Ui region narrowMsg msg
 ul attrs =
-    Keyed (applyKeyedFu (Html.Keyed.ul (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap
+    Ul attrs >> Ui.wrap
 
 
 {-| Key a node with `Tuple.pair "uniqueKey"` such that the vDom diffing algorithm preserves it even when it changes position in the list.
@@ -298,7 +297,7 @@ The functionality is taken directly from the standard library `Html.Keyed`.
 -}
 keyedNode : String -> List (Html.Attribute msg) -> List ( String, Ui region narrowMsg msg ) -> Ui region narrowMsg msg
 keyedNode tagName attrs =
-    Keyed (applyKeyedFu (Html.Keyed.node tagName (List.map (Attr.map Link.AppMsg) attrs))) >> Ui.wrap
+    KeyedNode tagName attrs >> Ui.wrap
 
 
 {-| Gives your Html widgets access to state information.
@@ -371,6 +370,54 @@ layout =
     }
 
 
+addAttributes :
+    { blockAttributes : List (Html.Attribute Never)
+    , inlineAttributes : List (Html.Attribute Never)
+    }
+    -> Wrapper region narrowMsg msg
+    -> Wrapper region narrowMsg msg
+addAttributes { blockAttributes, inlineAttributes } wrapper =
+    let
+        recurse : Ui region narrowMsg msg -> Ui region narrowMsg msg
+        recurse =
+            addAttributes { blockAttributes = blockAttributes, inlineAttributes = inlineAttributes }
+                |> Ui.mapWrapper
+
+        ( staticBlockAttributes, staticInlineAttributes ) =
+            ( List.map (Attr.map never) blockAttributes, List.map (Attr.map never) inlineAttributes )
+    in
+    case wrapper of
+        Block config tagName attrs contingent ->
+            Block config tagName (attrs ++ staticBlockAttributes) contingent
+
+        Inline config tagName attrs contingent ->
+            Inline config tagName (attrs ++ staticInlineAttributes) contingent
+
+        Ol attrs contingent ->
+            Ol (attrs ++ staticBlockAttributes) contingent
+
+        Ul attrs contingent ->
+            Ul (attrs ++ staticBlockAttributes) contingent
+
+        KeyedNode tagName attrs keyedElements ->
+            KeyedNode tagName (attrs ++ staticBlockAttributes) keyedElements
+
+        Nested { regions, combine } ->
+            Nested { regions = regions, combine = combine }
+
+        Toggle attrs { flag, isInline, label } contingent ->
+            Toggle (attrs ++ inlineAttributes) { flag = flag, isInline = isInline, label = label } contingent
+
+        Filter category maybeConfig contingent ->
+            Filter category maybeConfig (contingent >> recurse)
+
+        GoTo attrs config contingent ->
+            GoTo (attrs ++ inlineAttributes) config (recurse contingent)
+
+        Bounce attrs config contingent ->
+            Bounce (attrs ++ inlineAttributes) config (recurse contingent)
+
+
 {-| -}
 wrap :
     { current : State, previous : Maybe State }
@@ -384,14 +431,118 @@ wrap :
             (Wrapper region narrowMsg msg)
 wrap states wrapper =
     let
+        appAttr : List (Html.Attribute msg) -> List (Html.Attribute (Link.Msg msg))
+        appAttr =
+            List.map (Attr.map Link.AppMsg)
+
         appHtml : HtmlList msg -> HtmlList (Link.Msg msg)
         appHtml =
             List.map (Html.map Link.AppMsg)
+
+        applyMutation : Mutation -> Ui region narrowMsg msg -> Ui region narrowMsg msg
+        applyMutation mutation =
+            let
+                appearing : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
+                appearing =
+                    { block =
+                        visible.block
+                            ++ [ Attr.style "transition" "max-height .2s, margin .2s, padding .2s, opacity .2s" ]
+                    , inline =
+                        visible.inline
+                            ++ [ Attr.style "transition" "font-size .2s 0s, opacity .2s" ]
+                    }
+
+                visible : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
+                visible =
+                    { block =
+                        [ Attr.style "max-height" "100vh"
+                        , Attr.style "overflow" "hidden"
+                        ]
+                    , inline =
+                        []
+                    }
+
+                disappearing : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
+                disappearing =
+                    { block =
+                        hidden.block
+                            ++ [ Attr.style "transition" "max-height .2s, margin .2s, padding .2s, opacity .2s" ]
+                    , inline =
+                        hidden.inline
+                            ++ [ Attr.style "transition" "font-size .2s 0s, opacity .2s .0s" ]
+                    }
+
+                hidden : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
+                hidden =
+                    { block =
+                        [ Attr.attribute "aria-hidden" "true"
+                        , Attr.tabindex -1
+                        , Attr.style "opacity" "0"
+                        , Attr.style "pointer-events" "none;"
+                        , Attr.style "max-height" "0"
+                        , Attr.style "overflow" "hidden"
+                        , Attr.style "margin" "0"
+                        , Attr.style "padding" "0"
+                        , Attr.style "border-width" "0"
+                        ]
+                    , inline =
+                        [ Attr.attribute "aria-hidden" "true"
+                        , Attr.tabindex -1
+                        , Attr.style "opacity" "0"
+                        , Attr.style "pointer-events" "none;"
+                        , Attr.style "font-size" "0"
+                        ]
+                    }
+            in
+            Ui.mapWrapper
+                (addAttributes <|
+                    case mutation of
+                        StateEntered _ ->
+                            { blockAttributes = Attr.class "state-entered" :: appearing.block
+                            , inlineAttributes = Attr.class "state-entered" :: appearing.inline
+                            }
+
+                        StateInside _ ->
+                            { blockAttributes = [ Attr.class "state-inside" ]
+                            , inlineAttributes = [ Attr.class "state-inside" ]
+                            }
+
+                        StateLeft _ ->
+                            { blockAttributes = Attr.class "state-left" :: disappearing.block
+                            , inlineAttributes = Attr.class "state-left" :: disappearing.inline
+                            }
+
+                        StateOutside _ ->
+                            { blockAttributes = Attr.class "state-outside" :: hidden.block
+                            , inlineAttributes = Attr.class "state-outside" :: hidden.inline
+                            }
+
+                        SwitchedOn ->
+                            { blockAttributes = Attr.class "switched-on" :: appearing.block
+                            , inlineAttributes = Attr.class "switched-on" :: appearing.inline
+                            }
+
+                        StillOn ->
+                            { blockAttributes = [ Attr.class "still-on" ]
+                            , inlineAttributes = [ Attr.class "still-on" ]
+                            }
+
+                        SwitchedOff ->
+                            { blockAttributes = Attr.class "switched-off" :: disappearing.block
+                            , inlineAttributes = Attr.class "switched-off" :: disappearing.inline
+                            }
+
+                        StillOff ->
+                            { blockAttributes = Attr.class "still-off" :: hidden.block
+                            , inlineAttributes = Attr.class "still-off" :: hidden.inline
+                            }
+                )
 
         getMutation : Link -> Maybe String -> Mutation
         getMutation =
             Link.mutationFromTwoStates states
 
+        {- map the nested wrappers to appear/disappear -}
         labelAttributesByMutation : Mutation -> List (Html.Attribute msg)
         labelAttributesByMutation mutation =
             case mutation of
@@ -443,53 +594,73 @@ wrap states wrapper =
                     , Attr.class "state-outside"
                     ]
 
-        wrapByMutation : { onlyInCurrentRegion : Bool } -> Mutation -> Ui region narrowMsg msg -> Ui region narrowMsg msg
-        wrapByMutation config mutation =
-            let
-                animated : List (Html.Attribute (Link.Msg msg))
-                animated =
-                    [ Attr.style "transition" "font-size .2s 0s, opacity .2s .1s" ]
-
-                hidden : List (Html.Attribute (Link.Msg msg))
-                hidden =
-                    [ Attr.attribute "aria-hidden" "true"
-                    , Attr.tabindex -1
-                    , Attr.style "opacity" "0"
-                    , Attr.style "pointer-events" "none;"
-                    , Attr.style "font-size" "0"
-                    ]
-            in
-            case mutation of
-                StateEntered _ ->
-                    nodeWithConfig config "span" (Attr.class "state-entered" :: animated)
-
-                StateInside _ ->
-                    nodeWithConfig config "span" (Attr.class "state-inside" :: animated)
-
-                StateLeft _ ->
-                    nodeWithConfig config "span" (Attr.class "state-left" :: hidden ++ animated)
-
-                StateOutside _ ->
-                    nodeWithConfig config "span" (Attr.class "state-outside" :: hidden ++ animated)
-
-                SwitchedOn ->
-                    nodeWithConfig config "span" (Attr.class "switched-on" :: animated)
-
-                StillOn ->
-                    nodeWithConfig config "span" (Attr.class "still-on" :: animated)
-
-                SwitchedOff ->
-                    nodeWithConfig config "span" (Attr.class "switched-off" :: hidden ++ animated)
-
-                StillOff ->
-                    nodeWithConfig config "span" (Attr.class "still-off" :: hidden ++ animated)
+        wrapKeyedElements : (List ( String, b ) -> a) -> List ( String, List b ) -> List a
+        wrapKeyedElements fu =
+            List.concatMap
+                (\( key, items ) ->
+                    List.indexedMap (\i a -> ( key ++ "." ++ String.fromInt i, a )) items
+                )
+                >> fu
+                >> List.singleton
     in
     case wrapper of
-        Node config str attrs elements ->
-            Ui.Wrapped config (Html.node str attrs >> List.singleton) elements
+        Block { onlyInCurrentRegion } str attrs elements ->
+            let
+                howToWrap : List (Html (Link.Msg msg)) -> List (Html (Link.Msg msg))
+                howToWrap =
+                    Html.node str (appAttr attrs) >> List.singleton
+            in
+            Ui.Wrapped
+                { howToWrapCurrentRegion = howToWrap
+                , howToWrapOtherRegions =
+                    if onlyInCurrentRegion then
+                        howToWrap
 
-        Keyed fu list ->
-            Ui.Keyed fu list
+                    else
+                        identity
+                }
+                elements
+
+        Inline { onlyInCurrentRegion } str attrs elements ->
+            let
+                howToWrap : List (Html (Link.Msg msg)) -> List (Html (Link.Msg msg))
+                howToWrap =
+                    Html.node str (appAttr attrs) >> List.singleton
+            in
+            Ui.Wrapped
+                { howToWrapCurrentRegion = howToWrap
+                , howToWrapOtherRegions =
+                    if onlyInCurrentRegion then
+                        howToWrap
+
+                    else
+                        identity
+                }
+                elements
+
+        Ol attrs keyedElements ->
+            Ui.Keyed
+                { howToWrap =
+                    Html.Keyed.ol (appAttr attrs)
+                        |> wrapKeyedElements
+                }
+                keyedElements
+
+        Ul attrs keyedElements ->
+            Ui.Keyed
+                { howToWrap =
+                    Html.Keyed.ul (appAttr attrs)
+                        |> wrapKeyedElements
+                }
+                keyedElements
+
+        KeyedNode tagName attrs keyedElements ->
+            Ui.Keyed
+                { howToWrap =
+                    Html.Keyed.node tagName (appAttr attrs)
+                        |> wrapKeyedElements
+                }
+                keyedElements
 
         Nested { regions, combine } ->
             Ui.Nested
@@ -508,20 +679,19 @@ wrap states wrapper =
                 mutation =
                     getMutation link Nothing
             in
-            Ui.Stateful
-                { label =
-                    appHtml
-                        [ Html.a
-                            (Attr.href (Link.toHref link)
-                                :: labelAttributesByMutation mutation
-                                ++ List.map (Attr.map never) attributes
-                            )
-                            label
-                        ]
-                , isInline = isInline
-                , contingent =
-                    wrapByMutation { onlyInCurrentRegion = isInline } mutation contingent
-                }
+            applyMutation mutation contingent
+                |> Ui.Labeled
+                    { label =
+                        appHtml
+                            [ Html.a
+                                (Attr.href (Link.toHref link)
+                                    :: labelAttributesByMutation mutation
+                                    ++ List.map (Attr.map never) attributes
+                                )
+                                label
+                            ]
+                    , isInline = isInline
+                    }
 
         Filter category maybeConfig contingent ->
             let
@@ -542,53 +712,52 @@ wrap states wrapper =
                 searchTerms =
                     Link.getStateSearchTerms category states.current
             in
-            Ui.Stateful
-                { label =
-                    case maybeConfig of
-                        Just { attributes, label } ->
-                            appHtml label
-                                ++ [ Html.input
-                                        (Attr.value (String.join " " searchTerms)
-                                            :: Events.onInput
-                                                (\newSearchTerm ->
-                                                    Link.UrlCmd (link newSearchTerm)
-                                                )
-                                            :: List.map (Attr.map Link.AppMsg) (Attr.title category :: labelAttributesByMutation mutation)
-                                            ++ List.map (Attr.map never) attributes
-                                        )
-                                        []
-                                   ]
+            applyMutation mutation (contingent searchTerms)
+                |> Ui.Labeled
+                    { label =
+                        case maybeConfig of
+                            Just { attributes, label } ->
+                                appHtml label
+                                    ++ [ Html.input
+                                            (Attr.value (String.join " " searchTerms)
+                                                :: Events.onInput
+                                                    (\newSearchTerm ->
+                                                        Link.UrlCmd (link newSearchTerm)
+                                                    )
+                                                :: appAttr (Attr.title category :: labelAttributesByMutation mutation)
+                                                ++ List.map (Attr.map never) attributes
+                                            )
+                                            []
+                                       ]
 
-                        Nothing ->
-                            []
-                , isInline = isInline
-                , contingent = wrapByMutation { onlyInCurrentRegion = isInline } mutation (contingent searchTerms)
-                }
+                            Nothing ->
+                                []
+                    , isInline = isInline
+                    }
 
         GoTo attributes { destination, isInline, label } contingent ->
             let
-                mutation : Mutation
-                mutation =
-                    getMutation link (Just "page")
-
                 link : Link
                 link =
                     Link.GoTo (Link.parseLocation destination)
+
+                mutation : Mutation
+                mutation =
+                    getMutation link (Just "page")
             in
-            Ui.Stateful
-                { label =
-                    appHtml
-                        [ Html.a
-                            (Attr.href (Link.toHref link)
-                                :: labelAttributesByMutation mutation
-                                ++ List.map (Attr.map never) attributes
-                            )
-                            label
-                        ]
-                , isInline = isInline
-                , contingent =
-                    wrapByMutation { onlyInCurrentRegion = False } mutation contingent
-                }
+            applyMutation mutation contingent
+                |> Ui.Labeled
+                    { label =
+                        appHtml
+                            [ Html.a
+                                (Attr.href (Link.toHref link)
+                                    :: labelAttributesByMutation mutation
+                                    ++ List.map (Attr.map never) attributes
+                                )
+                                label
+                            ]
+                    , isInline = isInline
+                    }
 
         Bounce attributes { there, here, label } contingent ->
             let
@@ -600,20 +769,19 @@ wrap states wrapper =
                 mutation =
                     getMutation link (Just "page")
             in
-            Ui.Stateful
-                { label =
-                    appHtml
-                        [ Html.a
-                            (Attr.href (Link.toHref link)
-                                :: labelAttributesByMutation mutation
-                                ++ List.map (Attr.map never) attributes
-                            )
-                            label
-                        ]
-                , isInline = True
-                , contingent =
-                    wrapByMutation { onlyInCurrentRegion = True } mutation contingent
-                }
+            applyMutation mutation contingent
+                |> Ui.Labeled
+                    { label =
+                        appHtml
+                            [ Html.a
+                                (Attr.href (Link.toHref link)
+                                    :: labelAttributesByMutation mutation
+                                    ++ List.map (Attr.map never) attributes
+                                )
+                                label
+                            ]
+                    , isInline = True
+                    }
 
 
 {-| -}

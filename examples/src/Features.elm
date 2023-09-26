@@ -5,10 +5,7 @@ import Html.Attributes as Attr
 import Less
 import Less.Ui
 import Less.Ui.Html exposing (layout)
-import Markdown.Parser as Markdown
-import Markdown.Renderer exposing (defaultHtmlRenderer)
-import Result.Extra as Result
-import SyntaxHighlight
+import Markdown exposing (md)
 
 
 regionExplanation =
@@ -68,34 +65,6 @@ md =
 """
 
 
-md : String -> Ui
-md =
-    let
-        elmRenderer =
-            { defaultHtmlRenderer
-                | codeBlock =
-                    \block ->
-                        if block.language == Just "elm" then
-                            SyntaxHighlight.elm block.body
-                                |> Result.unpack
-                                    (\_ -> Html.text "Error in `code`")
-                                    (SyntaxHighlight.toBlockHtml Nothing)
-
-                        else
-                            Html.pre []
-                                [ Html.code []
-                                    [ Html.text block.body
-                                    ]
-                                ]
-            }
-    in
-    Markdown.parse
-        >> Result.mapError (List.map Markdown.deadEndToString >> String.join "\n")
-        >> Result.andThen (Markdown.Renderer.render elmRenderer)
-        >> Result.extract (Html.text >> List.singleton)
-        >> Less.Ui.singleton
-
-
 
 ---- VIEW ----
 
@@ -111,13 +80,13 @@ import Less.Ui.Html exposing (layout)
         ++ Less.Ui.Html.bounce []
             { there = "View/Body"
             , here = "View"
-            , label = [ Html.li [ Attr.style "margin-left" ".8em" ] [ Html.text "Body" ] ]
+            , label = [ Html.text "⬍ Body" ]
             }
             bodyExplanation
         ++ Less.Ui.Html.bounce []
             { there = "View/Outline"
             , here = "View"
-            , label = [ Html.li [ Attr.style "margin-left" ".8em" ] [ Html.text "Outline" ] ]
+            , label = [ Html.text "⬍ Outline" ]
             }
             outlineExplanation
         ++ md """
@@ -264,7 +233,7 @@ outline =
     , md """
 # Filters
             
-![under construction](https://upload.wikimedia.org/wikipedia/commons/1/19/Under_construction_graphic.gif)
+
 """
         |> Less.Ui.at Content
         |> Less.Ui.Html.goTo []
@@ -285,9 +254,13 @@ outline =
             , label = [ Html.li [] [ Html.text "The whole module" ] ]
             }
     , md """
-### Where to go next:
+## Where to go next:
 
-[https://github.com/upsiflu/less-ui](github.com/upsiflu/less-ui)
+[https://github.com/upsiflu/less-ui](https://github.com/upsiflu/less-ui)
+
+![under construction](https://upload.wikimedia.org/wikipedia/commons/1/19/Under_construction_graphic.gif)
+
+Have a beautiful day!
           
 """
         |> Less.Ui.at Content
@@ -316,7 +289,7 @@ body =
     home ++ outline
 ```
 
->>> 💡 _To compose the body of the app, we append two `Ui`s. 
+> _To compose the body of the app, we append two `Ui`s. 
   This is possible because a `Ui` is a `List`._
                """
 
@@ -340,13 +313,13 @@ view () =
 
                         toc =
                             Maybe.withDefault [] (rendered.region Toc)
-                                |> Html.nav [ Attr.class "❡", Attr.style "position" "fixed", Attr.style "padding" ".5em", Attr.style "background" "silver", Attr.style "bottom" ".5em" ]
+                                |> Html.nav [ Attr.class "❡", Attr.style "position" "fixed", Attr.style "padding" ".5em", Attr.style "background" "silver", Attr.style "right" ".5em", Attr.style "bottom" ".5em" ]
 
                         content =
                             Maybe.withDefault [] (rendered.region Content)
                                 |> Html.main_ [ Attr.style "padding" "0 2.4em 4em 2.4em" ]
                     in
-                    [ SyntaxHighlight.useTheme SyntaxHighlight.gitHub, header, content, toc ]
+                    [ Markdown.syntaxHighlighting, header, content, toc ]
         }
     , title = "Less-Ui Walkthrough"
     }
