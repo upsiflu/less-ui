@@ -373,14 +373,15 @@ layout =
 addAttributes :
     { blockAttributes : List (Html.Attribute Never)
     , inlineAttributes : List (Html.Attribute Never)
+    , vanishableAttributes : List (Html.Attribute Never)
     }
     -> Wrapper region narrowMsg msg
     -> Wrapper region narrowMsg msg
-addAttributes { blockAttributes, inlineAttributes } wrapper =
+addAttributes { blockAttributes, inlineAttributes, vanishableAttributes } wrapper =
     let
         recurse : Ui region narrowMsg msg -> Ui region narrowMsg msg
         recurse =
-            addAttributes { blockAttributes = blockAttributes, inlineAttributes = inlineAttributes }
+            addAttributes { blockAttributes = blockAttributes, inlineAttributes = inlineAttributes, vanishableAttributes = vanishableAttributes }
                 |> Ui.mapWrapper
 
         ( staticBlockAttributes, staticInlineAttributes ) =
@@ -406,16 +407,16 @@ addAttributes { blockAttributes, inlineAttributes } wrapper =
             Nested { regions = regions, combine = combine }
 
         Toggle attrs { flag, isInline, label } contingent ->
-            Toggle (attrs ++ inlineAttributes) { flag = flag, isInline = isInline, label = label } contingent
+            Toggle (attrs ++ vanishableAttributes) { flag = flag, isInline = isInline, label = label } contingent
 
         Filter category maybeConfig contingent ->
             Filter category maybeConfig (contingent >> recurse)
 
         GoTo attrs config contingent ->
-            GoTo (attrs ++ inlineAttributes) config (recurse contingent)
+            GoTo (attrs ++ vanishableAttributes) config (recurse contingent)
 
         Bounce attrs config contingent ->
-            Bounce (attrs ++ inlineAttributes) config (recurse contingent)
+            Bounce (attrs ++ vanishableAttributes ++ [ Attr.class "HERE" ]) config (recurse contingent)
 
 
 {-| -}
@@ -455,9 +456,7 @@ wrap states wrapper =
                 visible : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
                 visible =
                     { block =
-                        [ Attr.style "max-height" "100vh"
-                        , Attr.style "overflow" "hidden"
-                        ]
+                        [ Attr.style "max-height" "100vh" ]
                     , inline =
                         []
                     }
@@ -493,6 +492,10 @@ wrap states wrapper =
                         , Attr.style "font-size" "0"
                         ]
                     }
+
+                outOfFlow : List (Html.Attribute Never)
+                outOfFlow =
+                    [ Attr.style "display" "none" ]
             in
             Ui.mapWrapper
                 (addAttributes <|
@@ -500,41 +503,49 @@ wrap states wrapper =
                         StateEntered _ ->
                             { blockAttributes = Attr.class "state-entered" :: appearing.block
                             , inlineAttributes = Attr.class "state-entered" :: appearing.inline
+                            , vanishableAttributes = Attr.class "state-entered" :: appearing.inline
                             }
 
                         StateInside _ ->
                             { blockAttributes = [ Attr.class "state-inside" ]
                             , inlineAttributes = [ Attr.class "state-inside" ]
+                            , vanishableAttributes = [ Attr.class "state-inside" ]
                             }
 
                         StateLeft _ ->
                             { blockAttributes = Attr.class "state-left" :: disappearing.block
                             , inlineAttributes = Attr.class "state-left" :: disappearing.inline
+                            , vanishableAttributes = Attr.class "state-left" :: disappearing.inline ++ outOfFlow
                             }
 
                         StateOutside _ ->
                             { blockAttributes = Attr.class "state-outside" :: hidden.block
                             , inlineAttributes = Attr.class "state-outside" :: hidden.inline
+                            , vanishableAttributes = Attr.class "state-outside" :: hidden.inline ++ outOfFlow
                             }
 
                         SwitchedOn ->
                             { blockAttributes = Attr.class "switched-on" :: appearing.block
                             , inlineAttributes = Attr.class "switched-on" :: appearing.inline
+                            , vanishableAttributes = Attr.class "switched-on" :: appearing.inline
                             }
 
                         StillOn ->
                             { blockAttributes = [ Attr.class "still-on" ]
                             , inlineAttributes = [ Attr.class "still-on" ]
+                            , vanishableAttributes = [ Attr.class "still-on" ]
                             }
 
                         SwitchedOff ->
                             { blockAttributes = Attr.class "switched-off" :: disappearing.block
                             , inlineAttributes = Attr.class "switched-off" :: disappearing.inline
+                            , vanishableAttributes = Attr.class "switched-off" :: disappearing.inline ++ outOfFlow
                             }
 
                         StillOff ->
                             { blockAttributes = Attr.class "still-off" :: hidden.block
                             , inlineAttributes = Attr.class "still-off" :: hidden.inline
+                            , vanishableAttributes = Attr.class "still-off" :: hidden.inline ++ outOfFlow
                             }
                 )
 
