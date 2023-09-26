@@ -5,6 +5,9 @@ import Html.Attributes as Attr
 import Less
 import Less.Ui
 import Less.Ui.Html exposing (layout)
+import Markdown.Parser as Markdown
+import Markdown.Renderer
+import Result.Extra as Result
 
 
 type Region
@@ -16,26 +19,63 @@ type alias Ui =
     Less.Ui.Html.Ui Region () ()
 
 
+md : String -> Ui
+md =
+    Markdown.parse
+        >> Result.mapError (List.map Markdown.deadEndToString >> String.join "\n")
+        >> Result.andThen (Markdown.Renderer.render Markdown.Renderer.defaultHtmlRenderer)
+        >> Result.extract (Html.text >> List.singleton)
+        >> Less.Ui.singleton
+
+
 view : () -> Less.Document ()
-view _ =
+view () =
     let
-        chapters : List Ui
+        home : Ui
+        home =
+            md """
+# Welcome!
+            
+Click "Chapters" to open the Table of Contents.
+"""
+                |> Less.Ui.at Content
+                |> Less.Ui.Html.goTo []
+                    { destination = ""
+                    , isInline = False
+                    , label = [ Html.h2 [] [ Html.text "⌂" ] ]
+                    }
+
+        chapters : Ui
         chapters =
-            [ Less.Ui.singleton [ Html.text "Chapter 1" ]
+            [ md """
+# Chapter 1
+            
+GoTo and Toggle
+"""
                 |> Less.Ui.at Content
                 |> Less.Ui.Html.goTo []
                     { destination = "chapter1"
                     , isInline = True
                     , label = [ Html.li [] [ Html.text "GoTo and Toggle" ] ]
                     }
-            , Less.Ui.singleton [ Html.text "Chapter 2" ]
+            , md """
+# Chapter 2
+            
+Filters
+"""
                 |> Less.Ui.at Content
                 |> Less.Ui.Html.goTo []
                     { destination = "chapter2"
                     , isInline = True
                     , label = [ Html.li [] [ Html.text "Filters" ] ]
                     }
-            , Less.Ui.singleton [ Html.a [ Attr.href "https://github.com/upsiflu/less-ui" ] [ Html.text "github.com/upsiflu/less-ui" ] ]
+            , md """
+### Where to go next:
+
+[https://github.com/upsiflu/less-ui](github.com/upsiflu/less-ui)
+            
+Filters
+"""
                 |> Less.Ui.at Content
                 |> Less.Ui.Html.goTo []
                     { destination = "chapter3"
@@ -43,16 +83,17 @@ view _ =
                     , label = [ Html.li [] [ Html.text "Where to go next" ] ]
                     }
             ]
-
-        body : Ui
-        body =
-            List.concat chapters
+                |> List.concat
                 |> Less.Ui.Html.toggle []
                     { flag = "❡"
                     , isInline = True
                     , label = [ Html.b [] [ Html.text "❡ Chapters" ] ]
                     }
                 |> Less.Ui.at Toc
+
+        body : Ui
+        body =
+            home ++ chapters
     in
     Less.mapDocument identity
         { body = body
