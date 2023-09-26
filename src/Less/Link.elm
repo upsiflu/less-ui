@@ -130,6 +130,7 @@ fromUrl url =
             case
                 getStateSearchTerms "bounce" url
                     |> List.head
+                    |> Maybe.andThen Url.percentDecode
                     |> Maybe.map (String.split "<>")
             of
                 Just (there :: here) ->
@@ -138,7 +139,6 @@ fromUrl url =
                             { there = parseLocation (String.replace "%23" "#" there)
                             , here =
                                 String.join "<>" here
-                                    |> String.replace "%23" "#"
                                     |> parseLocation
                             }
                         )
@@ -182,7 +182,7 @@ toHref relativeChange =
                 ( there, here ) =
                     ( encodeLocation parsedLocations.there, encodeLocation parsedLocations.here )
             in
-            there ++ "?bounce=" ++ String.replace "#" "%23" (there ++ "<>" ++ here)
+            there ++ "?bounce=" ++ String.replace "#" "%23" (String.dropLeft 1 there ++ "<>" ++ String.dropLeft 1 here)
 
         Filter filter ->
             "?" ++ filter.category ++ "=" ++ filter.searchTerm
@@ -217,62 +217,12 @@ mutationFromTwoStates { current, previous } link maybeSetName =
                         |> String.split "&"
                         |> List.member flag
 
-                Bounce { here } ->
-                    stateContainsLocation here state
+                Bounce { there } ->
+                    stateContainsLocation there state
 
                 Filter { category } ->
                     Maybe.withDefault "" state.query
                         |> (\q -> String.startsWith (category ++ "=") q || String.contains ("&" ++ category ++ "=") q)
-
-        getLocationParameters location =
-            case location of
-                OnlyPath path ->
-                    ( Just path, Nothing )
-
-                OnlyFragment fragment ->
-                    ( Nothing, Just fragment )
-
-                PathAndFragment path fragment ->
-                    ( Just path, Just fragment )
-
-        --- stateContainsLocation
-        {-
-
-           Location            State           ?
-           b                   a/b/c           yes
-
-        -}
-        stateContainsLocation : ParsedLocation -> State -> Bool
-        stateContainsLocation location state =
-            let
-                ( ( maybeLocationPath, locationFragment ), statePath ) =
-                    ( getLocationParameters location, getPath state )
-
-                bothAreHome () =
-                    maybeLocationPath == Just "" && statePath == ""
-
-                locationPathIsSegmentOfStatePath () =
-                    Maybe.map (\locationPath -> String.contains ("/" ++ locationPath ++ "/") ("/" ++ statePath ++ "/")) maybeLocationPath
-                        |> Maybe.withDefault False
-
-                locationIsFragmentOnly () =
-                    maybeLocationPath == Nothing
-
-                bothFragmentsAreEqual () =
-                    locationFragment == getFragment state
-            in
-            bothAreHome ()
-                && bothFragmentsAreEqual ()
-                || (not (bothAreHome ()) && locationPathIsSegmentOfStatePath ())
-                || (not (bothAreHome ()) && locationIsFragmentOnly () && bothFragmentsAreEqual ())
-
-        getFragment : State -> Maybe Fragment
-        getFragment =
-            .fragment
-
-        getPath : State -> Path
-        getPath { path } =
-            String.dropLeft 1 path
     in
     case ( predicate current, predicate (Maybe.withDefault current previous), maybeSetName ) of
         ( True, True, Just set ) ->
@@ -325,37 +275,36 @@ apply link =
         withoutHistory : b -> ( { pushHistoryState : Bool }, b )
         withoutHistory =
             Tuple.pair { pushHistoryState = True }
+
+        setLocation : ParsedLocation -> State -> State
+        setLocation parsedLocation =
+            case parsedLocation of
+                OnlyPath path ->
+                    setPath path
+
+                OnlyFragment fragment ->
+                    setFragment fragment
+
+                PathAndFragment path fragment ->
+                    setPath path >> setFragment fragment
     in
     case link of
         GoTo parsedLocation ->
-            withHistory
-                << (case parsedLocation of
-                        OnlyPath path ->
-                            setPath path
-
-                        OnlyFragment fragment ->
-                            setFragment fragment
-
-                        PathAndFragment path fragment ->
-                            setPath path >> setFragment fragment
-                   )
+            setLocation parsedLocation
+                >> withHistory
 
         Toggle flag ->
             mapFlags (Set.remove ("toggle=" ++ flag) >> Set.toggle flag)
                 >> withoutHistory
 
         Bounce parsedLocations ->
-            let
-                ( there, here ) =
-                    ( encodeLocation parsedLocations.there, encodeLocation parsedLocations.here )
-            in
             withHistory
                 << (\state ->
-                        if String.startsWith there (String.dropLeft 1 state.path) then
-                            setPath here state
+                        if stateContainsLocation parsedLocations.there state then
+                            setLocation parsedLocations.here state
 
                         else
-                            setPath there state
+                            setLocation parsedLocations.there state
                    )
 
         Filter { category, searchTerm } ->
@@ -432,6 +381,19 @@ parseLocation location =
             PathAndFragment path (String.join "#" fragment)
 
 
+getLocationParameters : ParsedLocation -> ( Maybe Path, Maybe Fragment )
+getLocationParameters parsedLocation =
+    case parsedLocation of
+        OnlyPath path ->
+            ( Just path, Nothing )
+
+        OnlyFragment fragment ->
+            ( Nothing, Just fragment )
+
+        PathAndFragment path fragment ->
+            ( Just path, Just fragment )
+
+
 encodeLocation : ParsedLocation -> Location
 encodeLocation parsedLocation =
     case parsedLocation of
@@ -443,6 +405,49 @@ encodeLocation parsedLocation =
 
         PathAndFragment path fragment ->
             "/" ++ path ++ "#" ++ fragment
+
+
+
+--- stateContainsLocation
+{-
+
+   Location            State           ?
+   b                   a/b/c           yes
+
+-}
+
+
+stateContainsLocation : ParsedLocation -> State -> Bool
+stateContainsLocation location state =
+    let
+        getFragment : State -> Maybe Fragment
+        getFragment =
+            .fragment
+
+        getPath : State -> Path
+        getPath { path } =
+            String.dropLeft 1 path
+
+        ( ( maybeLocationPath, locationFragment ), statePath ) =
+            ( getLocationParameters location, getPath state )
+
+        bothAreHome () =
+            maybeLocationPath == Just "" && statePath == ""
+
+        locationPathIsSegmentOfStatePath () =
+            Maybe.map (\locationPath -> String.contains ("/" ++ locationPath ++ "/") ("/" ++ statePath ++ "/")) maybeLocationPath
+                |> Maybe.withDefault False
+
+        locationIsFragmentOnly () =
+            maybeLocationPath == Nothing
+
+        bothFragmentsAreEqual () =
+            locationFragment == getFragment state
+    in
+    bothAreHome ()
+        && bothFragmentsAreEqual ()
+        || (not (bothAreHome ()) && locationPathIsSegmentOfStatePath ())
+        || (not (bothAreHome ()) && locationIsFragmentOnly () && bothFragmentsAreEqual ())
 
 
 {-| Note that a `Category` may contain "=":

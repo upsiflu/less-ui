@@ -610,9 +610,9 @@ wrap states wrapper =
                             )
                             label
                         ]
-                , isInline = False
+                , isInline = True
                 , contingent =
-                    wrapByMutation { onlyInCurrentRegion = False } mutation contingent
+                    wrapByMutation { onlyInCurrentRegion = True } mutation contingent
                 }
 
 
