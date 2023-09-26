@@ -476,6 +476,7 @@ Attention: Categories "toggle" and "bounce" are interpreted as redirect directiv
 getStateSearchTerms : Category -> Url -> List SearchTerm
 getStateSearchTerms category =
     .query
+        >> Maybe.andThen Url.percentDecode
         >> Maybe.map
             (String.split "&"
                 >> List.filter (String.startsWith (category ++ "="))
@@ -532,6 +533,7 @@ mapFlags fu state =
         | query =
             Maybe.toList state.query
                 |> List.concatMap (String.split "&")
+                |> List.concatMap (Url.percentDecode >> Maybe.toList)
                 |> Set.fromList
                 |> fu
                 |> Set.toList

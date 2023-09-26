@@ -69,7 +69,7 @@ md =
 ---- VIEW ----
 
 
-viewExplanation =
+viewExplanation parentPath =
     md """
 # View
 
@@ -78,14 +78,14 @@ import Less.Ui.Html exposing (layout)
 ```
 """
         ++ Less.Ui.Html.bounce []
-            { there = "View/Body"
-            , here = "View"
+            { there = parentPath ++ "/Body"
+            , here = parentPath
             , label = [ Html.text "⬍ Body" ]
             }
             bodyExplanation
         ++ Less.Ui.Html.bounce []
-            { there = "View/Outline"
-            , here = "View"
+            { there = parentPath ++ "/Outline"
+            , here = parentPath
             , label = [ Html.text "⬍ Outline" ]
             }
             outlineExplanation
@@ -198,60 +198,73 @@ outline =
         |> Less.Ui.Html.goTo []
             { destination = "Ui"
             , isInline = True
-            , label = [ Html.li [] [ Html.text "Ui snippets" ] ]
+            , label = [ Html.text "Ui snippets" ]
             }
     , Less.Ui.at Content regionExplanation
         |> Less.Ui.Html.goTo []
             { destination = "Region"
             , isInline = True
-            , label = [ Html.li [] [ Html.text "Regions" ] ]
+            , label = [ Html.text "Regions" ]
             }
-    , Less.Ui.at Content viewExplanation
+    , Less.Ui.at Content (viewExplanation "View")
         |> Less.Ui.Html.goTo []
             { destination = "View"
             , isInline = True
-            , label = [ Html.li [] [ Html.text "View and Layout" ] ]
+            , label = [ Html.text "View and Layout" ]
             }
     , Less.Ui.Html.goTo []
         { destination = "View/Body"
         , isInline = True
-        , label = [ Html.li [ Attr.style "margin-left" ".8em" ] [ Html.text "Body" ] ]
+        , label = [ Html.li [] [ Html.text "Body" ] ]
         }
         []
     , Less.Ui.Html.goTo []
         { destination = "View/Outline"
         , isInline = True
-        , label = [ Html.li [ Attr.style "margin-left" ".8em" ] [ Html.text "Outline" ] ]
+        , label = [ Html.li [] [ Html.text "Outline" ] ]
         }
         []
     , Less.Ui.at Content mainExplanation
         |> Less.Ui.Html.goTo []
             { destination = "Main"
             , isInline = True
-            , label = [ Html.li [] [ Html.text "Less Application" ] ]
+            , label = [ Html.text "Less Application" ]
             }
-    , md """
-# Filters
-            
-
-"""
+    , md """# Filters..."""
+        ++ md "#### Category q=1:"
+        ++ Less.Ui.Html.search []
+            { category = "q=1"
+            , isInline = True
+            , label = []
+            }
+            (\_ -> [])
+        ++ md "#### Category q=2:"
+        ++ Less.Ui.Html.search []
+            { category = "q=2"
+            , isInline = True
+            , label = []
+            }
+            (\_ -> [])
+        ++ md "#### Category q:"
+        ++ Less.Ui.Html.filter "q"
+            (List.concatMap md)
         |> Less.Ui.at Content
         |> Less.Ui.Html.goTo []
-            { destination = "3"
+            { destination = "Filters"
             , isInline = True
-            , label = [ Html.li [] [ Html.text "Filters" ] ]
+            , label = [ Html.text "Filters" ]
             }
     , md """# Features.elm"""
         ++ regionExplanation
         ++ uiExplanation
         ++ mdExplanation
-        ++ viewExplanation
+        ++ viewExplanation "Module"
         ++ mainExplanation
         |> Less.Ui.at Content
         |> Less.Ui.Html.goTo []
             { destination = "Module"
             , isInline = True
-            , label = [ Html.li [] [ Html.text "The whole module" ] ]
+            , label = [ Html.text "The whole module" ]
             }
     , md """
 ## Where to go next:
@@ -267,14 +280,15 @@ Have a beautiful day!
         |> Less.Ui.Html.goTo []
             { destination = "Next"
             , isInline = True
-            , label = [ Html.li [] [ Html.text "Where to go next" ] ]
+            , label = [ Html.text "Where to go next" ]
             }
     ]
+        |> List.map (Less.Ui.Html.block "p" [ Attr.style "padding" "0 1em" ])
         |> List.concat
         |> Less.Ui.Html.toggle []
-            { flag = "❡"
+            { flag = "≔"
             , isInline = True
-            , label = [ Html.text "❡ Outline" ]
+            , label = [ Html.div [ Attr.style "padding" "1em" ] [ Html.text "Outline" ] ]
             }
         |> Less.Ui.at Toc
 
@@ -313,7 +327,7 @@ view () =
 
                         toc =
                             Maybe.withDefault [] (rendered.region Toc)
-                                |> Html.nav [ Attr.class "❡", Attr.style "position" "fixed", Attr.style "padding" ".5em", Attr.style "background" "silver", Attr.style "right" ".5em", Attr.style "bottom" ".5em" ]
+                                |> Html.nav [ Attr.class "❡", Attr.style "position" "fixed", Attr.style "background" "silver", Attr.style "right" ".5em", Attr.style "bottom" ".5em" ]
 
                         content =
                             Maybe.withDefault [] (rendered.region Content)

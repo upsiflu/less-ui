@@ -4,6 +4,7 @@ module Less.Ui.Html exposing
     , section, article, block, inline
     , ol, ul, keyedNode, nest
     , layout, arrangeOverDefaultRegions, Region(..)
+    , disclose
     )
 
 {-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Less.Ui`](Less-Ui)
@@ -253,6 +254,25 @@ article =
     block "article"
 
 
+{-| From w3.org:
+
+> The details element represents a disclosure widget from which the user can obtain additional information or controls.
+
+> The summary element child of the element, if any, represents the summary or legend of the details.
+
+Notes:
+
+  - You can auto-open it with `Attr.attribute "open" ""`
+  - It will also auto-open if you search the page and a match is inside
+  - It is impossible to animate
+  - If you want animations and reproducibility, use `toggle` instead
+
+-}
+disclose : List (Html.Attribute msg) -> { summary : Ui region narrowMsg msg, summaryAttrs : List (Html.Attribute msg) } -> Ui region narrowMsg msg -> Ui region narrowMsg msg
+disclose attrs { summary, summaryAttrs } more =
+    block "details" attrs (block "summary" summaryAttrs summary ++ more)
+
+
 {-| Wrap all parts of the Ui that are in the current region in an arbitrary Html node.
 
     block "div" [] myUi
@@ -370,55 +390,6 @@ layout =
     }
 
 
-addAttributes :
-    { blockAttributes : List (Html.Attribute Never)
-    , inlineAttributes : List (Html.Attribute Never)
-    , vanishableAttributes : List (Html.Attribute Never)
-    }
-    -> Wrapper region narrowMsg msg
-    -> Wrapper region narrowMsg msg
-addAttributes { blockAttributes, inlineAttributes, vanishableAttributes } wrapper =
-    let
-        recurse : Ui region narrowMsg msg -> Ui region narrowMsg msg
-        recurse =
-            addAttributes { blockAttributes = blockAttributes, inlineAttributes = inlineAttributes, vanishableAttributes = vanishableAttributes }
-                |> Ui.mapWrapper
-
-        ( staticBlockAttributes, staticInlineAttributes ) =
-            ( List.map (Attr.map never) blockAttributes, List.map (Attr.map never) inlineAttributes )
-    in
-    case wrapper of
-        Block config tagName attrs contingent ->
-            Block config tagName (attrs ++ staticBlockAttributes) contingent
-
-        Inline config tagName attrs contingent ->
-            Inline config tagName (attrs ++ staticInlineAttributes) contingent
-
-        Ol attrs contingent ->
-            Ol (attrs ++ staticBlockAttributes) contingent
-
-        Ul attrs contingent ->
-            Ul (attrs ++ staticBlockAttributes) contingent
-
-        KeyedNode tagName attrs keyedElements ->
-            KeyedNode tagName (attrs ++ staticBlockAttributes) keyedElements
-
-        Nested { regions, combine } ->
-            Nested { regions = regions, combine = combine }
-
-        Toggle attrs { flag, isInline, label } contingent ->
-            Toggle (attrs ++ vanishableAttributes) { flag = flag, isInline = isInline, label = label } contingent
-
-        Filter category maybeConfig contingent ->
-            Filter category maybeConfig (contingent >> recurse)
-
-        GoTo attrs config contingent ->
-            GoTo (attrs ++ vanishableAttributes) config (recurse contingent)
-
-        Bounce attrs config contingent ->
-            Bounce (attrs ++ vanishableAttributes ++ [ Attr.class "HERE" ]) config (recurse contingent)
-
-
 {-| -}
 wrap :
     { current : State, previous : Maybe State }
@@ -443,6 +414,60 @@ wrap states wrapper =
         applyMutation : Mutation -> Ui region narrowMsg msg -> Ui region narrowMsg msg
         applyMutation mutation =
             let
+                addAttributes :
+                    { blockAttributes : List (Html.Attribute Never)
+                    , inlineAttributes : List (Html.Attribute Never)
+                    , vanishableAttributes : List (Html.Attribute Never)
+                    }
+                    -> Wrapper region narrowMsg msg
+                    -> Wrapper region narrowMsg msg
+                addAttributes { blockAttributes, inlineAttributes, vanishableAttributes } innerWrapper =
+                    let
+                        recurse : Ui region narrowMsg msg -> Ui region narrowMsg msg
+                        recurse =
+                            addAttributes { blockAttributes = blockAttributes, inlineAttributes = inlineAttributes, vanishableAttributes = vanishableAttributes }
+                                |> Ui.mapWrapper
+
+                        ( staticBlockAttributes, staticInlineAttributes ) =
+                            ( List.map (Attr.map never) blockAttributes, List.map (Attr.map never) inlineAttributes )
+                    in
+                    case innerWrapper of
+                        Block config tagName attrs contingent ->
+                            Block config tagName (attrs ++ staticBlockAttributes) contingent
+
+                        Inline config tagName attrs contingent ->
+                            Inline config tagName (attrs ++ staticInlineAttributes) contingent
+
+                        Ol attrs contingent ->
+                            Ol (attrs ++ staticBlockAttributes) contingent
+
+                        Ul attrs contingent ->
+                            Ul (attrs ++ staticBlockAttributes) contingent
+
+                        KeyedNode tagName attrs keyedElements ->
+                            KeyedNode tagName (attrs ++ staticBlockAttributes) keyedElements
+
+                        Nested { regions, combine } ->
+                            Nested { regions = regions, combine = combine }
+
+                        Toggle attrs { flag, isInline, label } contingent ->
+                            Toggle
+                                (attrs ++ vanishableAttributes)
+                                { flag = flag, isInline = isInline, label = label }
+                                contingent
+
+                        Filter category maybeConfig contingent ->
+                            Filter
+                                category
+                                (Maybe.map (\a -> { a | attributes = a.attributes ++ vanishableAttributes }) maybeConfig)
+                                (contingent >> recurse)
+
+                        GoTo attrs config contingent ->
+                            GoTo (attrs ++ vanishableAttributes) config (recurse contingent)
+
+                        Bounce attrs config contingent ->
+                            Bounce (attrs ++ vanishableAttributes ++ [ Attr.class "HERE" ]) config (recurse contingent)
+
                 appearing : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
                 appearing =
                     { block =
@@ -625,10 +650,10 @@ wrap states wrapper =
                 { howToWrapCurrentRegion = howToWrap
                 , howToWrapOtherRegions =
                     if onlyInCurrentRegion then
-                        howToWrap
+                        identity
 
                     else
-                        identity
+                        howToWrap
                 }
                 elements
 
@@ -642,10 +667,10 @@ wrap states wrapper =
                 { howToWrapCurrentRegion = howToWrap
                 , howToWrapOtherRegions =
                     if onlyInCurrentRegion then
-                        howToWrap
+                        identity
 
                     else
-                        identity
+                        howToWrap
                 }
                 elements
 

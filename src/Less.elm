@@ -116,6 +116,7 @@ application config =
                         let
                             ( { pushHistoryState }, newState ) =
                                 Link.apply link current
+                                    |> Debug.log "( { pushHistoryState }, newState )"
                         in
                         -- changing the Url will implicitly trigger `nextState`
                         Return.singleton ( key, state, model )
