@@ -224,32 +224,47 @@ mutationFromTwoStates { current, previous } link maybeSetName =
                     Maybe.withDefault "" state.query
                         |> (\q -> String.startsWith (category ++ "=") q || String.contains ("&" ++ category ++ "=") q)
 
+        getLocationParameters location =
+            case location of
+                OnlyPath path ->
+                    ( Just path, Nothing )
+
+                OnlyFragment fragment ->
+                    ( Nothing, Just fragment )
+
+                PathAndFragment path fragment ->
+                    ( Just path, Just fragment )
+
+        --- stateContainsLocation
+        {-
+
+           Location            State           ?
+           b                   a/b/c           yes
+
+        -}
         stateContainsLocation : ParsedLocation -> State -> Bool
         stateContainsLocation location state =
-            case ( location, getLocation state ) of
-                ( OnlyPath innerPath, OnlyPath path ) ->
-                    String.contains innerPath path
+            let
+                ( ( maybeLocationPath, locationFragment ), statePath ) =
+                    ( getLocationParameters location, getPath state )
 
-                ( OnlyPath innerPath, PathAndFragment path _ ) ->
-                    String.contains innerPath path
+                bothAreHome () =
+                    maybeLocationPath == Just "" && statePath == ""
 
-                ( OnlyFragment innerFragment, PathAndFragment _ fragment ) ->
-                    innerFragment == fragment
+                locationPathIsSegmentOfStatePath () =
+                    Maybe.map (\locationPath -> String.contains ("/" ++ locationPath ++ "/") ("/" ++ statePath ++ "/")) maybeLocationPath
+                        |> Maybe.withDefault False
 
-                ( PathAndFragment innerPath innerFragment, PathAndFragment path fragment ) ->
-                    innerFragment == fragment && String.contains innerPath path
+                locationIsFragmentOnly () =
+                    maybeLocationPath == Nothing
 
-                _ ->
-                    False
-
-        getLocation : State -> ParsedLocation
-        getLocation url =
-            case ( getPath url, getFragment url ) of
-                ( path, Just fragment ) ->
-                    PathAndFragment path fragment
-
-                ( path, Nothing ) ->
-                    OnlyPath path
+                bothFragmentsAreEqual () =
+                    locationFragment == getFragment state
+            in
+            bothAreHome ()
+                && bothFragmentsAreEqual ()
+                || (not (bothAreHome ()) && locationPathIsSegmentOfStatePath ())
+                || (not (bothAreHome ()) && locationIsFragmentOnly () && bothFragmentsAreEqual ())
 
         getFragment : State -> Maybe Fragment
         getFragment =
@@ -407,11 +422,11 @@ parseLocation location =
         [] ->
             OnlyPath ""
 
-        "" :: fragment ->
-            OnlyFragment (String.join "#" fragment)
-
         [ path ] ->
             OnlyPath path
+
+        "" :: fragment ->
+            OnlyFragment (String.join "#" fragment)
 
         path :: fragment ->
             PathAndFragment path (String.join "#" fragment)
@@ -427,8 +442,7 @@ encodeLocation parsedLocation =
             "#" ++ fragment
 
         PathAndFragment path fragment ->
-            -- Todo: Tail Call Optimize
-            encodeLocation (OnlyPath path) ++ encodeLocation (OnlyFragment fragment)
+            "/" ++ path ++ "#" ++ fragment
 
 
 {-| Note that a `Category` may contain "=":

@@ -95,6 +95,7 @@ application config =
                     ( initialModel, modelCmd ) =
                         config.init
 
+                    initialState : { current : State, previous : Maybe State }
                     initialState =
                         { current = Link.sanitize url, previous = Nothing }
                 in
@@ -115,7 +116,6 @@ application config =
                         let
                             ( { pushHistoryState }, newState ) =
                                 Link.apply link current
-                                    |> Debug.log "Apply link ->"
                         in
                         -- changing the Url will implicitly trigger `nextState`
                         Return.singleton ( key, state, model )
@@ -144,8 +144,7 @@ application config =
                         nextState url
 
                     LinkClicked (Browser.Internal url) ->
-                        Link.fromUrl (Debug.log "Url" url)
-                            |> Debug.log "Link"
+                        Link.fromUrl url
                             |> applyLink
 
                     LinkClicked (Browser.External href) ->

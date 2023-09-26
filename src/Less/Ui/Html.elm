@@ -579,7 +579,7 @@ wrap states wrapper =
                 { label =
                     appHtml
                         [ Html.a
-                            (Attr.href destination
+                            (Attr.href (Link.toHref link)
                                 :: labelAttributesByMutation mutation
                                 ++ List.map (Attr.map never) attributes
                             )
