@@ -21,6 +21,7 @@
             "elm-community/result-extra": "2.4.0",
             "elm-community/string-extra": "4.0.1",
             "justinmimbs/date": "4.0.1",
+            "pablohirafuji/elm-syntax-highlight": "3.5.0",
             "pzp1997/assoc-list": "1.0.0",
             "stoeffel/set-extra": "1.2.3"
         },

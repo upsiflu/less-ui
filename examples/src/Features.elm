@@ -6,8 +6,25 @@ import Less
 import Less.Ui
 import Less.Ui.Html exposing (layout)
 import Markdown.Parser as Markdown
-import Markdown.Renderer
+import Markdown.Renderer exposing (defaultHtmlRenderer)
 import Result.Extra as Result
+import SyntaxHighlight
+
+
+regionExplanation =
+    md """
+### Screen Regions
+
+Define your regions, then assign your Ui snippets their place on the screen
+with `Less.Ui.at`. This is how the welcome text appears in the `Content` region 
+and the chapter links in the `Toc`.
+
+```elm 
+type Region
+    = Toc
+    | Content
+```
+"""
 
 
 type Region
@@ -15,221 +32,302 @@ type Region
     | Content
 
 
+uiExplanation =
+    md """
+# Ui
+
+```elm
+type alias Ui =
+    Less.Ui.Html.Ui Region () ()
+```
+
+Since a Ui snippet is a list, you can append snippets.
+"""
+
+
 type alias Ui =
     Less.Ui.Html.Ui Region () ()
 
 
+mdExplanation =
+    md """
+With `Less.Ui.singleton`, you can turn an Html snippet into a Ui snippet.
+This function uses _dillonkearns/elm-markdown_ to render a
+multiline string.
+
+```elm
+import Markdown.Parser as Markdown
+import Markdown.Renderer
+
 md : String -> Ui
 md =
     Markdown.parse
+        >> ⋯
+        >> Less.Ui.singleton
+```
+"""
+
+
+md : String -> Ui
+md =
+    let
+        elmRenderer =
+            { defaultHtmlRenderer
+                | codeBlock =
+                    \block ->
+                        if block.language == Just "elm" then
+                            SyntaxHighlight.elm block.body
+                                |> Result.unpack
+                                    (\_ -> Html.text "Error in `code`")
+                                    (SyntaxHighlight.toBlockHtml Nothing)
+
+                        else
+                            Html.pre []
+                                [ Html.code []
+                                    [ Html.text block.body
+                                    ]
+                                ]
+            }
+    in
+    Markdown.parse
         >> Result.mapError (List.map Markdown.deadEndToString >> String.join "\n")
-        >> Result.andThen (Markdown.Renderer.render Markdown.Renderer.defaultHtmlRenderer)
+        >> Result.andThen (Markdown.Renderer.render elmRenderer)
         >> Result.extract (Html.text >> List.singleton)
         >> Less.Ui.singleton
 
 
+
+---- VIEW ----
+
+
+viewExplanation =
+    md """
+# View
+
+```elm
+import Less.Ui.Html exposing (layout)
+```
+"""
+        ++ Less.Ui.Html.bounce []
+            { there = "View/Body"
+            , here = "View"
+            , label = [ Html.li [ Attr.style "margin-left" ".8em" ] [ Html.text "Body" ] ]
+            }
+            bodyExplanation
+        ++ Less.Ui.Html.bounce []
+            { there = "View/Outline"
+            , here = "View"
+            , label = [ Html.li [ Attr.style "margin-left" ".8em" ] [ Html.text "Outline" ] ]
+            }
+            outlineExplanation
+        ++ md """
+```elm
 view : () -> Less.Document ()
 view () =
-    let
-        home : Ui
-        home =
-            md """
-# Welcome!
-            
-This is a self-explanatory walkthrough. It presents its own code.
+    { body = body
+    , layout =
+        { layout
+            | arrange =
+                \\rendered ->
+                    let
+                        header =
+                            Maybe.withDefault [] rendered.header
+                                |> Html.header [ ... ]
 
-Click "Chapters" to open the Table of Contents.
-"""
-                |> Less.Ui.at Content
-                |> Less.Ui.Html.goTo []
-                    { destination = ""
-                    , isInline = False
-                    , label = [ Html.h2 [] [ Html.text "⌂" ] ]
-                    }
+                        toc =
+                            Maybe.withDefault [] (rendered.region Toc)
+                                |> Html.nav [ ... ]
 
-        chapters : Ui
-        chapters =
-            [ md """
-# A stateless view
-
-```elm
-
-    body : Ui
-    body =
-        home ++ chapters
-```
-
->>> 💡 _To compose the body of the app, we append two `Ui`s. 
-  This is possible because a `Ui` is a `List`._
-
-```elm
-    home : Ui
-    home =
-        md  \"\"\"
-            # Welcome!
-                    
-            Click "Chapters" to open the Table of Contents.
-            \"\"\"
-            |> Less.Ui.at Content
-            |> Less.Ui.Html.goTo []
-                { destination = ""
-                , isInline = False
-                , label = [ Html.h2 [] [ Html.text "⌂" ] ]
-                }
-```
-
-
-
-
->>> 💡 _The function `md` renders a markdown string to Html. It's
-  omitted here for brevity._
-
-### Screen Regions
-
-Define your regions, then assign your Ui snippets their place on the screen
-with `Less.Ui.at`. This is how the welcome text appears in the `Content` region 
-and the chapter links in the `Toc`.
-
-```elm
-    type Region
-        = Toc
-        | Content
-
-    chapters : Ui
-    chapters = 
-        [...]
-            |> List.concat
-            |> Less.Ui.Html.toggle []
-                { flag = "❡"
-                , isInline = True
-                , label = [ Html.b [] [ Html.text "❡ Chapters" ] ]
-                }
-            |> Less.Ui.at Toc
-```
-
-
-                
-                
-                """
-                |> Less.Ui.at Content
-                |> Less.Ui.Html.goTo []
-                    { destination = "View"
-                    , isInline = True
-                    , label = [ Html.li [] [ Html.text "A stateless view" ] ]
-                    }
-            , md """
-# Layout
-
-```elm
-    import Less.Ui.Html exposing (layout)
-
-    ⋯
-
-    view : () -> Less.Document ()
-    view () =
-        { body = body
-        , layout =
-            { layout
-                | arrange =
-                    \\rendered ->
-                        let
-                            header =
-                                Maybe.withDefault [] rendered.header
-                                    |> Html.header [ ⋯ ]
-
-                            toc =
-                                Maybe.withDefault [] (rendered.region Toc)
-                                    |> Html.nav [ ⋯ ]
-
-                            content =
-                                Maybe.withDefault [] (rendered.region Content)
-                        in
-                        header :: content ++ [ toc ]
-            }
-        , title = "Less-Ui Walkthrough"
+                        content =
+                            Maybe.withDefault [] (rendered.region Content)
+                                |> Html.main_ [ ... ]
+                    in
+                    [ SyntaxHighlight.useTheme SyntaxHighlight.gitHub, header, content, toc ]
         }
-            |> Less.mapDocument identity
+    , title = "Less-Ui Walkthrough"
+    }
+        |> Less.mapDocument identity
 ```
 
-"""
-                |> Less.Ui.at Content
-                |> Less.Ui.Html.goTo []
-                    { destination = "Layout"
-                    , isInline = True
-                    , label = [ Html.li [] [ Html.text "Layout" ] ]
-                    }
-            , md """
-# Less code and less control
+    """
 
 
-We start with building an application that hides the Ui states in the Url:
+welcomeExplanation =
+    md """
+
+## Welcome!
+
+This is a self-explanatory walkthrough. It presents its own code.
+        
+Click _Outline_ on the bottom of the screen to open the Table of Contents.
+
+Btw, here is my code:
 
 ```elm
-    main : Less.Application () ()
-    main =
-        Less.application
-            { init = ( (), Cmd.none )
-            , update = \\() () -> ( (), Cmd.none )
-            , view = view
+welcome : Ui
+welcome =
+    md  \"\"\"
+## Welcome!
+
+This is a self-explanatory walkthrough. It presents its own code.
+        
+Click _Outline_ below to open the Table of Contents.
+
+And here is my code:
+
+    ```elm
+    welcome : Ui
+    welcome =
+        ∞
+    ```
+        \"\"\"
+        |> Less.Ui.at Content
+        |> Less.Ui.Html.goTo []
+            { destination = ""
+            , isInline = False
+            , label = [ Html.h2 [] [ Html.text "⌂" ] ]
             }
 ```
+"""
 
->> _As you see, both our `model` and `msg` type are (), meaning the app
-defers all state handling to `Less`._
+
+welcome : Ui
+welcome =
+    welcomeExplanation
+        |> Less.Ui.at Content
+        |> Less.Ui.Html.goTo []
+            { destination = ""
+            , isInline = False
+            , label = [ Html.h2 [] [ Html.text "⌂" ] ]
+            }
+
+
+outlineExplanation =
+    md """
+
+## Outline
+
+```elm
+outline : Ui
+outline = 
+    [...]
+        |> List.concat
+        |> Less.Ui.Html.toggle []
+            { flag = "❡"
+            , isInline = True
+            , label = [ Html.b [] [ Html.text "❡ Outline" ] ]
+            }
+        |> Less.Ui.at Toc
+```
+        
 """
-                |> Less.Ui.at Content
-                |> Less.Ui.Html.goTo []
-                    { destination = "Less"
-                    , isInline = True
-                    , label = [ Html.li [] [ Html.text "Less Application" ] ]
-                    }
-            , md """
-# Chapter 2
-            
-GoTo and Toggle
-"""
-                |> Less.Ui.at Content
-                |> Less.Ui.Html.goTo []
-                    { destination = "2"
-                    , isInline = True
-                    , label = [ Html.li [] [ Html.text "GoTo and Toggle" ] ]
-                    }
-            , md """
+
+
+outline : Ui
+outline =
+    [ Less.Ui.at Content uiExplanation
+        |> Less.Ui.Html.goTo []
+            { destination = "Ui"
+            , isInline = True
+            , label = [ Html.li [] [ Html.text "Ui snippets" ] ]
+            }
+    , Less.Ui.at Content regionExplanation
+        |> Less.Ui.Html.goTo []
+            { destination = "Region"
+            , isInline = True
+            , label = [ Html.li [] [ Html.text "Regions" ] ]
+            }
+    , Less.Ui.at Content viewExplanation
+        |> Less.Ui.Html.goTo []
+            { destination = "View"
+            , isInline = True
+            , label = [ Html.li [] [ Html.text "View and Layout" ] ]
+            }
+    , Less.Ui.Html.goTo []
+        { destination = "View/Body"
+        , isInline = True
+        , label = [ Html.li [ Attr.style "margin-left" ".8em" ] [ Html.text "Body" ] ]
+        }
+        []
+    , Less.Ui.Html.goTo []
+        { destination = "View/Outline"
+        , isInline = True
+        , label = [ Html.li [ Attr.style "margin-left" ".8em" ] [ Html.text "Outline" ] ]
+        }
+        []
+    , Less.Ui.at Content mainExplanation
+        |> Less.Ui.Html.goTo []
+            { destination = "Main"
+            , isInline = True
+            , label = [ Html.li [] [ Html.text "Less Application" ] ]
+            }
+    , md """
 # Filters
             
 ![under construction](https://upload.wikimedia.org/wikipedia/commons/1/19/Under_construction_graphic.gif)
 """
-                |> Less.Ui.at Content
-                |> Less.Ui.Html.goTo []
-                    { destination = "3"
-                    , isInline = True
-                    , label = [ Html.li [] [ Html.text "Filters" ] ]
-                    }
-            , md """
+        |> Less.Ui.at Content
+        |> Less.Ui.Html.goTo []
+            { destination = "3"
+            , isInline = True
+            , label = [ Html.li [] [ Html.text "Filters" ] ]
+            }
+    , md """# Features.elm"""
+        ++ regionExplanation
+        ++ uiExplanation
+        ++ mdExplanation
+        ++ viewExplanation
+        ++ mainExplanation
+        |> Less.Ui.at Content
+        |> Less.Ui.Html.goTo []
+            { destination = "Module"
+            , isInline = True
+            , label = [ Html.li [] [ Html.text "The whole module" ] ]
+            }
+    , md """
 ### Where to go next:
 
 [https://github.com/upsiflu/less-ui](github.com/upsiflu/less-ui)
           
 """
-                |> Less.Ui.at Content
-                |> Less.Ui.Html.goTo []
-                    { destination = "Next"
-                    , isInline = True
-                    , label = [ Html.li [] [ Html.text "Where to go next" ] ]
-                    }
-            ]
-                |> List.concat
-                |> Less.Ui.Html.toggle []
-                    { flag = "❡"
-                    , isInline = True
-                    , label = [ Html.b [] [ Html.text "❡ Chapters" ] ]
-                    }
-                |> Less.Ui.at Toc
+        |> Less.Ui.at Content
+        |> Less.Ui.Html.goTo []
+            { destination = "Next"
+            , isInline = True
+            , label = [ Html.li [] [ Html.text "Where to go next" ] ]
+            }
+    ]
+        |> List.concat
+        |> Less.Ui.Html.toggle []
+            { flag = "❡"
+            , isInline = True
+            , label = [ Html.text "❡ Outline" ]
+            }
+        |> Less.Ui.at Toc
 
-        body : Ui
-        body =
-            home ++ chapters
-    in
+
+bodyExplanation =
+    md """
+## Body
+
+```elm
+body : Ui
+body =
+    home ++ outline
+```
+
+>>> 💡 _To compose the body of the app, we append two `Ui`s. 
+  This is possible because a `Ui` is a `List`._
+               """
+
+
+body : Ui
+body =
+    welcome ++ outline
+
+
+view : () -> Less.Document ()
+view () =
     { body = body
     , layout =
         { layout
@@ -242,17 +340,38 @@ GoTo and Toggle
 
                         toc =
                             Maybe.withDefault [] (rendered.region Toc)
-                                |> Html.nav [ Attr.class "❡", Attr.style "position" "fixed", Attr.style "padding" "1em", Attr.style "background" "#eee", Attr.style "bottom" ".5em" ]
+                                |> Html.nav [ Attr.class "❡", Attr.style "position" "fixed", Attr.style "padding" ".5em", Attr.style "background" "silver", Attr.style "bottom" ".5em" ]
 
                         content =
                             Maybe.withDefault [] (rendered.region Content)
-                                |> Html.main_ [ Attr.style "padding" "0 2.4em 12em 2.4em" ]
+                                |> Html.main_ [ Attr.style "padding" "0 2.4em 4em 2.4em" ]
                     in
-                    [ header, content, toc ]
+                    [ SyntaxHighlight.useTheme SyntaxHighlight.gitHub, header, content, toc ]
         }
     , title = "Less-Ui Walkthrough"
     }
         |> Less.mapDocument identity
+
+
+mainExplanation =
+    md """# Main
+### _Less code and less control_
+
+
+A `Less.Application` hides the Ui states in the Url:
+
+```elm
+main : Less.Application () ()
+main =
+    Less.application
+        { init = ( (), Cmd.none )
+        , update = \\() () -> ( (), Cmd.none )
+        , view = view
+        }
+```
+
+> _As you see, both our `model` and `msg` type are (), meaning the app
+defers all state handling to `Less`._"""
 
 
 {-| -}
