@@ -491,6 +491,6 @@ dict :
     , concatBy : (List v -> v) -> List (Dict k v) -> Dict k v
     }
 dict =
-    { concat = List.foldl (append List.concat) Dict.empty
+    { concat = List.foldr (append List.concat) Dict.empty
     , concatBy = \howToFlatten -> List.foldr (append howToFlatten) Dict.empty
     }
