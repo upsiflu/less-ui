@@ -43,7 +43,10 @@ import Browser.Navigation as Nav
 import Html exposing (Html)
 import Less.Link as Link exposing (Link, Msg(..), State)
 import Less.Ui as Ui exposing (Layout, Ui)
+import Process
 import Return exposing (Return)
+import SmoothScroll exposing (defaultConfig)
+import Task
 import Url
 
 
@@ -116,21 +119,41 @@ application config =
                         let
                             ( { pushHistoryState }, newState ) =
                                 Link.apply link current
-                                    |> Debug.log "( { pushHistoryState }, newState )"
                         in
-                        -- changing the Url will implicitly trigger `nextState`
-                        Return.singleton ( key, state, model )
-                            |> Return.command
-                                (if pushHistoryState then
-                                    Nav.pushUrl key (Url.toString newState)
+                        (if pushHistoryState then
+                            Nav.pushUrl key (Url.toString newState)
 
-                                 else
-                                    Nav.replaceUrl key (Url.toString newState)
-                                )
+                         else
+                            Nav.replaceUrl key (Url.toString newState)
+                        )
+                            -- changing the Url will implicitly trigger `nextState`
+                            |> Return.return ( key, state, model )
 
-                    nextState : State -> ApplicationState model -> Return msg_ (ApplicationState model)
-                    nextState newUrl ( key, { current }, model ) =
-                        Return.singleton ( key, { current = newUrl, previous = Just current }, model )
+                    nextState : State -> ApplicationState model -> Return (Msg modelMsg) (ApplicationState model)
+                    nextState newUrl ( key, { current, previous }, model ) =
+                        Maybe.map
+                            (\id ->
+                                let
+                                    scrollToFragment : Float -> Cmd (Msg modelMsg)
+                                    scrollToFragment =
+                                        Process.sleep
+                                            >> Task.andThen
+                                                (\() ->
+                                                    SmoothScroll.scrollToWithOptions
+                                                        { defaultConfig | offset = 101, speed = 40 }
+                                                        id
+                                                )
+                                            >> Task.attempt (\_ -> NoOp)
+                                in
+                                if Maybe.map .path previous == Just current.path then
+                                    scrollToFragment 30
+
+                                else
+                                    scrollToFragment 260
+                            )
+                            newUrl.fragment
+                            |> Maybe.withDefault Cmd.none
+                            |> Return.return ( key, { current = newUrl, previous = Just current }, model )
 
                     updateModel : modelMsg -> ApplicationState model -> Return (Msg modelMsg) (ApplicationState model)
                     updateModel modelMsg ( key, state, model ) =
@@ -138,7 +161,8 @@ application config =
                             ( updatedModel, modelCmd ) =
                                 config.update modelMsg model
                         in
-                        Return.return ( key, state, updatedModel ) (Cmd.map AppMsg modelCmd)
+                        Cmd.map AppMsg modelCmd
+                            |> Return.return ( key, state, updatedModel )
                 in
                 case msg of
                     UrlChanged url ->
@@ -157,6 +181,9 @@ application config =
 
                     UrlCmd link ->
                         applyLink link
+
+                    NoOp ->
+                        Return.singleton
         , view =
             \( _, states, model ) -> config.view model states
         }

@@ -76,6 +76,7 @@ type Msg modelMsg
     | LinkClicked Browser.UrlRequest
     | AppMsg modelMsg
     | UrlCmd Link
+    | NoOp
 
 
 {-| Relative changes to the Url are only applied when a link opens in the same tab.
