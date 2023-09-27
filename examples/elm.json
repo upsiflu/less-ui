@@ -21,8 +21,10 @@
             "elm-community/result-extra": "2.4.0",
             "elm-community/string-extra": "4.0.1",
             "justinmimbs/date": "4.0.1",
+            "linuss/smooth-scroll": "1.1.0",
             "pablohirafuji/elm-syntax-highlight": "3.5.0",
             "pzp1997/assoc-list": "1.0.0",
+            "rl-king/elm-scroll-to": "1.1.2",
             "stoeffel/set-extra": "1.2.3"
         },
         "indirect": {
@@ -31,7 +33,9 @@
             "elm/regex": "1.0.0",
             "elm/time": "1.0.0",
             "elm/virtual-dom": "1.0.3",
-            "rtfeldman/elm-hex": "1.0.0"
+            "elm-community/easing-functions": "2.0.0",
+            "rtfeldman/elm-hex": "1.0.0",
+            "tad-lispy/springs": "1.0.5"
         }
     },
     "test-dependencies": {

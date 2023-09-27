@@ -24,6 +24,7 @@
         "elm-community/maybe-extra": "5.3.0 <= v < 6.0.0",
         "elm-community/result-extra": "2.4.0 <= v < 3.0.0",
         "elm-community/string-extra": "4.0.1 <= v < 5.0.0",
+        "linuss/smooth-scroll": "1.1.0 <= v < 2.0.0",
         "lue-bird/elm-review-single-use-type-vars-end-with-underscore": "2.0.3 <= v < 3.0.0",
         "pzp1997/assoc-list": "1.0.0 <= v < 2.0.0",
         "stoeffel/set-extra": "1.2.3 <= v < 2.0.0"

@@ -1,10 +1,9 @@
 module Less.Ui.Html exposing
     ( Ui, singleton
     , toggle, goTo, bounce, filter, search
-    , section, article, block, inline
+    , section, article, block, inline, disclose
     , ol, ul, keyedNode, nest
     , layout, arrangeOverDefaultRegions, Region(..)
-    , disclose
     )
 
 {-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Less.Ui`](Less-Ui)
@@ -21,7 +20,7 @@ module Less.Ui.Html exposing
 
 # Wrap the DOM
 
-@docs section, article, block, inline
+@docs section, article, block, inline, disclose
 @docs ol, ul, keyedNode, nest
 
 
