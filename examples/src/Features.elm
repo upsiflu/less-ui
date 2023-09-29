@@ -8,6 +8,7 @@ import Less.Ui.Html exposing (layout)
 import Markdown exposing (md)
 
 
+welcomeExplanation : String
 welcomeExplanation =
     """
 
@@ -50,6 +51,7 @@ welcome =
             }
 
 
+importExplanation : String
 importExplanation =
     """
 # Imports
@@ -65,6 +67,7 @@ import Markdown exposing (md)
 """
 
 
+regionExplanation : String
 regionExplanation =
     """
 # Screen Regions
@@ -86,6 +89,7 @@ type Region
     | Content
 
 
+uiExplanation : String
 uiExplanation =
     """
 # Ui
@@ -107,6 +111,7 @@ type alias Ui =
 ---- VIEW ----
 
 
+viewExplanation : String
 viewExplanation =
     """
 # View
@@ -117,6 +122,7 @@ import Less.Ui.Html exposing (layout)
 """
         ++ bodyExplanation
         ++ outlineExplanation
+        ++ tokenExplanation
         ++ """
 ```elm
 view : () -> Less.Document ()
@@ -149,6 +155,7 @@ view () =
     """
 
 
+outlineExplanation : String
 outlineExplanation =
     """
 ## Outline
@@ -169,137 +176,110 @@ outline =
 """
 
 
-outline : List String
-outline =
-    [ importExplanation
-    , uiExplanation
-    , regionExplanation
-    , viewExplanation
-    , mainExplanation
-    , """
-## Where to go next
+tokenExplanation : String
+tokenExplanation =
+    """
+# Tokens
 
-[https://github.com/upsiflu/less-ui](https://github.com/upsiflu/less-ui)
+[Toggle Tokens](?toggle=showTokens)
 
-![under construction](https://upload.wikimedia.org/wikipedia/commons/1/19/Under_construction_graphic.gif)
+```elm
+Toggle "showTokens" [ Search "q" [List.concatMap viewToken >> at Toc] ]
+```
 
-Have a beautiful day!
-          
-"""
-    ]
+    """
 
 
 createToc : Ui
 createToc =
     let
-        headings chapter =
+        createChapterLinks attrs chapter =
             case Markdown.toc chapter of
                 Err _ ->
-                    []
+                    md "(Markdown parsing error)"
 
-                Ok results ->
-                    List.map .text results
+                Ok [] ->
+                    md "(No headings)"
 
-        createLinks chapter =
-            case headings chapter of
-                [] ->
-                    []
-
-                firstHeading :: moreHeadings ->
-                    Less.Ui.Html.ul []
-                        (atLink (md chapter) ( firstHeading, [] )
-                            :: List.map (\subHeading -> atLink [] ( firstHeading, [ subHeading ] )) moreHeadings
+                Ok (firstHeading :: moreHeadings) ->
+                    Less.Ui.Html.section
+                        attrs
+                        (createLink (md chapter) ( firstHeading.text, [] )
+                            ++ List.concatMap (\subHeading -> createLink [] ( firstHeading.text, [ subHeading.text ] )) moreHeadings
                         )
 
-        atLink content ( heading, subheadings ) =
-            ( heading
-            , Less.Ui.at Content content
-                |> Less.Ui.Html.goTo []
-                    { destination = String.replace " " "+" (heading ++ "#" ++ Maybe.withDefault heading (List.head subheadings))
+        createLink content ( heading, subheadings ) =
+            Less.Ui.at Content content
+                |> Less.Ui.Html.goTo [ Attr.style "padding" "1ch", Attr.style "display" "inline-block", Attr.style "background" "#ddd" ]
+                    { destination =
+                        heading
+                            ++ "#"
+                            ++ Maybe.withDefault heading (List.head subheadings)
+                            |> String.replace " " "+"
                     , isInline = True
-                    , label = [ Html.li [] [ Html.text (Maybe.withDefault heading (List.head subheadings)) ] ]
+                    , label = [ Html.text (Maybe.withDefault heading (List.head subheadings)) ]
                     }
-            )
+
+        outline : List String
+        outline =
+            [ importExplanation
+            , uiExplanation
+            , regionExplanation
+            , viewExplanation
+            , mainExplanation
+            , whereToGoNext
+            ]
     in
-    List.concatMap createLinks outline
-        ++ md "---"
-        ++ search
-        |> Less.Ui.Html.section []
-        |> Less.Ui.Html.toggle []
-            { flag = "≔"
-            , isInline = True
-            , label = [ Html.text "Outline" ]
-            }
+    Less.Ui.Html.search [ Attr.placeholder "Search" ]
+        { category = "search"
+        , isInline = True
+        , label = []
+        }
+        (\searchTerms ->
+            let
+                hasAllSearchTerms : String -> Bool
+                hasAllSearchTerms chapter =
+                    List.foldl
+                        (\searchTerm -> String.contains searchTerm chapter |> (&&))
+                        True
+                        searchTerms
+
+                tokens : Ui
+                tokens =
+                    List.filter ((/=) "") searchTerms
+                        |> List.concatMap
+                            (\searchTerm ->
+                                Less.Ui.Html.toggle []
+                                    { flag = "search=" ++ String.join " " (List.filter ((/=) searchTerm) searchTerms)
+                                    , isInline = True
+                                    , label = [ Html.button [] [ Html.text (searchTerm ++ " ✖") ] ]
+                                    }
+                                    []
+                            )
+                        |> Less.Ui.Html.toggle []
+                            { flag = "showTokens"
+                            , isInline = True
+                            , label = []
+                            }
+            in
+            List.concatMap
+                (\chapter ->
+                    if hasAllSearchTerms chapter then
+                        createChapterLinks [ Attr.style "transition" "all .2s" ] chapter
+
+                    else
+                        createChapterLinks [ Attr.style "transition" "all .2s", Attr.style "font-size" "0" ] chapter
+                )
+                outline
+                ++ tokens
+        )
         |> Less.Ui.at Toc
 
 
+bodyExplanation : String
 bodyExplanation =
     """
 ## Body
-
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
----
 
 ```elm
 body : Ui
@@ -323,28 +303,41 @@ view () =
     , layout =
         { layout
             | arrange =
-                \rendered ->
+                \renderedHtml ->
                     let
                         header =
-                            Maybe.withDefault [] rendered.header
-                                |> Html.header [ Attr.class "header", Attr.style "position" "sticky", Attr.style "top" "0.5em", Attr.style "max-height" "calc(100vh - 0.5rem)", Attr.style "overflow" "scroll", Attr.style "background" "white" ]
+                            Maybe.withDefault [] renderedHtml.header
+                                |> Html.header
+                                    [ Attr.class "header"
+                                    , Attr.style "position" "sticky"
+                                    , Attr.style "top" "0.5em"
+                                    ]
 
                         toc =
-                            Maybe.withDefault [] (rendered.region Toc)
+                            Maybe.withDefault [] (renderedHtml.region Toc)
                                 |> Html.nav
-                                    [ Attr.style "float" "right"
+                                    -- [ Attr.style "float" "right"
+                                    -- , Attr.style "position" "sticky"
+                                    -- , Attr.style "top" "2rem"
+                                    -- , Attr.style "bottom" "6rem"
+                                    -- , Attr.style "max-width" "20rem"
+                                    -- , Attr.style "transition" "all 2s"
+                                    -- ]
+                                    [ Attr.style "display" "inline-block"
                                     , Attr.style "position" "sticky"
-                                    , Attr.style "top" "2rem"
-                                    , Attr.style "bottom" "6rem"
-                                    , Attr.style "max-width" "20rem"
-                                    , Attr.style "transition" "all 2s"
-
-                                    {- Attr.style "position" "fixed", Attr.style "background" "silver", Attr.style "right" ".5em", Attr.style "bottom" ".5em" -}
+                                    , Attr.style "top" "3rem"
+                                    , Attr.style "vertical-align" "top"
+                                    , Attr.style "margin" "0rem 3rem 0 0"
                                     ]
 
                         content =
-                            Maybe.withDefault [] (rendered.region Content)
-                                |> Html.main_ [ Attr.style "padding" "0 2.4em 4em 2.4em" ]
+                            Maybe.withDefault [] (renderedHtml.region Content)
+                                |> Html.main_
+                                    -- [ Attr.style "padding" "0 2.4em 4em 2.4em" ]
+                                    [ Attr.style "display" "inline-block"
+
+                                    -- , Attr.style "padding" "0 2.4em 4em 2.4em"
+                                    ]
                     in
                     [ Markdown.syntaxHighlighting, header, toc, content ]
         }
@@ -353,76 +346,7 @@ view () =
         |> Less.mapDocument identity
 
 
-searchResultsExplanation =
-    """
-# Search
-```elm
-ess.Ui.Html.search [ Attr.placeholder "Find" ]
-    { category = "search"
-    , isInline = False
-    , label = []
-    }
-    (\\keywords -> 
-        ...
-    )
-```
-"""
-
-
-search : Ui
-search =
-    let
-        results keywords =
-            outline
-                |> List.filterMap
-                    (\explanation ->
-                        case
-                            List.filter
-                                (\keyword -> keyword /= "" && String.contains keyword explanation)
-                                keywords
-                        of
-                            [] ->
-                                Nothing
-
-                            matches ->
-                                Just ( matches, explanation )
-                    )
-                >> List.sortBy (Tuple.first >> List.length >> negate)
-                >> List.concatMap
-                    (\( keywordsFound, explanationFound ) ->
-                        case Markdown.toc explanationFound of
-                            Ok toc ->
-                                List.concatMap
-                                    (\{ text } ->
-                                        Less.Ui.Html.toggle []
-                                            { flag = String.replace " " "+" text
-                                            , isInline = True
-                                            , label = [ Html.text (text ++ " (" ++ String.join ", " keywordsFound ++ ")") ]
-                                            }
-                                            (md explanationFound)
-                                            ++ md "---"
-                                    )
-                                    toc
-
-                            Err message ->
-                                message
-                    )
-    in
-    Less.Ui.Html.search [ Attr.placeholder "Find" ]
-        { category = "search"
-        , isInline = True
-        , label = []
-        }
-        (\keywordList ->
-            case List.concatMap (String.split " " >> List.filter ((/=) "")) keywordList of
-                [] ->
-                    []
-
-                keywords ->
-                    md "**Search Results:**" ++ results keywords
-        )
-
-
+mainExplanation : String
 mainExplanation =
     """# Main
 ### _Less code and less control_
@@ -452,3 +376,17 @@ main =
         , update = \() () -> ( (), Cmd.none )
         , view = view
         }
+
+
+whereToGoNext : String
+whereToGoNext =
+    """
+## Where to go next
+
+[https://github.com/upsiflu/less-ui](https://github.com/upsiflu/less-ui)
+
+![under construction](https://upload.wikimedia.org/wikipedia/commons/1/19/Under_construction_graphic.gif)
+
+Have a beautiful day!
+        
+    """
