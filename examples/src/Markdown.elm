@@ -1,10 +1,10 @@
-module Markdown exposing (md, syntaxHighlighting, toc)
+module Markdown exposing (html, md, syntaxHighlighting, toc)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Less.Ui
 import Less.Ui.Html exposing (Ui)
-import Markdown.Block as Block exposing (Block)
+import Markdown.Block as Block
 import Markdown.Html
 import Markdown.Parser as Markdown
 import Markdown.Renderer exposing (Renderer)

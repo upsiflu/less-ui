@@ -222,7 +222,7 @@ getStringControl { makeInnerHtml } =
                     myStaticUi =
                         Html.toggle []
                             { flag = id
-                            , isInline = True
+                            , inHeader = True
                             , label = [ Html.label [ Attr.for id ] [ Html.text label ] ]
                             }
                             (Ui.singleton
@@ -239,7 +239,7 @@ getStringControl { makeInnerHtml } =
                             )
                             ++ (Html.toggle []
                                     { flag = "Fun10"
-                                    , isInline = False
+                                    , inHeader = False
                                     , label = [ Html.text "From GetStringControl to Header.. wheee!" ]
                                     }
                                     []
@@ -249,7 +249,7 @@ getStringControl { makeInnerHtml } =
                                )
                             ++ Html.goTo []
                                 { destination = ( Just "Hi", Nothing )
-                                , isInline = True
+                                , inHeader = True
                                 , label = [ Html.text "Me, no!" ]
                                 }
                                 []
@@ -397,7 +397,7 @@ main =
                         moreFun int =
                             Html.toggle []
                                 { flag = "Fun" ++ String.fromInt int
-                                , isInline = True
+                                , inHeader = True
                                 , label = [ Html.label [] [ Html.text "＋" ] ]
                                 }
                                 (Ui.singleton [ tupleIntStringForm.view model.tupleIntStringState ]
@@ -427,7 +427,7 @@ main =
                         ++ Ui.at Info (textLabel "Info!")
                         ++ Ui.at Info
                             (Html.toggle []
-                                { flag = "Fun10", isInline = False, label = [ Html.text "Hello" ] }
+                                { flag = "Fun10", inHeader = False, label = [ Html.text "Hello" ] }
                                 []
                             )
                 , layout = Html.layout

@@ -2,7 +2,7 @@ module Less.Link exposing
     ( Link(..)
     , fromUrl
     , toHref, apply
-    , getStateSearchTerms
+    , getStateSearchTerms, getSpaceSeparatedSearchTerms
     , Mutation(..), mutationFromTwoStates
     , Msg(..)
     , State
@@ -24,7 +24,7 @@ module Less.Link exposing
 ## Deconstruct
 
 @docs toHref, apply
-@docs getStateSearchTerms
+@docs getStateSearchTerms, getSpaceSeparatedSearchTerms
 
 
 ## Mutations
@@ -265,13 +265,17 @@ apply link =
         setLocation parsedLocation =
             case parsedLocation of
                 OnlyPath path ->
-                    setPath path
+                    setPath path >> removeFragment
 
                 OnlyFragment fragment ->
                     setFragment fragment
 
                 PathAndFragment path fragment ->
                     setPath path >> setFragment fragment
+
+        removeFragment : State -> State
+        removeFragment state =
+            { state | fragment = Nothing }
 
         setFragment : Fragment -> State -> State
         setFragment fragment state =
@@ -486,6 +490,20 @@ getStateSearchTerms category =
         >> List.map (String.dropLeft (String.length category + 1))
 
 
+{-| Space-separate, then intersect, all assignments to `category`.
+-}
+getSpaceSeparatedSearchTerms : Category -> Url -> List SearchTerm
+getSpaceSeparatedSearchTerms category state =
+    case List.map (String.split " ") (getStateSearchTerms category state) of
+        [] ->
+            []
+
+        firstSet :: otherSets ->
+            List.filter
+                (\a -> List.all (List.member a) otherSets)
+                firstSet
+
+
 {-| Distinguish parallel search inputs on a screen.
 -}
 type alias Category =
@@ -537,6 +555,7 @@ mapFlags fu state =
                 |> List.concatMap (Url.percentDecode >> Maybe.toList)
                 |> Set.fromList
                 |> fu
+                |> Set.map (String.split "=" >> List.map Url.percentEncode >> String.join "=")
                 |> Set.toList
                 |> String.join "&"
                 |> String.nonEmpty

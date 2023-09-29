@@ -37,6 +37,7 @@ import Html.Keyed
 import Html.Lazy
 import Less.Link as Link exposing (Link, Mutation(..), State)
 import Less.Ui as Ui
+import List.Extra as List
 import Maybe.Extra as Maybe
 
 
@@ -76,7 +77,7 @@ toggle :
     List (Html.Attribute Never)
     ->
         { flag : Link.Flag
-        , isInline : Bool
+        , inHeader : Bool
         , label : HtmlList msg
         }
     -> Ui region narrowMsg msg
@@ -98,49 +99,27 @@ filter :
     -> (List Link.SearchTerm -> Ui region narrowMsg msg)
     -> Ui region narrowMsg msg
 filter category =
-    Filter category Nothing
+    Filter category
         >> Ui.wrap
 
 
 {-| Display a search box and show a `Ui` according to what searchTerms are currently associated with a given category.
-
-    singleton [ Html.h1 [] [ Html.text "Two Search Boxes" ] ]
-        ++ search []
-            { category = "search=a"
-            , isInline = True
-            , label = []
-            }
-            (\_ -> [])
-        ++ search []
-            { category = "search=b"
-            , isInline = True
-            , label = []
-            }
-            (\_ -> [])
-        ++ filter "search"
-            -- will receive a subset of ["a=...", "b=..."] as SearchTerms
-            (List.concatMap resultsPerSearchTerm
-                >> List.concatMap viewSeachResult
-            )
-
 -}
 search :
     List (Html.Attribute Never)
     ->
         { category : Link.Category
-        , isInline : Bool
+        , inHeader : Bool
         , label : HtmlList msg
         }
     -> (List Link.SearchTerm -> Ui region narrowMsg msg)
     -> Ui region narrowMsg msg
 search attributes config =
-    Filter config.category
-        (Just
-            { attributes = attributes
-            , isInline = config.isInline
-            , label = config.label
-            }
-        )
+    Search config.category
+        { attributes = attributes
+        , inHeader = config.inHeader
+        , label = config.label
+        }
         >> Ui.wrap
 
 
@@ -150,7 +129,7 @@ goTo :
     List (Html.Attribute Never)
     ->
         { destination : Link.Location
-        , isInline : Bool
+        , inHeader : Bool
         , label : HtmlList msg
         }
     -> Ui region narrowMsg msg
@@ -200,23 +179,22 @@ type Wrapper region narrowMsg msg
     | Toggle
         (List (Html.Attribute Never))
         { flag : Link.Flag
-        , isInline : Bool
+        , inHeader : Bool
         , label : HtmlList msg
         }
         (Ui region narrowMsg msg)
-    | Filter
+    | Filter Link.Category (List Link.SearchTerm -> Ui region narrowMsg msg)
+    | Search
         Link.Category
-        (Maybe
-            { attributes : List (Html.Attribute Never)
-            , isInline : Bool
-            , label : HtmlList msg
-            }
-        )
+        { attributes : List (Html.Attribute Never)
+        , inHeader : Bool
+        , label : HtmlList msg
+        }
         (List Link.SearchTerm -> Ui region narrowMsg msg)
     | GoTo
         (List (Html.Attribute Never))
         { destination : Link.Location
-        , isInline : Bool
+        , inHeader : Bool
         , label : HtmlList msg
         }
         (Ui region narrowMsg msg)
@@ -449,16 +427,21 @@ wrap states wrapper =
                         Nested { regions, combine } ->
                             Nested { regions = regions, combine = combine }
 
-                        Toggle attrs { flag, isInline, label } contingent ->
+                        Toggle attrs { flag, inHeader, label } contingent ->
                             Toggle
                                 (attrs ++ vanishableAttributes)
-                                { flag = flag, isInline = isInline, label = label }
+                                { flag = flag, inHeader = inHeader, label = label }
                                 contingent
 
-                        Filter category maybeConfig contingent ->
+                        Filter category contingent ->
                             Filter
                                 category
-                                (Maybe.map (\a -> { a | attributes = a.attributes ++ vanishableAttributes }) maybeConfig)
+                                (contingent >> recurse)
+
+                        Search category config contingent ->
+                            Search
+                                category
+                                ((\a -> { a | attributes = a.attributes ++ vanishableAttributes }) config)
                                 (contingent >> recurse)
 
                         GoTo attrs config contingent ->
@@ -637,6 +620,15 @@ wrap states wrapper =
                 )
                 >> fu
                 >> List.singleton
+
+        wrapListElements : (List ( a, Html (Link.Msg msg) ) -> b) -> List ( a, List (Html (Link.Msg msg)) ) -> List b
+        wrapListElements fu =
+            List.map
+                (\( key, items ) ->
+                    ( key, Html.li [] items )
+                )
+                >> fu
+                >> List.singleton
     in
     case wrapper of
         Block { onlyInCurrentRegion } str attrs elements ->
@@ -677,7 +669,7 @@ wrap states wrapper =
             Ui.Keyed
                 { howToWrap =
                     Html.Keyed.ol (appAttr attrs)
-                        |> wrapKeyedElements
+                        |> wrapListElements
                 }
                 keyedElements
 
@@ -685,7 +677,7 @@ wrap states wrapper =
             Ui.Keyed
                 { howToWrap =
                     Html.Keyed.ul (appAttr attrs)
-                        |> wrapKeyedElements
+                        |> wrapListElements
                 }
                 keyedElements
 
@@ -704,7 +696,7 @@ wrap states wrapper =
                 , combine = combine
                 }
 
-        Toggle attributes { flag, isInline, label } contingent ->
+        Toggle attributes { flag, inHeader, label } contingent ->
             let
                 link : Link
                 link =
@@ -725,52 +717,65 @@ wrap states wrapper =
                                 )
                                 label
                             ]
-                    , isInline = isInline
+                    , inHeader = inHeader
                     }
 
-        Filter category maybeConfig contingent ->
+        Filter category contingent ->
             let
-                isInline : Bool
-                isInline =
-                    Maybe.map .isInline maybeConfig
-                        |> Maybe.withDefault True
-
-                link : Link.SearchTerm -> Link
-                link newSearchTerm =
-                    Link.Filter { category = category, searchTerm = newSearchTerm }
+                inHeader : Bool
+                inHeader =
+                    True
 
                 mutation : Mutation
                 mutation =
                     getMutation (link "") Nothing
 
-                searchTerms : List Link.SearchTerm
-                searchTerms =
-                    Link.getStateSearchTerms category states.current
+                link : Link.SearchTerm -> Link
+                link newSearchTerm =
+                    Link.Filter { category = category, searchTerm = newSearchTerm }
             in
-            applyMutation mutation (contingent searchTerms)
+            applyMutation mutation (contingent (List.unique (Link.getSpaceSeparatedSearchTerms category states.current)))
                 |> Ui.Labeled
-                    { label =
-                        case maybeConfig of
-                            Just { attributes, label } ->
-                                appHtml label
-                                    ++ [ Html.input
-                                            (Attr.value (String.join " " searchTerms)
-                                                :: Events.onInput
-                                                    (\newSearchTerm ->
-                                                        Link.UrlCmd (link newSearchTerm)
-                                                    )
-                                                :: appAttr (Attr.title category :: labelAttributesByMutation mutation)
-                                                ++ List.map (Attr.map never) attributes
-                                            )
-                                            []
-                                       ]
-
-                            Nothing ->
-                                []
-                    , isInline = isInline
+                    { label = []
+                    , inHeader = inHeader
                     }
 
-        GoTo attributes { destination, isInline, label } contingent ->
+        Search category config contingent ->
+            let
+                spaceSeparatedSearchTerms : List Link.SearchTerm
+                spaceSeparatedSearchTerms =
+                    Link.getSpaceSeparatedSearchTerms category states.current
+
+                viewLabel : HtmlList (Link.Msg msg)
+                viewLabel =
+                    appHtml config.label
+                        ++ [ Html.input
+                                (Attr.value (String.join " " spaceSeparatedSearchTerms)
+                                    :: Events.onInput
+                                        (\newSearchTerm ->
+                                            Link.UrlCmd (link newSearchTerm)
+                                        )
+                                    :: appAttr (Attr.title category :: labelAttributesByMutation mutation)
+                                    ++ List.map (Attr.map never) config.attributes
+                                )
+                                []
+                           ]
+
+                mutation : Mutation
+                mutation =
+                    getMutation (link "") Nothing
+
+                link : Link.SearchTerm -> Link
+                link newSearchTerm =
+                    Link.Filter { category = category, searchTerm = newSearchTerm }
+            in
+            contingent (List.unique spaceSeparatedSearchTerms)
+                |> Ui.Labeled
+                    { label = viewLabel
+                    , inHeader = config.inHeader
+                    }
+
+        GoTo attributes { destination, inHeader, label } contingent ->
             let
                 link : Link
                 link =
@@ -791,7 +796,7 @@ wrap states wrapper =
                                 )
                                 label
                             ]
-                    , isInline = isInline
+                    , inHeader = inHeader
                     }
 
         Bounce attributes { there, here, label } contingent ->
@@ -815,7 +820,7 @@ wrap states wrapper =
                                 )
                                 label
                             ]
-                    , isInline = True
+                    , inHeader = True
                     }
 
 

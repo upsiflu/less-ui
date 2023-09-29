@@ -135,17 +135,20 @@ application config =
                             (\id ->
                                 let
                                     scrollToFragment : Float -> Cmd (Msg modelMsg)
-                                    scrollToFragment =
-                                        Process.sleep
-                                            >> Task.andThen
+                                    scrollToFragment sleepTime =
+                                        Process.sleep sleepTime
+                                            |> Task.andThen
                                                 (\() ->
                                                     SmoothScroll.scrollToWithOptions
-                                                        { defaultConfig | offset = 101, speed = 40 }
+                                                        { defaultConfig | offset = 220, speed = 30 }
                                                         id
                                                 )
-                                            >> Task.attempt (\_ -> NoOp)
+                                            |> Task.attempt (\_ -> NoOp)
                                 in
-                                if Maybe.map .path previous == Just current.path then
+                                if Maybe.andThen .fragment previous == Just id then
+                                    Cmd.none
+
+                                else if Maybe.map .path previous == Just current.path then
                                     scrollToFragment 30
 
                                 else

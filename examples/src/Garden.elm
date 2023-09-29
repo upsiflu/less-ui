@@ -51,7 +51,7 @@ view garden =
                 ++ Ui.at Scene
                     (Less.Ui.Html.toggle []
                         { flag = "rhododendron"
-                        , isInline = True
+                        , inHeader = True
                         , label = [ Html.text "Toggle Rhododendron" ]
                         }
                         (Rhododendron.view RhododendronMsg garden.rhododendron)

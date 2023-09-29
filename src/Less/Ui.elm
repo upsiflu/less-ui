@@ -1,7 +1,7 @@
 module Less.Ui exposing
     ( Ui, Item
     , singleton, wrap
-    , at
+    , inRegion
     , view
     , Layout, CurrentLayout, Wrapper(..), applyStates
     , repeat
@@ -26,7 +26,7 @@ and build accessible patterns orthogonal to the Dom tree.
 
 # Modify
 
-@docs at
+@docs inRegion
 
 
 # Append
@@ -152,8 +152,8 @@ Note that the last designation "wins".
 [#26: Once designated, `Ui`s can't be redesignated](https://github.com/upsiflu/restrictive/issues/26)
 
 -}
-at : region -> Ui region html wrapper -> Ui region html wrapper
-at region =
+inRegion : region -> Ui region html wrapper -> Ui region html wrapper
+inRegion region =
     At region >> List.singleton
 
 
@@ -327,7 +327,7 @@ type Wrapper region narrowHtml html narrowWrapper wrapper
         }
     | Labeled
         { label : html
-        , isInline : Bool
+        , inHeader : Bool
         }
         (Ui region html wrapper)
 
@@ -403,19 +403,21 @@ viewUi layout region =
 
                 Keyed { howToWrap } keyedElements ->
                     let
-                        distributeKey : ( String, Ui region html wrapper ) -> List (Dict (OrHeader region) (List ( String, html )))
-                        distributeKey ( key, ui ) =
+                        unkeyItems : String -> Ui region html wrapper -> List (Dict (OrHeader region) html)
+                        unkeyItems key =
                             List.indexedMap
-                                (\i item ->
-                                    viewItem item
-                                        |> Dict.map (\_ html -> [ ( key ++ String.fromInt i, html ) ])
+                                (\i ->
+                                    viewItem
+                                        >> Dict.update region
+                                            (Maybe.map (\html -> howToWrap [ ( key ++ String.fromInt i, html ) ]))
                                 )
-                                ui
                     in
-                    List.concatMap distributeKey keyedElements
-                        |> dict.concat
-                        |> Dict.map (\_ -> howToWrap)
+                    List.concatMap
+                        (\( key, ui ) -> unkeyItems key ui)
+                        keyedElements
+                        |> layout.concat
 
+                -- map : (k -> a -> b) -> Dict k a -> Dict k b
                 Nested { regions, narrowLayout, combine } ->
                     let
                         renderHtml : OrHeader region -> Dict (OrHeader region) html -> Dict (OrHeader region) html
@@ -432,15 +434,15 @@ viewUi layout region =
                         :: List.map Region regions
                         |> List.foldl renderHtml Dict.empty
 
-                Labeled { label, isInline } elements ->
+                Labeled { label, inHeader } elements ->
                     let
                         labelRegion : OrHeader region
                         labelRegion =
-                            if isInline then
-                                region
+                            if inHeader then
+                                Header
 
                             else
-                                Header
+                                region
                     in
                     layout.concat
                         [ Dict.singleton labelRegion label
@@ -454,7 +456,7 @@ viewUi layout region =
                     identity
 
                 Region r ->
-                    at r
+                    inRegion r
     in
     List.map viewItem
         >> layout.concat
