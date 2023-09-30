@@ -2,7 +2,9 @@
 
 An proof-of-concept package for people who don't want to hand-wrangle user interface logic. Don't use it when you need direct control over the user interface. 
 
-🐌 I'm curious what you think! Write me on `upsiflu@gmail.com` 🐌
+[Live example](https://less-ui.web.app/)
+
+🐌 I'm curious what you think! Write me on `upsiflu@gmail.com` or issue an [issue on github](https://github.com/upsiflu/less-ui/issues) 🐌
 
 
 ## Goals
@@ -42,8 +44,6 @@ Ui.inRegion Scene (text "Scene") ++ Ui.inRegion Info (text "Info") ...
 ```
 
 **— Compose everything:** `inRegion`, `(++)`, `wrap` compose Uis with each other. Uis can be created from anything that renders to Html (`elm-ui`, `elm-widgets`, `String`...) or from a limited set of patterns including `toggle`, `search`, `filter`, `goTo` etc. You can also use widgets that compose Html such as `elm-any-type-form`.
-
-
 
 
 ## Try it
@@ -93,7 +93,6 @@ This package can help you create predictable and pleasurable interfaces without 
 
 - No inaccessible, invalid, inconsistently styled Html – Use _elm-w3_, _elm-widgets_, _elm-ui_ and friends.
 - No interactive controls without corresponding Model type – Use _elm-any-type-forms_.
-
 
 
 ## Use case
