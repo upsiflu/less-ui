@@ -140,7 +140,7 @@ application config =
                                             |> Task.andThen
                                                 (\() ->
                                                     SmoothScroll.scrollToWithOptions
-                                                        { defaultConfig | offset = 220, speed = 30 }
+                                                        { defaultConfig | offset = 204, speed = 30 }
                                                         id
                                                 )
                                             |> Task.attempt (\_ -> NoOp)

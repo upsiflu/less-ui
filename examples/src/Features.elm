@@ -42,7 +42,7 @@ viewWelcome =
         |> Ui.goTo []
             { destination = ""
             , inHeader = True
-            , label = [ Html.h2 [] [ Html.text "⌂" ] ]
+            , label = [ Html.button [] [ Html.text "⌂" ] ]
             }
 
 
@@ -66,14 +66,15 @@ import Markdown exposing (md)
 ```
 
 An Html Ui has three type parameters:
-- The [Screen Region](Screen+Regions) of a snipped sets where on the screen it will appear.
+1. The [Screen Region](Screen+Regions) of a snipped sets where on the screen it will appear.
 For example, `#!elm ui |> inRegion X` moves the Ui to region "X". 
 [Check out `#!elm View` for how regions are laid out on the screen.](View#Layout)
-- The second parameter is the message type. This app is completely Url-driven and has
+1. The second parameter is the message type. This app is completely Url-driven and has
 neither a model nor any messages, so the message type is "unit" `#!elm ()`.
-- The third parameter is the message type of nested Html. It's only relevant if you want
+Any message that patterns such as "search" require are managed internally by [Less.Application](Applications+without+Ui+state).
+1. The third parameter is the message type of nested Html. It's only relevant if you want
 to nest Ui code inside a function that transforms from Html a to Html b. For example with
-`elm-any-type-forms`.
+`elm-any-type-forms`. 
 
 ```elm
 type alias Ui =
@@ -335,7 +336,7 @@ viewToc =
 
 body : Ui
 body =
-    viewWelcome ++ viewToc
+    viewWelcome ++ viewToc ++ Markdown.syntaxHighlight ++ Ui.animations
 
 
 view : () -> Less.Document ()
@@ -359,9 +360,9 @@ view () =
                                 |> Html.nav
                                     [ Attr.style "display" "inline-block"
                                     , Attr.style "position" "sticky"
-                                    , Attr.style "top" "3rem"
+                                    , Attr.style "top" "2rem"
                                     , Attr.style "vertical-align" "top"
-                                    , Attr.style "margin" "0rem 3rem 0 0"
+                                    , Attr.style "margin" "2rem 3rem 0 0"
                                     ]
 
                         content =
@@ -369,10 +370,11 @@ view () =
                                 |> Html.main_
                                     [ Attr.style "display" "inline-block"
                                     , Attr.style "max-width" "calc(100vw - 1em)"
+                                    , Attr.style "width" "min-content"
                                     , Attr.style "overflow" "visible"
                                     ]
                     in
-                    [ Markdown.syntaxHighlighting, header, toc, content ]
+                    [ header, toc, content ]
         }
     , title = "Less-Ui Walkthrough"
     }
@@ -381,10 +383,12 @@ view () =
 
 mainExplanation : String
 mainExplanation =
-    """# Main
+    """# Applications without Ui state
 
 
-A `#!elm Less.Application` hides the Ui states in the Url:
+A `#!elm Less.Application` hides the Ui states in the Url. In your Ui, you can then use
+prefabricated patterns such as `#!elm toggle`, `#!elm goTo` or `#!elm filter` to
+create progressive disclosures, routed pages, or query assignments.
 
 ```elm
 main : Less.Application () ()
@@ -396,8 +400,8 @@ main =
         }
 ```
 
-> _As you see, both our `#!elm model` and `#!elm msg` type are (), meaning the app
-defers all state handling to `#!elm Less`._"""
+>> _As you see, both our `#!elm model` and `#!elm msg` type are `#!elm ()`, meaning the app
+doesn't manage any state of its wn. Instead, `#!elm Less` manages Url transition opaquely._"""
 
 
 {-| -}

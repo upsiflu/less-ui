@@ -3,7 +3,7 @@ module Less.Ui.Html exposing
     , toggle, goTo, bounce, filter, search
     , section, article, block, inline, disclose
     , ol, ul, keyedNode, nest
-    , layout, arrangeOverDefaultRegions, Region(..)
+    , layout, animations, arrangeOverDefaultRegions, Region(..)
     )
 
 {-| Default types and functions for working with [elm/html](https://package.elm-lang.org/packages/elm/html/latest/) within [`Less.Ui`](Less-Ui)
@@ -26,7 +26,7 @@ module Less.Ui.Html exposing
 
 # Provide a Layout
 
-@docs layout, arrangeOverDefaultRegions, Region
+@docs layout, animations, arrangeOverDefaultRegions, Region
 
 -}
 
@@ -367,6 +367,104 @@ layout =
     }
 
 
+getAttributes :
+    Mutation
+    ->
+        { childAttributes : List ( String, String )
+        , childSelector : ( String, String )
+        , labelAttributes : List ( String, String )
+        , labelSelector : ( String, String )
+        }
+getAttributes mutation =
+    case mutation of
+        StateEntered currentSet ->
+            { childAttributes = []
+            , childSelector = ( "data-mutation", "state-entered" )
+            , labelAttributes =
+                [ ( "aria-current", currentSet )
+                , ( "data-set", currentSet )
+                ]
+            , labelSelector = ( "data-mutation", "label-state-entered" )
+            }
+
+        StateInside currentSet ->
+            { childAttributes = []
+            , childSelector =
+                ( "data-mutation", "state-inside" )
+            , labelAttributes =
+                [ ( "aria-current", currentSet )
+                , ( "data-set", currentSet )
+                ]
+            , labelSelector = ( "data-mutation", "label-state-inside" )
+            }
+
+        StateLeft currentSet ->
+            { childAttributes =
+                [ ( "aria-hidden", "true" ) ]
+            , childSelector = ( "data-mutation", "state-left" )
+            , labelAttributes =
+                [ ( "aria-current", "false" )
+                , ( "data-set", currentSet )
+                ]
+            , labelSelector = ( "data-mutation", "label-state-left" )
+            }
+
+        StateOutside currentSet ->
+            { childAttributes = []
+            , childSelector =
+                ( "data-mutation", "state-outside" )
+            , labelAttributes =
+                [ ( "aria-current", "false" )
+                , ( "data-set", currentSet )
+                ]
+            , labelSelector = ( "data-mutation", "label-state-outside" )
+            }
+
+        SwitchedOn ->
+            { childAttributes = []
+            , childSelector =
+                ( "data-mutation", "switched-on" )
+            , labelAttributes =
+                [ ( "role", "switch" )
+                , ( "aria-checked", "true" )
+                ]
+            , labelSelector = ( "data-mutation", "label-switched-on" )
+            }
+
+        StillOn ->
+            { childAttributes = []
+            , childSelector =
+                ( "data-mutation", "still-on" )
+            , labelAttributes =
+                [ ( "role", "switch" )
+                , ( "aria-checked", "true" )
+                ]
+            , labelSelector = ( "data-mutation", "label-still-on" )
+            }
+
+        SwitchedOff ->
+            { childAttributes =
+                [ ( "aria-hidden", "true" ) ]
+            , childSelector = ( "data-mutation", "switched-off" )
+            , labelAttributes =
+                [ ( "role", "switch" )
+                , ( "aria-checked", "false" )
+                ]
+            , labelSelector = ( "data-mutation", "label-switched-off" )
+            }
+
+        StillOff ->
+            { childAttributes = []
+            , childSelector =
+                ( "data-mutation", "still-off" )
+            , labelAttributes =
+                [ ( "role", "switch" )
+                , ( "aria-checked", "false" )
+                ]
+            , labelSelector = ( "data-mutation", "label-still-off" )
+            }
+
+
 {-| -}
 wrap :
     { current : State, previous : Maybe State }
@@ -392,44 +490,36 @@ wrap states wrapper =
         applyMutation mutation =
             let
                 addAttributes :
-                    { blockAttributes : List (Html.Attribute Never)
-                    , inlineAttributes : List (Html.Attribute Never)
-                    , vanishableAttributes : List (Html.Attribute Never)
-                    }
+                    Wrapper region narrowMsg msg
                     -> Wrapper region narrowMsg msg
-                    -> Wrapper region narrowMsg msg
-                addAttributes { blockAttributes, inlineAttributes, vanishableAttributes } innerWrapper =
+                addAttributes innerWrapper =
                     let
                         recurse : Html region narrowMsg msg -> Html region narrowMsg msg
                         recurse =
-                            addAttributes { blockAttributes = blockAttributes, inlineAttributes = inlineAttributes, vanishableAttributes = vanishableAttributes }
-                                |> Ui.mapWrapper
-
-                        ( staticBlockAttributes, staticInlineAttributes ) =
-                            ( List.map (Attr.map never) blockAttributes, List.map (Attr.map never) inlineAttributes )
+                            Ui.mapWrapper addAttributes
                     in
                     case innerWrapper of
                         Block config tagName attrs contingent ->
-                            Block config tagName (attrs ++ staticBlockAttributes) contingent
+                            Block config tagName (attrs ++ attributes) contingent
 
                         Inline config tagName attrs contingent ->
-                            Inline config tagName (attrs ++ staticInlineAttributes) contingent
+                            Inline config tagName (attrs ++ attributes) contingent
 
                         Ol attrs contingent ->
-                            Ol (attrs ++ staticBlockAttributes) contingent
+                            Ol (attrs ++ attributes) contingent
 
                         Ul attrs contingent ->
-                            Ul (attrs ++ staticBlockAttributes) contingent
+                            Ul (attrs ++ attributes) contingent
 
                         KeyedNode tagName attrs keyedElements ->
-                            KeyedNode tagName (attrs ++ staticBlockAttributes) keyedElements
+                            KeyedNode tagName (attrs ++ attributes) keyedElements
 
                         Nested { regions, combine } ->
                             Nested { regions = regions, combine = combine }
 
                         Toggle attrs { flag, inHeader, label } contingent ->
                             Toggle
-                                (attrs ++ vanishableAttributes)
+                                (attrs ++ staticAttributes)
                                 { flag = flag, inHeader = inHeader, label = label }
                                 contingent
 
@@ -441,120 +531,29 @@ wrap states wrapper =
                         Search category config contingent ->
                             Search
                                 category
-                                ((\a -> { a | attributes = a.attributes ++ vanishableAttributes }) config)
+                                ((\a -> { a | attributes = a.attributes ++ staticAttributes }) config)
                                 (contingent >> recurse)
 
                         GoTo attrs config contingent ->
-                            GoTo (attrs ++ vanishableAttributes) config (recurse contingent)
+                            GoTo (attrs ++ staticAttributes) config (recurse contingent)
 
                         Bounce attrs config contingent ->
-                            Bounce (attrs ++ vanishableAttributes ++ [ Attr.class "HERE" ]) config (recurse contingent)
+                            Bounce (attrs ++ staticAttributes) config (recurse contingent)
 
-                appearing : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
-                appearing =
-                    { block =
-                        visible.block
-                            ++ [ Attr.style "transition" "max-height .2s, margin .2s, padding .2s, opacity .2s" ]
-                    , inline =
-                        visible.inline
-                            ++ [ Attr.style "transition" "font-size .2s 0s, opacity .2s" ]
-                    }
+                attributes : List (Html.Attribute msg)
+                attributes =
+                    List.map (Attr.map never) staticAttributes
 
-                visible : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
-                visible =
-                    { block =
-                        [ Attr.style "max-height" "100vh" ]
-                    , inline =
-                        []
-                    }
+                staticAttributes : List (Html.Attribute Never)
+                staticAttributes =
+                    childSelector
+                        :: childAttributes
+                        |> List.map (\( attributeName, attributeValue ) -> Attr.attribute attributeName attributeValue)
 
-                disappearing : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
-                disappearing =
-                    { block =
-                        hidden.block
-                            ++ [ Attr.style "transition" "max-height .2s, margin .2s, padding .2s, opacity .2s" ]
-                    , inline =
-                        hidden.inline
-                            ++ [ Attr.style "transition" "font-size .2s 0s, opacity .2s .0s" ]
-                    }
-
-                hidden : { block : List (Html.Attribute Never), inline : List (Html.Attribute Never) }
-                hidden =
-                    { block =
-                        [ Attr.attribute "aria-hidden" "true"
-                        , Attr.tabindex -1
-                        , Attr.style "opacity" "0"
-                        , Attr.style "pointer-events" "none;"
-                        , Attr.style "max-height" "0"
-                        , Attr.style "overflow" "hidden"
-                        , Attr.style "margin" "0"
-                        , Attr.style "padding" "0"
-                        , Attr.style "border-width" "0"
-                        ]
-                    , inline =
-                        [ Attr.attribute "aria-hidden" "true"
-                        , Attr.tabindex -1
-                        , Attr.style "opacity" "0"
-                        , Attr.style "pointer-events" "none;"
-                        , Attr.style "font-size" "0"
-                        ]
-                    }
-
-                outOfFlow : List (Html.Attribute Never)
-                outOfFlow =
-                    [ Attr.style "display" "none" ]
+                { childAttributes, childSelector } =
+                    getAttributes mutation
             in
-            Ui.mapWrapper
-                (addAttributes <|
-                    case mutation of
-                        StateEntered _ ->
-                            { blockAttributes = Attr.class "state-entered" :: appearing.block
-                            , inlineAttributes = Attr.class "state-entered" :: appearing.inline
-                            , vanishableAttributes = Attr.class "state-entered" :: appearing.inline
-                            }
-
-                        StateInside _ ->
-                            { blockAttributes = [ Attr.class "state-inside" ]
-                            , inlineAttributes = [ Attr.class "state-inside" ]
-                            , vanishableAttributes = [ Attr.class "state-inside" ]
-                            }
-
-                        StateLeft _ ->
-                            { blockAttributes = Attr.class "state-left" :: disappearing.block
-                            , inlineAttributes = Attr.class "state-left" :: disappearing.inline
-                            , vanishableAttributes = Attr.class "state-left" :: disappearing.inline ++ outOfFlow
-                            }
-
-                        StateOutside _ ->
-                            { blockAttributes = Attr.class "state-outside" :: hidden.block
-                            , inlineAttributes = Attr.class "state-outside" :: hidden.inline
-                            , vanishableAttributes = Attr.class "state-outside" :: hidden.inline ++ outOfFlow
-                            }
-
-                        SwitchedOn ->
-                            { blockAttributes = Attr.class "switched-on" :: appearing.block
-                            , inlineAttributes = Attr.class "switched-on" :: appearing.inline
-                            , vanishableAttributes = Attr.class "switched-on" :: appearing.inline
-                            }
-
-                        StillOn ->
-                            { blockAttributes = [ Attr.class "still-on" ]
-                            , inlineAttributes = [ Attr.class "still-on" ]
-                            , vanishableAttributes = [ Attr.class "still-on" ]
-                            }
-
-                        SwitchedOff ->
-                            { blockAttributes = Attr.class "switched-off" :: disappearing.block
-                            , inlineAttributes = Attr.class "switched-off" :: disappearing.inline
-                            , vanishableAttributes = Attr.class "switched-off" :: disappearing.inline ++ outOfFlow
-                            }
-
-                        StillOff ->
-                            { blockAttributes = Attr.class "still-off" :: hidden.block
-                            , inlineAttributes = Attr.class "still-off" :: hidden.inline
-                            , vanishableAttributes = Attr.class "still-off" :: hidden.inline ++ outOfFlow
-                            }
-                )
+            Ui.mapWrapper addAttributes
 
         getMutation : Link -> Maybe String -> Mutation
         getMutation =
@@ -562,55 +561,11 @@ wrap states wrapper =
 
         {- map the nested wrappers to appear/disappear -}
         labelAttributesByMutation : Mutation -> List (Html.Attribute msg)
-        labelAttributesByMutation mutation =
-            case mutation of
-                StateEntered currentSet ->
-                    [ Attr.attribute "aria-current" currentSet
-                    , Attr.attribute "data-set" currentSet
-                    , Attr.class "state-entered"
-                    ]
-
-                StateInside currentSet ->
-                    [ Attr.attribute "aria-current" currentSet
-                    , Attr.attribute "data-set" currentSet
-                    , Attr.class "state-inside"
-                    ]
-
-                StateLeft currentSet ->
-                    [ Attr.attribute "aria-current" "false"
-                    , Attr.attribute "data-set" currentSet
-                    , Attr.class "state-left"
-                    ]
-
-                StateOutside currentSet ->
-                    [ Attr.attribute "aria-current" "false"
-                    , Attr.attribute "data-set" currentSet
-                    , Attr.class "state-outside"
-                    ]
-
-                SwitchedOn ->
-                    [ Attr.attribute "role" "switch"
-                    , Attr.attribute "aria-checked" "true"
-                    , Attr.class "state-entered"
-                    ]
-
-                StillOn ->
-                    [ Attr.attribute "role" "switch"
-                    , Attr.attribute "aria-checked" "true"
-                    , Attr.class "state-inside"
-                    ]
-
-                SwitchedOff ->
-                    [ Attr.attribute "role" "switch"
-                    , Attr.attribute "aria-checked" "false"
-                    , Attr.class "state-left"
-                    ]
-
-                StillOff ->
-                    [ Attr.attribute "role" "switch"
-                    , Attr.attribute "aria-checked" "false"
-                    , Attr.class "state-outside"
-                    ]
+        labelAttributesByMutation =
+            getAttributes
+                >> (\{ labelAttributes, labelSelector } -> labelSelector :: labelAttributes)
+                >> List.map
+                    (\( attributeName, attributeValue ) -> Attr.attribute attributeName attributeValue)
 
         wrapKeyedElements : (List ( String, b ) -> a) -> List ( String, List b ) -> List a
         wrapKeyedElements fu =
@@ -751,6 +706,7 @@ wrap states wrapper =
                     appHtml config.label
                         ++ [ Html.input
                                 (Attr.value (String.join " " spaceSeparatedSearchTerms)
+                                    :: Attr.type_ "search"
                                     :: Events.onInput
                                         (\newSearchTerm ->
                                             Link.UrlCmd (link newSearchTerm)
@@ -822,6 +778,168 @@ wrap states wrapper =
                             ]
                     , inHeader = True
                     }
+
+
+{-| Add delightful css transitions to reflect the Url transitions.
+
+Works best when little additional css is added to your app.
+
+-}
+animations : Html region_ msg_ narrowMsg_
+animations =
+    let
+        animation : String -> List ( String, List ( String, String ) ) -> String
+        animation name =
+            List.map
+                (\( position, rules ) ->
+                    position
+                        :: List.map
+                            (\( key, value ) -> " {" ++ key ++ ": " ++ value ++ "}\n")
+                            rules
+                        |> String.concat
+                )
+                >> String.concat
+                >> ruleset [ "@keyframes " ++ name ]
+
+        blockElements : String
+        blockElements =
+            ":is(address, article, aside, blockquote, canvas, dd, div, dl, dt, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, header, hr, li, main, nav, ol, p, pre, section, table, tfoot, ul, video)"
+
+        children : List Mutation -> String
+        children =
+            List.map
+                (\mutation ->
+                    let
+                        ( attr, value ) =
+                            (getAttributes mutation).childSelector
+                    in
+                    "[" ++ attr ++ "=\"" ++ value ++ "\"]"
+                )
+                >> either
+
+        inlineElements : String
+        inlineElements =
+            selectNot blockElements
+
+        selectNot : String -> String
+        selectNot selector =
+            ":not(" ++ selector ++ ")"
+
+        labels : List Mutation -> String
+        labels =
+            List.map
+                (\mutation ->
+                    let
+                        ( attr, value ) =
+                            (getAttributes mutation).labelSelector
+                    in
+                    "[" ++ attr ++ "=\"" ++ value ++ "\"]"
+                )
+                >> either
+
+        ruleset : List String -> String -> String
+        ruleset selectors rule =
+            String.concat selectors
+                ++ "{\n"
+                ++ rule
+                ++ "\n}\n\n"
+
+        either : List String -> String
+        either selectors =
+            ":is(" ++ String.join ", " selectors ++ ")"
+    in
+    [ animation "less-ui-blink"
+        [ ( "90%", [ ( "filter", "invert(1)" ) ] ) ]
+    , ruleset [ labels [ StateEntered "" ] ]
+        """
+            animation: 
+                3 .1s alternate steps(1, start) .05s less-ui-blink;
+        """
+
+    ---- Block Elements
+    , ruleset
+        [ blockElements
+        , children [ StateEntered "", SwitchedOn, StateInside "", StillOn ]
+        ]
+        """
+            line-height: 1.15;
+        """
+    , ruleset
+        [ blockElements
+        , children [ StateEntered "", SwitchedOn ]
+        ]
+        """
+            transition: 
+                .2s line-height,
+                .2s margin,
+                .2s padding,
+                0s 0s height,
+                0s 0s visibility;
+        """
+    , ruleset
+        [ blockElements
+        , children [ StateLeft "", SwitchedOff, StateOutside "", StillOff ]
+        ]
+        """
+            line-height:0;
+            margin:0; padding:0;
+            visibility: hidden;
+        """
+    , ruleset
+        [ blockElements
+        , children [ StateLeft "", SwitchedOff ]
+        ]
+        """
+            transition: 
+                .2s line-height,
+                .2s margin,
+                .2s padding,
+                0s .2s height,
+                0s .2s visibility;
+        """
+    , ruleset
+        [ blockElements
+        , children [ StateOutside "", StillOff ]
+        ]
+        """
+            height:0
+        """
+
+    ---- Nasty Descendents
+    , ruleset
+        [ blockElements
+        , children [ StateLeft "", SwitchedOff, StateOutside "", StillOff ]
+        , " " ++ blockElements
+        ]
+        """
+            margin:0; padding:0;
+            
+        """
+
+    ---- Inline Elements
+    , ruleset
+        [ inlineElements
+        , children [ StateEntered "", SwitchedOn ]
+        ]
+        """
+            line-height: 1.15;
+        """
+    , ruleset [ inlineElements, children [ StateLeft "", SwitchedOff, StateInside "", StillOn, StateOutside "", StillOff ] ]
+        """
+            transition:
+                font-size 1.2s 0s, 
+                visibility 0s 1s;
+        """
+    , ruleset [ inlineElements, children [ StateLeft "", SwitchedOff, StateOutside "", StillOff ] ]
+        """
+            line-height:0;
+            text-indent:0;
+            font-size:0;
+        """
+    ]
+        |> List.map Html.text
+        |> Ui.singleton
+        |> block "style" []
 
 
 {-| -}

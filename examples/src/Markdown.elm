@@ -1,4 +1,4 @@
-module Markdown exposing (html, md, syntaxHighlighting, toc)
+module Markdown exposing (html, md, syntaxHighlight, toc)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -334,6 +334,8 @@ toc =
             )
 
 
-syntaxHighlighting : Html msg
-syntaxHighlighting =
-    SyntaxHighlight.useTheme SyntaxHighlight.gitHub
+{-| Adds github syntax highlighting from <https://pablohirafuji.github.io/elm-syntax-highlight/>
+-}
+syntaxHighlight : Ui.Html region narrowMsg msg
+syntaxHighlight =
+    Ui.html [ SyntaxHighlight.useTheme SyntaxHighlight.gitHub ]
