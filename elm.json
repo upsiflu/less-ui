@@ -3,7 +3,7 @@
     "name": "upsiflu/less-ui",
     "summary": "Less pushing around `views` across the DOM. Less Ui state in your model.",
     "license": "BSD-3-Clause",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "exposed-modules": [
         "Less",
         "Less.Ui",
