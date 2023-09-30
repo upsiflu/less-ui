@@ -12,10 +12,10 @@ examples/firebase-debug.*.log*
 
 # Firebase cache
 examples/.firebase/
+examples/.firebase/hosting.cHVibGlj.cache
 
 # Node
 node_modules
 
 # Tipp: add editor and OS specific excludes into your global excludefile before committing.
 
-examples/.firebase/hosting.cHVibGlj.cache
