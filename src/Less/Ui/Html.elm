@@ -363,7 +363,7 @@ layout :
 layout =
     { wrap = wrap
     , concat = concat
-    , arrange = \{ header } -> Maybe.withDefault [] header
+    , arrange = .header
     }
 
 
@@ -521,7 +521,7 @@ wrap states wrapper =
                             Toggle
                                 (attrs ++ staticAttributes)
                                 { flag = flag, inHeader = inHeader, label = label }
-                                contingent
+                                (recurse contingent)
 
                         Filter category contingent ->
                             Filter
@@ -857,16 +857,27 @@ animations =
         """
 
     ---- Block Elements
+    -- Note that line height must be set because
+    -- otherwise it's often `normal` and can't be
+    -- animated. `normal` varies between 1 and more.
     , ruleset
         [ blockElements
-        , children [ StateEntered "", SwitchedOn, StateInside "", StillOn ]
+        , children
+            [ StateEntered ""
+            , SwitchedOn
+            , StateInside ""
+            , StillOn
+            ]
         ]
         """
             line-height: 1.15;
         """
     , ruleset
         [ blockElements
-        , children [ StateEntered "", SwitchedOn ]
+        , children
+            [ StateEntered ""
+            , SwitchedOn
+            ]
         ]
         """
             transition: 
@@ -878,16 +889,25 @@ animations =
         """
     , ruleset
         [ blockElements
-        , children [ StateLeft "", SwitchedOff, StateOutside "", StillOff ]
+        , children
+            [ StateLeft ""
+            , SwitchedOff
+            , StateOutside ""
+            , StillOff
+            ]
         ]
         """
             line-height:0;
-            margin:0; padding:0;
+            margin:0; 
+            padding:0;
             visibility: hidden;
         """
     , ruleset
         [ blockElements
-        , children [ StateLeft "", SwitchedOff ]
+        , children
+            [ StateLeft ""
+            , SwitchedOff
+            ]
         ]
         """
             transition: 
@@ -899,7 +919,10 @@ animations =
         """
     , ruleset
         [ blockElements
-        , children [ StateOutside "", StillOff ]
+        , children
+            [ StateOutside ""
+            , StillOff
+            ]
         ]
         """
             height:0
@@ -908,7 +931,12 @@ animations =
     ---- Nasty Descendents
     , ruleset
         [ blockElements
-        , children [ StateLeft "", SwitchedOff, StateOutside "", StillOff ]
+        , children
+            [ StateLeft ""
+            , SwitchedOff
+            , StateOutside ""
+            , StillOff
+            ]
         , " " ++ blockElements
         ]
         """
@@ -919,22 +947,70 @@ animations =
     ---- Inline Elements
     , ruleset
         [ inlineElements
-        , children [ StateEntered "", SwitchedOn ]
+        , children
+            [ StateEntered ""
+            , SwitchedOn
+            , StateInside ""
+            , StillOn
+            ]
         ]
         """
-            line-height: 1.15;
         """
-    , ruleset [ inlineElements, children [ StateLeft "", SwitchedOff, StateInside "", StillOn, StateOutside "", StillOff ] ]
+    , ruleset
+        [ inlineElements
+        , children
+            [ StateEntered ""
+            , SwitchedOn
+            ]
+        ]
         """
             transition:
-                font-size 1.2s 0s, 
-                visibility 0s 1s;
+                .2s font-size,
+                .2s text-indent,
+                .2s padding,
+                .1s opacity,
+                0s 0s visibility;
         """
-    , ruleset [ inlineElements, children [ StateLeft "", SwitchedOff, StateOutside "", StillOff ] ]
+    , ruleset
+        [ inlineElements
+        , children
+            [ StateLeft ""
+            , SwitchedOff
+            , StateOutside ""
+            , StillOff
+            ]
+        ]
         """
-            line-height:0;
             text-indent:0;
             font-size:0;
+            padding:0;
+            opacity:0;
+            visibility: hidden;
+        """
+    , ruleset
+        [ inlineElements
+        , children
+            [ StateLeft ""
+            , SwitchedOff
+            ]
+        ]
+        """
+            transition: 
+                .2s font-size,
+                .2s text-indent,
+                .2s padding,
+                .1s .1s opacity,
+                0s .2s visibility;
+        """
+    , ruleset
+        [ inlineElements
+        , children
+            [ StateOutside ""
+            , StillOff
+            ]
+        ]
+        """
+            opacity:0
         """
     ]
         |> List.map Html.text

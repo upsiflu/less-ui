@@ -64,8 +64,8 @@ text =
 
 codeSpan : String -> Ui.Html region narrowMsg msg
 codeSpan str =
-    if String.startsWith "#!elm" str then
-        String.dropLeft 5 str
+    if String.startsWith "#!elm " str then
+        String.dropLeft 6 str
             |> SyntaxHighlight.elm
             |> Result.unpack
                 (\_ -> Html.text "Error in `code`")

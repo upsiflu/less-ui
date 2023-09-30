@@ -102,6 +102,7 @@ The following exports have no application and may be removed in the next release
 import AssocList as Dict exposing (Dict)
 import Less.Link exposing (State)
 import List.Extra as List
+import Maybe.Extra as Maybe
 
 
 {-|
@@ -267,7 +268,7 @@ uncons =
 type alias Layout region narrowHtml html narrowWrapper customWrapper =
     { wrap : { current : State, previous : Maybe State } -> customWrapper -> Wrapper region narrowHtml html narrowWrapper customWrapper
     , concat : List html -> html
-    , arrange : { header : Maybe html, region : region -> Maybe html } -> html
+    , arrange : { header : html, region : region -> html } -> html
     }
 
 
@@ -279,7 +280,8 @@ applyStates :
     -> CurrentLayout region narrowHtml html narrowWrapper customWrapper
 applyStates states layout =
     { wrap = layout.wrap states
-    , concat = dict.concatBy layout.concat
+    , concat = layout.concat
+    , concatDicts = dict.concatBy layout.concat
     , arrange = layout.arrange
     }
 
@@ -289,8 +291,9 @@ through [applyStates](#applyStates).
 -}
 type alias CurrentLayout region narrowHtml html narrowWrapper customWrapper =
     { wrap : customWrapper -> Wrapper region narrowHtml html narrowWrapper customWrapper
-    , concat : List (Dict (OrHeader region) html) -> Dict (OrHeader region) html
-    , arrange : { header : Maybe html, region : region -> Maybe html } -> html
+    , concat : List html -> html
+    , concatDicts : List (Dict (OrHeader region) html) -> Dict (OrHeader region) html
+    , arrange : { header : html, region : region -> html } -> html
     }
 
 
@@ -346,8 +349,15 @@ view :
 view layout =
     viewUi layout Header
         >> (\rendered ->
-                { header = Dict.get Header rendered
-                , region = \region -> Dict.get (Region region) rendered
+                { header =
+                    Dict.get Header rendered
+                        |> Maybe.toList
+                        |> layout.concat
+                , region =
+                    \region ->
+                        Dict.get (Region region) rendered
+                            |> Maybe.toList
+                            |> layout.concat
                 }
            )
         >> layout.arrange
@@ -415,7 +425,7 @@ viewUi layout region =
                     List.concatMap
                         (\( key, ui ) -> unkeyItems key ui)
                         keyedElements
-                        |> layout.concat
+                        |> layout.concatDicts
 
                 -- map : (k -> a -> b) -> Dict k a -> Dict k b
                 Nested { regions, narrowLayout, combine } ->
@@ -444,7 +454,7 @@ viewUi layout region =
                             else
                                 region
                     in
-                    layout.concat
+                    layout.concatDicts
                         [ Dict.singleton labelRegion label
                         , viewUi layout region elements
                         ]
@@ -459,7 +469,7 @@ viewUi layout region =
                     inRegion r
     in
     List.map viewItem
-        >> layout.concat
+        >> layout.concatDicts
 
 
 
