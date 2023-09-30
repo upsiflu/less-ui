@@ -14,19 +14,21 @@ welcomeExplanation =
 
 # Welcome!
 
-This is a self-explaning walkthrough. It presents its own code.
+This is a self-explaining walkthrough. It presents its own code.
 
-Open [the Elm module](https://github.com/upsiflu/less-ui/blob/main/examples/src/Features.elm) in your editor
-of choice and follow along!
+To run it yourself, `git clone https://github.com/upsiflu/less-ui/` into your computer,
+then follow the instructions in the Readme.
+
+Or open [the Elm module](https://github.com/upsiflu/less-ui/blob/main/examples/src/Features.elm) and follow along!
 
 Btw, here is the code that created this message:
 
 ```elm
 viewWelcome : Ui
 viewWelcome =
-    md  \"\"\"∞\"\"\"
-        |> Less.Ui.inRegion Content
-        |> Less.Ui.Html.goTo []
+    md  ∞
+        |> Ui.inRegion Content
+        |> Ui.goTo []
             { destination = ""
             , inHeader = True
             , label = [ Html.h2 [] [ Html.text "⌂" ] ]
@@ -60,26 +62,30 @@ uiExplanation =
 import Html
 import Html.Attributes as Attr
 import Less
-import Less.Ui
-import Less.Ui.Html exposing (layout)
+import Less.Ui as Ui
+import Less.Ui.Html as Ui exposing (layout)
 import Markdown exposing (md)
 ```
 
+```elm
+type alias Ui =
+    Ui.Html 
+        Region 
+        () 
+        ()
+```
+
 An Html Ui has three type parameters:
+
 1. The [Screen Region](Screen+Regions) of a snipped sets where on the screen it will appear.
 For example, `#!elm ui |> inRegion X` moves the Ui to region "X". 
-[Check out `#!elm View` for how regions are laid out on the screen.](View#Layout)
+More about Regions [in the next chapter](Screen+Regions).
 1. The second parameter is the message type. This app is completely Url-driven and has
 neither a model nor any messages, so the message type is "unit" `#!elm ()`.
 Any message that patterns such as "search" require are managed internally by [Less.Application](Applications+without+Ui+state).
 1. The third parameter is the message type of nested Html. It's only relevant if you want
 to nest Ui code inside a function that transforms from Html a to Html b. For example with
 `elm-any-type-forms`. 
-
-```elm
-type alias Ui =
-    Less.Ui.Html.Ui Region () ()
-```
 """
 
 
@@ -93,7 +99,7 @@ regionExplanation =
 # Screen Regions
 
 Define your regions, then assign your Ui snippets their place on the screen
-with `#!elm Less.Ui.inRegion`. This is how this text appears in the `#!elm Content` region 
+with `#!elm Ui.inRegion`. This is how this text appears in the `#!elm Content` region 
 and the chapter links in the `#!elm Toc`.
 
 ```elm 
@@ -119,11 +125,12 @@ viewExplanation =
 ```elm
 body : Ui
 body =
-    viewWelcome ++ viewToc
+    viewWelcome ++ viewToc ++ Markdown.syntaxHighlight ++ Ui.animations
 ```
 
 >> _To compose the body of the app, we append two `#!elm Ui`s. 
-  This is possible because a `#!elm Ui` is a `#!elm List`._
+  This is possible because a `#!elm Ui` is a `#!elm List`.
+  As you may have guessed, the last two are `<style>` tags._
                
 
 ```elm
@@ -147,13 +154,13 @@ of `#!elm goTo` links with associated routes and pages._
 ```elm
 viewToc : Ui
 viewToc =
-    Less.Ui.Html.search [ Attr.placeholder "Search" ]
+    Ui.search [ Attr.placeholder "Search" ]
         { category = "search"
         , inHeader = False
         , label = []
         }
-        searchToc
-        |> Less.Ui.inRegion Toc
+        searchOutline
+        |> Ui.inRegion Toc
 ```
 
 
@@ -161,11 +168,12 @@ viewToc =
 In `#!elm searchToc`, we respond dynamically to these changes._
 
 ```elm
-searchToc : List String -> Ui
-searchToc searchTerms =
+searchOutline : List String -> Ui
+searchOutline searchTerms =
     let
 ```
->> _For each chapter, draw a link, then hide it with a graceful transition if it doesn't contain all search terms._
+>> _For each chapter, render links to its heading(s). If the chapter doesn't contain all search terms, 
+   hide the corresponding links with a graceful css transition._
 ```elm
     in
     List.concatMap viewChapter outline
@@ -183,7 +191,7 @@ This means that if the current assignment is `#!elm search=a b c`, I can add a f
 filter out `#!elm c`:
 
 ```elm
-Less.Ui.Html.toggle []
+Ui.toggle []
     { flag = 
         "search=" 
             ++ String.join 
@@ -200,20 +208,20 @@ Enter some search terms, then click the following link to toggle the visibility 
 [Toggle me the tokens](?toggle=showTokens)
 
 The markdown for this Link is `[Toggle me the tokens](?toggle=showTokens)`,
-and here is the `#!elm toggle` pattern that hides and shows the toggles:
+and here is the `#!elm toggle` pattern that hides and shows the toggles under the TOC:
 
 ```elm
-Less.Ui.Html.toggle []
+Ui.toggle []
     { flag = "showTokens"
     , inHeader = False
     , label = []
     }
-    -- Here come the toggles (as long as they are toggled on)
+    ...
 ```
 
 # Layout
 
-We are extending `#!elm Less.Ui.Html.layout`,
+We are extending `#!elm Ui.layout`,
 using a custom `#!elm arrange` function that receives the rendered Html snippets per screen region.
 
 ```elm
@@ -222,22 +230,17 @@ view () =
     { body = body
     , layout =
         { layout 
-            | arrange =
-                \\renderedHtml ->
-                    let
-                        header =
-                            Maybe.withDefault [] renderedHtml.header
-                                |> Html.header [ ... ]
+        | arrange =
+            \\renderedHtml ->
+                [ renderedHtml.header
+                    |> Html.header [ ... ]
 
-                        toc =
-                            Maybe.withDefault [] (renderedHtml.region Toc)
-                                |> Html.nav [ ... ]
+                , renderedHtml.region Toc
+                    |> Html.nav [ ... ]
 
-                        content =
-                            Maybe.withDefault [] (renderedHtml.region Content)
-                                |> Html.main_ [ ... ]
-                    in
-                    [ Markdown.syntaxHighlighting, header, toc, content ]
+                , renderedHtml.region Content
+                    |> Html.main_ [ ... ]
+                ]
         }
     , title = "Less-Ui Walkthrough"
     }
@@ -246,6 +249,11 @@ view () =
 
 
     """
+
+
+body : Ui
+body =
+    viewWelcome ++ viewToc ++ Markdown.syntaxHighlight ++ Ui.animations
 
 
 outline : List String
@@ -258,8 +266,19 @@ outline =
     ]
 
 
-searchToc : List String -> Ui
-searchToc searchTerms =
+viewToc : Ui
+viewToc =
+    Ui.search [ Attr.placeholder "Search" ]
+        { category = "search"
+        , inHeader = False
+        , label = []
+        }
+        searchOutline
+        |> Ui.inRegion Toc
+
+
+searchOutline : List String -> Ui
+searchOutline searchTerms =
     let
         addHeadingLinks : ( String, List String ) -> Ui -> Ui
         addHeadingLinks ( heading, subheadings ) =
@@ -323,22 +342,6 @@ searchToc searchTerms =
         ++ tokens
 
 
-viewToc : Ui
-viewToc =
-    Ui.search [ Attr.placeholder "Search" ]
-        { category = "search"
-        , inHeader = False
-        , label = []
-        }
-        searchToc
-        |> Ui.inRegion Toc
-
-
-body : Ui
-body =
-    viewWelcome ++ viewToc ++ Markdown.syntaxHighlight ++ Ui.animations
-
-
 view : () -> Less.Document ()
 view () =
     { body = body
@@ -346,35 +349,28 @@ view () =
         { layout
             | arrange =
                 \renderedHtml ->
-                    let
-                        header =
-                            Maybe.withDefault [] renderedHtml.header
-                                |> Html.header
-                                    [ Attr.class "header"
-                                    , Attr.style "position" "sticky"
-                                    , Attr.style "top" "0.5em"
-                                    ]
-
-                        toc =
-                            Maybe.withDefault [] (renderedHtml.region Toc)
-                                |> Html.nav
-                                    [ Attr.style "display" "inline-block"
-                                    , Attr.style "position" "sticky"
-                                    , Attr.style "top" "2rem"
-                                    , Attr.style "vertical-align" "top"
-                                    , Attr.style "margin" "2rem 3rem 0 0"
-                                    ]
-
-                        content =
-                            Maybe.withDefault [] (renderedHtml.region Content)
-                                |> Html.main_
-                                    [ Attr.style "display" "inline-block"
-                                    , Attr.style "max-width" "calc(100vw - 1em)"
-                                    , Attr.style "width" "min-content"
-                                    , Attr.style "overflow" "visible"
-                                    ]
-                    in
-                    [ header, toc, content ]
+                    [ renderedHtml.header
+                        |> Html.header
+                            [ Attr.class "header"
+                            , Attr.style "position" "sticky"
+                            , Attr.style "top" "0.5em"
+                            ]
+                    , renderedHtml.region Toc
+                        |> Html.nav
+                            [ Attr.style "display" "inline-block"
+                            , Attr.style "position" "sticky"
+                            , Attr.style "top" "2rem"
+                            , Attr.style "vertical-align" "top"
+                            , Attr.style "margin" "2rem 3rem 0 0"
+                            ]
+                    , renderedHtml.region Content
+                        |> Html.main_
+                            [ Attr.style "display" "inline-block"
+                            , Attr.style "max-width" "calc(100vw - 1em)"
+                            , Attr.style "width" "min-content"
+                            , Attr.style "overflow" "visible"
+                            ]
+                    ]
         }
     , title = "Less-Ui Walkthrough"
     }
@@ -387,7 +383,7 @@ mainExplanation =
 
 
 A `#!elm Less.Application` hides the Ui states in the Url. In your Ui, you can then use
-prefabricated patterns such as `#!elm toggle`, `#!elm goTo` or `#!elm filter` to
+prefabricated patterns such as `#!elm Ui.toggle`, `#!elm Ui.goTo` or `#!elm Ui.filter` to
 create progressive disclosures, routed pages, or query assignments.
 
 ```elm
