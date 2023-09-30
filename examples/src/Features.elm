@@ -415,11 +415,13 @@ whereToGoNext =
     """
 ## Where to go next
 
-Source: [https://github.com/upsiflu/less-ui](https://github.com/upsiflu/less-ui)
+📖 Docs: [https://package.elm-lang.org/packages/upsiflu/less-ui/latest](https://package.elm-lang.org/packages/upsiflu/less-ui/latest)
 
-Issues: [https://github.com/upsiflu/less-ui/issues](https://github.com/upsiflu/less-ui/issues)
+🐌 Source: [https://github.com/upsiflu/less-ui](https://github.com/upsiflu/less-ui)
 
-🐌🐌🐌
+💭 Issues: [https://github.com/upsiflu/less-ui/issues](https://github.com/upsiflu/less-ui/issues)
+
+
 
 _I'm always excited to hear your comments, questions, musings, issues or tips. Slip me a message via upsiflu{at}gmail.com or on the elm slack or in a github issue._
 
