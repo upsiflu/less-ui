@@ -21,12 +21,12 @@ An proof-of-concept package for people who don't want to hand-wrangle user inter
 
 ## Features
 
-**Let the Url store all the Ui state** - No more Ui messages in your application. Bonus: you can reproduce the current Ui state by copying the Url. Bonus 2: You can style state transitions for extra smoothness.
+**— Let the Url store all the Ui state** — No more Ui messages in your application. Bonus: you can reproduce the current Ui state by copying the Url. Bonus 2: You can style state transitions for extra smoothness.
 
-**Target several screen regions in a single view** so you don't need to aggregate Html snippets in some unrelated module.
+**— Target several screen regions in a single view** — so you don't need to aggregate Html snippets in some unrelated module.
 
 ```elm
-    at Scene (textLabel "Scene") ++ at Info (textLabel "Info")
+Ui.inRegion Scene (text "Scene") ++ Ui.inRegion Info (text "Info") ...
 ```
 
 ```
@@ -41,7 +41,7 @@ An proof-of-concept package for people who don't want to hand-wrangle user inter
     ┗━━━━━━━━━━━┛
 ```
 
-**Compose everything:** `at region`, `(++)`, `wrap wrapper` compose Uis with each other. Uis can be created from anything that renders to Html (`elm-ui`, `elm-widgets`, `String`...) or from a limited set of patterns including `toggle`, `search`, `filter`, `goTo` etc. You can also use widgets that compose Html such as `elm-any-type-form`.
+**— Compose everything:** `inRegion`, `(++)`, `wrap` compose Uis with each other. Uis can be created from anything that renders to Html (`elm-ui`, `elm-widgets`, `String`...) or from a limited set of patterns including `toggle`, `search`, `filter`, `goTo` etc. You can also use widgets that compose Html such as `elm-any-type-form`.
 
 
 
@@ -91,40 +91,37 @@ elm-review
 
 This package can help you create predictable and pleasurable interfaces without making design decisions. It is not a complete Ui package.
 
-- No inaccessible, invalid, inconsistently styled Html – Use _elm-w3_, _elm-widgets_, _elm-ui_ and friends
-- No interactive controls without corresponding Model type – Use _elm-any-type-forms_
+- No inaccessible, invalid, inconsistently styled Html – Use _elm-w3_, _elm-widgets_, _elm-ui_ and friends.
+- No interactive controls without corresponding Model type – Use _elm-any-type-forms_.
 
 
 
 ## Use case
 
-In small apps, `less-ui` can reduce the `view` code. In the following example, `Html.toggle` adds state without cluttering the model, and `Ui.at` spreads a single view over separate screen regions (branches of the DOM).
+In small apps, `less-ui` can reduce the `view` code. In the following example, `Ui.toggle` adds state without cluttering the model, and `Ui.inRegion` spreads a single view over separate screen regions (branches of the DOM).
 
   ```elm
-  import Ui
-  import Ui.Html as Html
-  import Ui.Region exposing (Region(..))
-
-
+  import Less.Ui
+  import Less.Ui.Html as Ui exposing (Region(..))
 
   makeTab (name, src, description) =
       let
           photo =
-              Ui.singleton [Html.img [Attr.src photo] []]
+              Ui.html [Html.img [Attr.src src] []]
 
           caption =
-              Ui.singleton [Html.text description]
+              Ui.html [Html.text description]
         
       in
-      Ui.at Scene photo ++ Ui.at Info caption
+      Ui.inRegion Scene photo ++ Ui.inRegion Info caption
           |> Html.toggle []
               { flag = name
-              , isGlobal = True
+              , inHeader = True
               , label = Html.text name 
               }
 
   view =
-      Ui.singleton [Html.text "Look at these trees:"]
+      Ui.html [Html.text "Look at these trees:"]
           ++ List.concatMap makeTab
             [ ("Elm", "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/East_Coker_elm%2C_2.jpg/440px-East_Coker_elm%2C_2.jpg", "Its planky wood makes the Elm tree a hikers' favorite.")
             , ("Yggdrasill", "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Om_Yggdrasil_by_Fr%C3%B8lich.jpg/440px-Om_Yggdrasil_by_Fr%C3%B8lich.jpg", "You cannot sleep here but you may find fruit and feathers.")
