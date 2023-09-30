@@ -23,33 +23,33 @@ heading { level, rawText, children } =
     List.concat children
         |> (case level of
                 Block.H1 ->
-                    Ui.block "h1" [ Attr.id id ]
+                    Ui.node "h1" [ Attr.id id ]
 
                 Block.H2 ->
-                    Ui.block "h2" [ Attr.id id ]
+                    Ui.node "h2" [ Attr.id id ]
 
                 Block.H3 ->
-                    Ui.block "h3" [ Attr.id id ]
+                    Ui.node "h3" [ Attr.id id ]
 
                 Block.H4 ->
-                    Ui.block "h4" [ Attr.id id ]
+                    Ui.node "h4" [ Attr.id id ]
 
                 Block.H5 ->
-                    Ui.block "h5" [ Attr.id id ]
+                    Ui.node "h5" [ Attr.id id ]
 
                 Block.H6 ->
-                    Ui.block "h6" [ Attr.id id ]
+                    Ui.node "h6" [ Attr.id id ]
            )
 
 
 paragraph : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 paragraph =
-    List.concat >> Ui.block "p" []
+    List.concat >> Ui.node "p" []
 
 
 blockQuote : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 blockQuote =
-    List.concat >> Ui.block "blockquote" []
+    List.concat >> Ui.node "blockquote" []
 
 
 html_ : Markdown.Html.Renderer (List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg)
@@ -75,22 +75,22 @@ codeSpan str =
 
     else
         text str
-            |> Ui.inline "code" []
+            |> Ui.node "code" []
 
 
 strong : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 strong =
-    List.concat >> Ui.inline "strong" []
+    List.concat >> Ui.node "strong" []
 
 
 emphasis : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 emphasis =
-    List.concat >> Ui.inline "em" []
+    List.concat >> Ui.node "em" []
 
 
 strikethrough : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 strikethrough =
-    List.concat >> Ui.inline "span" [ Attr.style "text-decoration-line" "line-through" ]
+    List.concat >> Ui.node "span" [ Attr.style "text-decoration-line" "line-through" ]
 
 
 hardLineBreak : Ui.Html region narrowMsg msg
@@ -102,21 +102,21 @@ link : { title : Maybe String, destination : String } -> List (Ui.Html region na
 link config content =
     case config.title of
         Just title ->
-            Ui.inline "a"
+            Ui.node "a"
                 [ Attr.href config.destination
                 , Attr.title title
                 ]
                 (List.concat content)
 
         Nothing ->
-            Ui.inline "a" [ Attr.href config.destination ] (List.concat content)
+            Ui.node "a" [ Attr.href config.destination ] (List.concat content)
 
 
 image : { alt : String, src : String, title : Maybe String } -> Ui.Html region narrowMsg msg
 image imageInfo =
     case imageInfo.title of
         Just title ->
-            Ui.inline "img"
+            Ui.node "img"
                 [ Attr.src imageInfo.src
                 , Attr.alt imageInfo.alt
                 , Attr.title title
@@ -124,7 +124,7 @@ image imageInfo =
                 []
 
         Nothing ->
-            Ui.inline "img"
+            Ui.node "img"
                 [ Attr.src imageInfo.src
                 , Attr.alt imageInfo.alt
                 ]
@@ -144,7 +144,7 @@ unorderedList =
                                     Ui.singleton [ Html.text "" ]
 
                                 Block.IncompleteTask ->
-                                    Ui.block "input"
+                                    Ui.node "input"
                                         [ Attr.disabled True
                                         , Attr.checked False
                                         , Attr.type_ "checkbox"
@@ -152,16 +152,16 @@ unorderedList =
                                         (Ui.singleton [ Html.text "" ])
 
                                 Block.CompletedTask ->
-                                    Ui.block "input"
+                                    Ui.node "input"
                                         [ Attr.disabled True
                                         , Attr.checked True
                                         , Attr.type_ "checkbox"
                                         ]
                                         (Ui.singleton [ Html.text "" ])
                     in
-                    Ui.block "li" [] (checkbox ++ List.concat children)
+                    Ui.node "li" [] (checkbox ++ List.concat children)
         )
-        >> Ui.block "ul"
+        >> Ui.node "ul"
             []
 
 
@@ -169,11 +169,11 @@ orderedList : Int -> List (List (Ui.Html region narrowMsg msg)) -> Ui.Html regio
 orderedList startingIndex =
     List.concatMap
         (\itemBlocks ->
-            Ui.block "li"
+            Ui.node "li"
                 []
                 (List.concat itemBlocks)
         )
-        >> Ui.block "ol"
+        >> Ui.node "ol"
             (case startingIndex of
                 1 ->
                     [ Attr.start startingIndex ]
@@ -192,10 +192,10 @@ codeBlock block =
                 (SyntaxHighlight.toBlockHtml Nothing)
             |> List.singleton
             |> Ui.singleton
-            |> Ui.block "div" []
+            |> Ui.node "div" []
 
     else
-        Ui.block "pre"
+        Ui.node "pre"
             []
             (Ui.singleton
                 [ Html.code []
@@ -207,32 +207,32 @@ codeBlock block =
 
 thematicBreak : Ui.Html region narrowMsg msg
 thematicBreak =
-    Ui.block "hr" [] (text "")
+    Ui.node "hr" [] (text "")
 
 
 table : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 table =
-    List.concat >> Ui.block "table" []
+    List.concat >> Ui.node "table" []
 
 
 tableHeader : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 tableHeader =
-    List.concat >> Ui.block "thead" []
+    List.concat >> Ui.node "thead" []
 
 
 tableBody : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 tableBody =
-    List.concat >> Ui.block "tbody" []
+    List.concat >> Ui.node "tbody" []
 
 
 tableRow : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 tableRow =
-    List.concat >> Ui.block "tr" []
+    List.concat >> Ui.node "tr" []
 
 
 tableCell : Maybe Block.Alignment -> List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 tableCell =
-    \_ -> List.concat >> Ui.block "td" []
+    \_ -> List.concat >> Ui.node "td" []
 
 
 tableHeaderCell : Maybe Block.Alignment -> List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
@@ -256,7 +256,7 @@ tableHeaderCell maybeAlignment =
                 |> Maybe.map List.singleton
                 |> Maybe.withDefault []
     in
-    List.concat >> Ui.block "th" attrs
+    List.concat >> Ui.node "th" attrs
 
 
 elmRenderer : Renderer (Ui.Html region narrowMsg msg)

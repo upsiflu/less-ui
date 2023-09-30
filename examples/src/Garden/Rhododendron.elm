@@ -6,12 +6,10 @@ module Garden.Rhododendron exposing (Rhododendron, singleton, update, Msg, view)
 
 -}
 
-import Html exposing (Html, button, input, text)
-import Html.Attributes as Attr
+import Html exposing (button, input, text)
 import Html.Events exposing (onClick, onInput)
-import Html.Keyed
 import Less.Ui as Ui
-import Less.Ui.Html
+import Less.Ui.Html as Ui
 import Less.Ui.Region exposing (Region(..))
 
 
@@ -82,7 +80,7 @@ map toPath ((Rhododendron label descendants) as rhodo) =
 
 
 type alias Ui msg =
-    Less.Ui.Html.Ui msg msg
+    Ui.Html Ui.Region msg msg
 
 
 {-| -}

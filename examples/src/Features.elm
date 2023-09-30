@@ -17,7 +17,7 @@ welcomeExplanation =
 This is a self-explaining walkthrough. It presents its own code.
 
 To run it yourself, `git clone https://github.com/upsiflu/less-ui/` into your computer,
-then follow the instructions in the Readme.
+then follow the instructions [in the Readme](https://github.com/upsiflu/less-ui/).
 
 Or open [the Elm module](https://github.com/upsiflu/less-ui/blob/main/examples/src/Features.elm) and follow along!
 
