@@ -1,7 +1,7 @@
 module Less.Ui.Html exposing
     ( Html, html
     , toggle, goTo, bounce, filter, search
-    , section, article, block, inline, disclose
+    , section, article, node, disclose
     , ol, ul, keyedNode, nest
     , layout, animations, arrangeOverDefaultRegions, Region(..)
     )
@@ -20,7 +20,7 @@ module Less.Ui.Html exposing
 
 # Wrap the DOM
 
-@docs section, article, block, inline, disclose
+@docs section, article, node, disclose
 @docs ol, ul, keyedNode, nest
 
 
@@ -162,8 +162,7 @@ bounce attributes config =
 
 {-| -}
 type Wrapper region narrowMsg msg
-    = Block { onlyInCurrentRegion : Bool } String (List (Html.Attribute msg)) (Html region narrowMsg msg)
-    | Inline { onlyInCurrentRegion : Bool } String (List (Html.Attribute msg)) (Html region narrowMsg msg)
+    = Node { onlyInCurrentRegion : Bool } String (List (Html.Attribute msg)) (Html region narrowMsg msg)
     | Ol (List (Html.Attribute msg)) (List ( String, Html region narrowMsg msg ))
     | Ul (List (Html.Attribute msg)) (List ( String, Html region narrowMsg msg ))
     | KeyedNode String (List (Html.Attribute msg)) (List ( String, Html region narrowMsg msg ))
@@ -218,7 +217,7 @@ type alias HtmlList msg =
 -}
 section : List (Html.Attribute msg) -> Html region narrowMsg msg -> Html region narrowMsg msg
 section =
-    block "section"
+    node "section"
 
 
 {-| From w3.org:
@@ -228,7 +227,7 @@ section =
 -}
 article : List (Html.Attribute msg) -> Html region narrowMsg msg -> Html region narrowMsg msg
 article =
-    block "article"
+    node "article"
 
 
 {-| From w3.org:
@@ -247,28 +246,17 @@ Notes:
 -}
 disclose : List (Html.Attribute msg) -> { summary : Html region narrowMsg msg, summaryAttrs : List (Html.Attribute msg) } -> Html region narrowMsg msg -> Html region narrowMsg msg
 disclose attrs { summary, summaryAttrs } more =
-    block "details" attrs (block "summary" summaryAttrs summary ++ more)
+    node "details" attrs (node "summary" summaryAttrs summary ++ more)
 
 
 {-| Wrap all parts of the Ui that are in the current region in an arbitrary Html node.
 
-    block "div" [] myUi
+    node "div" [] myUi
 
 -}
-block : String -> List (Html.Attribute msg) -> Html region narrowMsg msg -> Html region narrowMsg msg
-block str attrs =
-    Block { onlyInCurrentRegion = True } str attrs >> Ui.wrap
-
-
-{-| Wrap all parts of the Ui that are in the current region in an arbitrary Html node.
-Distinguishing between inline and block helps showing nice transitions.
-
-    inline "span" [] myUi
-
--}
-inline : String -> List (Html.Attribute msg) -> Html region narrowMsg msg -> Html region narrowMsg msg
-inline str attrs =
-    Inline { onlyInCurrentRegion = True } str attrs >> Ui.wrap
+node : String -> List (Html.Attribute msg) -> Html region narrowMsg msg -> Html region narrowMsg msg
+node str attrs =
+    Node { onlyInCurrentRegion = True } str attrs >> Ui.wrap
 
 
 {-| Ordered List
@@ -499,11 +487,8 @@ wrap states wrapper =
                             Ui.mapWrapper addAttributes
                     in
                     case innerWrapper of
-                        Block config tagName attrs contingent ->
-                            Block config tagName (attrs ++ attributes) contingent
-
-                        Inline config tagName attrs contingent ->
-                            Inline config tagName (attrs ++ attributes) contingent
+                        Node config tagName attrs contingent ->
+                            Node config tagName (attrs ++ attributes) contingent
 
                         Ol attrs contingent ->
                             Ol (attrs ++ attributes) contingent
@@ -586,24 +571,7 @@ wrap states wrapper =
                 >> List.singleton
     in
     case wrapper of
-        Block { onlyInCurrentRegion } str attrs elements ->
-            let
-                howToWrap : HtmlList (Link.Msg msg) -> HtmlList (Link.Msg msg)
-                howToWrap =
-                    Html.node str (appAttr attrs) >> List.singleton
-            in
-            Ui.Wrapped
-                { howToWrapCurrentRegion = howToWrap
-                , howToWrapOtherRegions =
-                    if onlyInCurrentRegion then
-                        identity
-
-                    else
-                        howToWrap
-                }
-                elements
-
-        Inline { onlyInCurrentRegion } str attrs elements ->
+        Node { onlyInCurrentRegion } str attrs elements ->
             let
                 howToWrap : HtmlList (Link.Msg msg) -> HtmlList (Link.Msg msg)
                 howToWrap =
@@ -1015,7 +983,7 @@ animations =
     ]
         |> List.map Html.text
         |> Ui.singleton
-        |> block "style" []
+        |> node "style" []
 
 
 {-| -}
