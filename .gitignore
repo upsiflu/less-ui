@@ -6,8 +6,16 @@ elm-stuff
 repl-temp-*
 tests/VerifyExamples
 
+# Example deployment
+examples/firebase-debug.log*
+examples/firebase-debug.*.log*
+
+# Firebase cache
+examples/.firebase/
+
 # Node
 node_modules
 
 # Tipp: add editor and OS specific excludes into your global excludefile before committing.
 
+examples/.firebase/hosting.cHVibGlj.cache
