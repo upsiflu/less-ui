@@ -2,8 +2,8 @@ module Markdown exposing (html, md, syntaxHighlighting, toc)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Less.Ui
-import Less.Ui.Html exposing (Ui)
+import Less.Ui as Ui
+import Less.Ui.Html as Ui
 import Markdown.Block as Block
 import Markdown.Html
 import Markdown.Parser as Markdown
@@ -13,8 +13,8 @@ import SyntaxHighlight
 
 
 heading :
-    { level : Block.HeadingLevel, rawText : String, children : List (Ui region narrowMsg msg) }
-    -> Ui region narrowMsg msg
+    { level : Block.HeadingLevel, rawText : String, children : List (Ui.Html region narrowMsg msg) }
+    -> Ui.Html region narrowMsg msg
 heading { level, rawText, children } =
     let
         id =
@@ -23,46 +23,46 @@ heading { level, rawText, children } =
     List.concat children
         |> (case level of
                 Block.H1 ->
-                    Less.Ui.Html.block "h1" [ Attr.id id ]
+                    Ui.block "h1" [ Attr.id id ]
 
                 Block.H2 ->
-                    Less.Ui.Html.block "h2" [ Attr.id id ]
+                    Ui.block "h2" [ Attr.id id ]
 
                 Block.H3 ->
-                    Less.Ui.Html.block "h3" [ Attr.id id ]
+                    Ui.block "h3" [ Attr.id id ]
 
                 Block.H4 ->
-                    Less.Ui.Html.block "h4" [ Attr.id id ]
+                    Ui.block "h4" [ Attr.id id ]
 
                 Block.H5 ->
-                    Less.Ui.Html.block "h5" [ Attr.id id ]
+                    Ui.block "h5" [ Attr.id id ]
 
                 Block.H6 ->
-                    Less.Ui.Html.block "h6" [ Attr.id id ]
+                    Ui.block "h6" [ Attr.id id ]
            )
 
 
-paragraph : List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+paragraph : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 paragraph =
-    List.concat >> Less.Ui.Html.block "p" []
+    List.concat >> Ui.block "p" []
 
 
-blockQuote : List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+blockQuote : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 blockQuote =
-    List.concat >> Less.Ui.Html.block "blockquote" []
+    List.concat >> Ui.block "blockquote" []
 
 
-html_ : Markdown.Html.Renderer (List (Ui region narrowMsg msg) -> Ui region narrowMsg msg)
+html_ : Markdown.Html.Renderer (List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg)
 html_ =
     Markdown.Html.oneOf []
 
 
-text : String -> Ui region narrowMsg msg
+text : String -> Ui.Html region narrowMsg msg
 text =
-    Html.text >> List.singleton >> Less.Ui.singleton
+    Html.text >> List.singleton >> Ui.singleton
 
 
-codeSpan : String -> Ui region narrowMsg msg
+codeSpan : String -> Ui.Html region narrowMsg msg
 codeSpan str =
     if String.startsWith "#!elm" str then
         String.dropLeft 5 str
@@ -71,52 +71,52 @@ codeSpan str =
                 (\_ -> Html.text "Error in `code`")
                 SyntaxHighlight.toInlineHtml
             |> List.singleton
-            |> Less.Ui.singleton
+            |> Ui.singleton
 
     else
         text str
-            |> Less.Ui.Html.inline "code" []
+            |> Ui.inline "code" []
 
 
-strong : List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+strong : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 strong =
-    List.concat >> Less.Ui.Html.inline "strong" []
+    List.concat >> Ui.inline "strong" []
 
 
-emphasis : List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+emphasis : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 emphasis =
-    List.concat >> Less.Ui.Html.inline "em" []
+    List.concat >> Ui.inline "em" []
 
 
-strikethrough : List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+strikethrough : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 strikethrough =
-    List.concat >> Less.Ui.Html.inline "span" [ Attr.style "text-decoration-line" "line-through" ]
+    List.concat >> Ui.inline "span" [ Attr.style "text-decoration-line" "line-through" ]
 
 
-hardLineBreak : Ui region narrowMsg msg
+hardLineBreak : Ui.Html region narrowMsg msg
 hardLineBreak =
-    Less.Ui.singleton [ Html.br [] [] ]
+    Ui.singleton [ Html.br [] [] ]
 
 
-link : { title : Maybe String, destination : String } -> List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+link : { title : Maybe String, destination : String } -> List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 link config content =
     case config.title of
         Just title ->
-            Less.Ui.Html.inline "a"
+            Ui.inline "a"
                 [ Attr.href config.destination
                 , Attr.title title
                 ]
                 (List.concat content)
 
         Nothing ->
-            Less.Ui.Html.inline "a" [ Attr.href config.destination ] (List.concat content)
+            Ui.inline "a" [ Attr.href config.destination ] (List.concat content)
 
 
-image : { alt : String, src : String, title : Maybe String } -> Ui region narrowMsg msg
+image : { alt : String, src : String, title : Maybe String } -> Ui.Html region narrowMsg msg
 image imageInfo =
     case imageInfo.title of
         Just title ->
-            Less.Ui.Html.inline "img"
+            Ui.inline "img"
                 [ Attr.src imageInfo.src
                 , Attr.alt imageInfo.alt
                 , Attr.title title
@@ -124,14 +124,14 @@ image imageInfo =
                 []
 
         Nothing ->
-            Less.Ui.Html.inline "img"
+            Ui.inline "img"
                 [ Attr.src imageInfo.src
                 , Attr.alt imageInfo.alt
                 ]
                 []
 
 
-unorderedList : List (Block.ListItem (Ui region narrowMsg msg)) -> Ui region narrowMsg msg
+unorderedList : List (Block.ListItem (Ui.Html region narrowMsg msg)) -> Ui.Html region narrowMsg msg
 unorderedList =
     List.concatMap
         (\item ->
@@ -141,39 +141,39 @@ unorderedList =
                         checkbox =
                             case task of
                                 Block.NoTask ->
-                                    Less.Ui.singleton [ Html.text "" ]
+                                    Ui.singleton [ Html.text "" ]
 
                                 Block.IncompleteTask ->
-                                    Less.Ui.Html.block "input"
+                                    Ui.block "input"
                                         [ Attr.disabled True
                                         , Attr.checked False
                                         , Attr.type_ "checkbox"
                                         ]
-                                        (Less.Ui.singleton [ Html.text "" ])
+                                        (Ui.singleton [ Html.text "" ])
 
                                 Block.CompletedTask ->
-                                    Less.Ui.Html.block "input"
+                                    Ui.block "input"
                                         [ Attr.disabled True
                                         , Attr.checked True
                                         , Attr.type_ "checkbox"
                                         ]
-                                        (Less.Ui.singleton [ Html.text "" ])
+                                        (Ui.singleton [ Html.text "" ])
                     in
-                    Less.Ui.Html.block "li" [] (checkbox ++ List.concat children)
+                    Ui.block "li" [] (checkbox ++ List.concat children)
         )
-        >> Less.Ui.Html.block "ul"
+        >> Ui.block "ul"
             []
 
 
-orderedList : Int -> List (List (Ui region narrowMsg msg)) -> Ui region narrowMsg msg
+orderedList : Int -> List (List (Ui.Html region narrowMsg msg)) -> Ui.Html region narrowMsg msg
 orderedList startingIndex =
     List.concatMap
         (\itemBlocks ->
-            Less.Ui.Html.block "li"
+            Ui.block "li"
                 []
                 (List.concat itemBlocks)
         )
-        >> Less.Ui.Html.block "ol"
+        >> Ui.block "ol"
             (case startingIndex of
                 1 ->
                     [ Attr.start startingIndex ]
@@ -183,7 +183,7 @@ orderedList startingIndex =
             )
 
 
-codeBlock : { body : String, language : Maybe String } -> Ui region narrowMsg msg
+codeBlock : { body : String, language : Maybe String } -> Ui.Html region narrowMsg msg
 codeBlock block =
     if block.language == Just "elm" then
         SyntaxHighlight.elm block.body
@@ -191,13 +191,13 @@ codeBlock block =
                 (\_ -> Html.text "Error in `code`")
                 (SyntaxHighlight.toBlockHtml Nothing)
             |> List.singleton
-            |> Less.Ui.singleton
-            |> Less.Ui.Html.block "div" []
+            |> Ui.singleton
+            |> Ui.block "div" []
 
     else
-        Less.Ui.Html.block "pre"
+        Ui.block "pre"
             []
-            (Less.Ui.singleton
+            (Ui.singleton
                 [ Html.code []
                     [ Html.text block.body
                     ]
@@ -205,37 +205,37 @@ codeBlock block =
             )
 
 
-thematicBreak : Ui region narrowMsg msg
+thematicBreak : Ui.Html region narrowMsg msg
 thematicBreak =
-    Less.Ui.Html.block "hr" [] (text "")
+    Ui.block "hr" [] (text "")
 
 
-table : List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+table : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 table =
-    List.concat >> Less.Ui.Html.block "table" []
+    List.concat >> Ui.block "table" []
 
 
-tableHeader : List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+tableHeader : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 tableHeader =
-    List.concat >> Less.Ui.Html.block "thead" []
+    List.concat >> Ui.block "thead" []
 
 
-tableBody : List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+tableBody : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 tableBody =
-    List.concat >> Less.Ui.Html.block "tbody" []
+    List.concat >> Ui.block "tbody" []
 
 
-tableRow : List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+tableRow : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 tableRow =
-    List.concat >> Less.Ui.Html.block "tr" []
+    List.concat >> Ui.block "tr" []
 
 
-tableCell : Maybe Block.Alignment -> List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+tableCell : Maybe Block.Alignment -> List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 tableCell =
-    \_ -> List.concat >> Less.Ui.Html.block "td" []
+    \_ -> List.concat >> Ui.block "td" []
 
 
-tableHeaderCell : Maybe Block.Alignment -> List (Ui region narrowMsg msg) -> Ui region narrowMsg msg
+tableHeaderCell : Maybe Block.Alignment -> List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
 tableHeaderCell maybeAlignment =
     let
         attrs =
@@ -256,10 +256,10 @@ tableHeaderCell maybeAlignment =
                 |> Maybe.map List.singleton
                 |> Maybe.withDefault []
     in
-    List.concat >> Less.Ui.Html.block "th" attrs
+    List.concat >> Ui.block "th" attrs
 
 
-elmRenderer : Renderer (Ui region narrowMsg msg)
+elmRenderer : Renderer (Ui.Html region narrowMsg msg)
 elmRenderer =
     { heading = heading
     , paragraph = paragraph
@@ -286,7 +286,7 @@ elmRenderer =
     }
 
 
-md : String -> Ui region narrowMsg msg
+md : String -> Ui.Html region narrowMsg msg
 md =
     Markdown.parse
         >> Result.mapError (List.map Markdown.deadEndToString >> String.join "\n")
@@ -307,7 +307,7 @@ toc :
     String
     ->
         Result
-            (Ui region narrowMsg msg)
+            (Ui.Html region narrowMsg msg)
             (List
                 { level : Block.HeadingLevel
                 , raw : List Block.Inline

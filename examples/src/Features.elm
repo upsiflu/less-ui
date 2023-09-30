@@ -3,8 +3,8 @@ module Features exposing (main)
 import Html
 import Html.Attributes as Attr
 import Less
-import Less.Ui
-import Less.Ui.Html exposing (layout)
+import Less.Ui as Ui
+import Less.Ui.Html as Ui exposing (layout)
 import Markdown exposing (md)
 
 
@@ -38,8 +38,8 @@ viewWelcome =
 viewWelcome : Ui
 viewWelcome =
     md welcomeExplanation
-        |> Less.Ui.inRegion Content
-        |> Less.Ui.Html.goTo []
+        |> Ui.inRegion Content
+        |> Ui.goTo []
             { destination = ""
             , inHeader = True
             , label = [ Html.h2 [] [ Html.text "⌂" ] ]
@@ -83,7 +83,7 @@ type alias Ui =
 
 
 type alias Ui =
-    Less.Ui.Html.Ui Region () ()
+    Ui.Html Region () ()
 
 
 regionExplanation : String
@@ -262,8 +262,8 @@ searchToc searchTerms =
     let
         addHeadingLinks : ( String, List String ) -> Ui -> Ui
         addHeadingLinks ( heading, subheadings ) =
-            Less.Ui.inRegion Content
-                >> Less.Ui.Html.goTo [ Attr.style "padding" ".5ch", Attr.style "display" "inline-block", Attr.style "background" "#ddd" ]
+            Ui.inRegion Content
+                >> Ui.goTo [ Attr.style "padding" ".5ch", Attr.style "display" "inline-block", Attr.style "background" "#ddd" ]
                     { destination =
                         heading
                             ++ "#"
@@ -285,7 +285,7 @@ searchToc searchTerms =
                 Ok (firstHeading :: moreHeadings) ->
                     addHeadingLinks ( firstHeading.text, [] ) (md chapter)
                         ++ List.concatMap (\subHeading -> addHeadingLinks ( firstHeading.text, [ subHeading.text ] ) []) moreHeadings
-                        |> Less.Ui.Html.section
+                        |> Ui.section
                             (if hasAllSearchTerms chapter then
                                 [ Attr.style "transition" "all .2s" ]
 
@@ -305,14 +305,14 @@ searchToc searchTerms =
             List.filter ((/=) "") searchTerms
                 |> List.concatMap
                     (\searchTerm ->
-                        Less.Ui.Html.toggle []
+                        Ui.toggle []
                             { flag = "search=" ++ String.join " " (List.filter ((/=) searchTerm) searchTerms)
                             , inHeader = False
                             , label = [ Html.button [] [ Html.text (searchTerm ++ " ×") ] ]
                             }
                             []
                     )
-                |> Less.Ui.Html.toggle []
+                |> Ui.toggle []
                     { flag = "showTokens"
                     , inHeader = False
                     , label = []
@@ -324,13 +324,13 @@ searchToc searchTerms =
 
 viewToc : Ui
 viewToc =
-    Less.Ui.Html.search [ Attr.placeholder "Search" ]
+    Ui.search [ Attr.placeholder "Search" ]
         { category = "search"
         , inHeader = False
         , label = []
         }
         searchToc
-        |> Less.Ui.inRegion Toc
+        |> Ui.inRegion Toc
 
 
 body : Ui
