@@ -254,6 +254,10 @@ view () =
 body : Ui
 body =
     viewWelcome ++ viewToc ++ Markdown.syntaxHighlight ++ Ui.animations
+        ++ Ui.html 
+            [ Html.node "meta" 
+                [ Attr.name "viewport", Attr.attribute "content" "width=device-width, initial-scale=1" ] []
+            ]
 
 
 outline : List String

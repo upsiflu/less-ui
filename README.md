@@ -2,7 +2,7 @@
 
 An proof-of-concept package for people who don't want to hand-wrangle user interface logic. Don't use it when you need direct control over the user interface. 
 
-[Live example](https://less-ui.web.app/)
+[Live demo](https://less-ui.web.app/)
 
 🐌 I'm curious what you think! Write me on `upsiflu@gmail.com` or issue an [issue on github](https://github.com/upsiflu/less-ui/issues) 🐌
 
