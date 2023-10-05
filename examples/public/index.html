@@ -7200,6 +7200,35 @@ var $author$project$Less$Ui$Html$animations = function () {
 						'\n            opacity:0\n        ')
 					]))));
 }();
+var $elm$virtual_dom$VirtualDom$attribute = F2(
+	function (key, value) {
+		return A2(
+			_VirtualDom_attribute,
+			_VirtualDom_noOnOrFormAction(key),
+			_VirtualDom_noJavaScriptOrHtmlUri(value));
+	});
+var $elm$html$Html$Attributes$attribute = $elm$virtual_dom$VirtualDom$attribute;
+var $elm$virtual_dom$VirtualDom$map = _VirtualDom_map;
+var $elm$html$Html$map = $elm$virtual_dom$VirtualDom$map;
+var $author$project$Less$Ui$Html$html = A2(
+	$elm$core$Basics$composeR,
+	$elm$core$List$map(
+		$elm$html$Html$map($author$project$Less$Link$AppMsg)),
+	$author$project$Less$Ui$singleton);
+var $elm$json$Json$Encode$string = _Json_wrap;
+var $elm$html$Html$Attributes$stringProperty = F2(
+	function (key, string) {
+		return A2(
+			_VirtualDom_property,
+			key,
+			$elm$json$Json$Encode$string(string));
+	});
+var $elm$html$Html$Attributes$name = $elm$html$Html$Attributes$stringProperty('name');
+var $elm$virtual_dom$VirtualDom$node = function (tag) {
+	return _VirtualDom_node(
+		_VirtualDom_noScript(tag));
+};
+var $elm$html$Html$node = $elm$virtual_dom$VirtualDom$node;
 var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Theme = $elm$core$Basics$identity;
 var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Style$Hex = function (a) {
 	return {$: 1, a: a};
@@ -7597,18 +7626,6 @@ var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Theme$Type$toCss = funct
 var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Theme$GitHub$css = $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Theme$Type$toCss($pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Theme$GitHub$theme);
 var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Theme$gitHub = $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Theme$GitHub$css;
 var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$gitHub = $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Theme$gitHub;
-var $elm$virtual_dom$VirtualDom$map = _VirtualDom_map;
-var $elm$html$Html$map = $elm$virtual_dom$VirtualDom$map;
-var $author$project$Less$Ui$Html$html = A2(
-	$elm$core$Basics$composeR,
-	$elm$core$List$map(
-		$elm$html$Html$map($author$project$Less$Link$AppMsg)),
-	$author$project$Less$Ui$singleton);
-var $elm$virtual_dom$VirtualDom$node = function (tag) {
-	return _VirtualDom_node(
-		_VirtualDom_noScript(tag));
-};
-var $elm$html$Html$node = $elm$virtual_dom$VirtualDom$node;
 var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$useTheme = function (_v0) {
 	var theme = _v0;
 	return A3(
@@ -7635,14 +7652,6 @@ var $author$project$Less$Ui$inRegion = function (region) {
 		$author$project$Less$Ui$At(region),
 		$elm$core$List$singleton);
 };
-var $elm$json$Json$Encode$string = _Json_wrap;
-var $elm$html$Html$Attributes$stringProperty = F2(
-	function (key, string) {
-		return A2(
-			_VirtualDom_property,
-			key,
-			$elm$json$Json$Encode$string(string));
-	});
 var $elm$html$Html$Attributes$placeholder = $elm$html$Html$Attributes$stringProperty('placeholder');
 var $author$project$Less$Ui$Html$Search = F3(
 	function (a, b, c) {
@@ -9407,14 +9416,6 @@ var $elm$html$Html$Attributes$class = $elm$html$Html$Attributes$stringProperty('
 var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Line$Add = 1;
 var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Line$Del = 2;
 var $pablohirafuji$elm_syntax_highlight$SyntaxHighlight$Line$Normal = 0;
-var $elm$virtual_dom$VirtualDom$attribute = F2(
-	function (key, value) {
-		return A2(
-			_VirtualDom_attribute,
-			_VirtualDom_noOnOrFormAction(key),
-			_VirtualDom_noJavaScriptOrHtmlUri(value));
-	});
-var $elm$html$Html$Attributes$attribute = $elm$virtual_dom$VirtualDom$attribute;
 var $elm$html$Html$Attributes$classList = function (classes) {
 	return $elm$html$Html$Attributes$class(
 		A2(
@@ -18246,7 +18247,7 @@ var $author$project$Features$viewToc = A2(
 			]),
 		{dL: 'search', a_: false, a0: _List_Nil},
 		$author$project$Features$searchOutline));
-var $author$project$Features$welcomeExplanation = '\n\n# Welcome!\n\nThis is a self-explaining walkthrough. It presents its own code.\n\nTo run it yourself, `git clone https://github.com/upsiflu/less-ui/` into your computer,\nthen follow the instructions [in the Readme](https://github.com/upsiflu/less-ui/).\n\nOr open [the Elm module](https://github.com/upsiflu/less-ui/blob/main/examples/src/Features.elm) and follow along!\n\nBtw, here is the code that created this message:\n\n```elm\nviewWelcome : Ui\nviewWelcome =\n    md  ∞\n        |> Ui.inRegion Content\n        |> Ui.goTo []\n            { destination = ""\n            , inHeader = True\n            , label = [ Html.h2 [] [ Html.text "⌂" ] ]\n            }\n```\n';
+var $author$project$Features$welcomeExplanation = '\n\n# Less-Ui Demo\n\nHow can we make our user interface code more cohesive? \nLess pushing around `views` across the DOM, less Ui state in the model.\n\nThis demo implements some of the patterns I have found useful in my work. \nIt is a self-explaining walkthrough and presents its own code.\n\nTo run it yourself, `git clone https://github.com/upsiflu/less-ui/` into your computer,\nthen follow the instructions [in the Readme](https://github.com/upsiflu/less-ui/).\n\nOr open [the Elm module](https://github.com/upsiflu/less-ui/blob/main/examples/src/Features.elm) and follow along!\n\nTo use the patterns in your own frontends, install Elm and `elm install upsiflu/less-ui`.\n\nBtw, here is the code that created this message:\n\n```elm\nviewWelcome : Ui\nviewWelcome =\n    md  ∞\n        |> Ui.inRegion Content\n        |> Ui.goTo []\n            { destination = ""\n            , inHeader = True\n            , label = [ Html.h2 [] [ Html.text "⌂" ] ]\n            }\n```\n';
 var $author$project$Features$viewWelcome = A3(
 	$author$project$Less$Ui$Html$goTo,
 	_List_Nil,
@@ -18272,7 +18273,31 @@ var $author$project$Features$body = _Utils_ap(
 	$author$project$Features$viewWelcome,
 	_Utils_ap(
 		$author$project$Features$viewToc,
-		_Utils_ap($author$project$Markdown$syntaxHighlight, $author$project$Less$Ui$Html$animations)));
+		_Utils_ap(
+			$author$project$Markdown$syntaxHighlight,
+			_Utils_ap(
+				$author$project$Less$Ui$Html$animations,
+				$author$project$Less$Ui$Html$html(
+					_List_fromArray(
+						[
+							A3(
+							$elm$html$Html$node,
+							'meta',
+							_List_fromArray(
+								[
+									$elm$html$Html$Attributes$name('viewport'),
+									A2($elm$html$Html$Attributes$attribute, 'content', 'width=device-width, initial-scale=1')
+								]),
+							_List_Nil),
+							A3(
+							$elm$html$Html$node,
+							'style',
+							_List_Nil,
+							_List_fromArray(
+								[
+									$elm$html$Html$text('body {padding: .5em;}')
+								]))
+						]))))));
 var $elm$html$Html$header = _VirtualDom_node('header');
 var $author$project$Less$Ui$Html$Bounce = F3(
 	function (a, b, c) {
