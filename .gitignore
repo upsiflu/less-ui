@@ -3,15 +3,18 @@ build
 
 # Elm
 elm-stuff
+examples/elm-stuff
 repl-temp-*
 tests/VerifyExamples
 
 # Example deployment
 examples/firebase-debug.log*
 examples/firebase-debug.*.log*
+examples/build
+examples/public/index.html
 
 # Firebase cache
-examples/.firebase/
+examples/.firebase
 examples/.firebase/hosting.cHVibGlj.cache
 
 # Node

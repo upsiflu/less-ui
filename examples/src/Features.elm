@@ -12,14 +12,20 @@ welcomeExplanation : String
 welcomeExplanation =
     """
 
-# Welcome!
+# Less-Ui Demo
 
-This is a self-explaining walkthrough. It presents its own code.
+How can we make our user interface code more cohesive? 
+Less pushing around `views` across the DOM, less Ui state in the model.
+
+This demo implements some of the patterns I have found useful in my work. 
+It is a self-explaining walkthrough and presents its own code.
 
 To run it yourself, `git clone https://github.com/upsiflu/less-ui/` into your computer,
 then follow the instructions [in the Readme](https://github.com/upsiflu/less-ui/).
 
 Or open [the Elm module](https://github.com/upsiflu/less-ui/blob/main/examples/src/Features.elm) and follow along!
+
+To use the patterns in your own frontends, install Elm and `elm install upsiflu/less-ui`.
 
 Btw, here is the code that created this message:
 
@@ -254,6 +260,13 @@ view () =
 body : Ui
 body =
     viewWelcome ++ viewToc ++ Markdown.syntaxHighlight ++ Ui.animations
+    -- Let's make the default `elm make` Html a bit more delightful...
+        ++ Ui.html 
+            [ Html.node "meta" 
+                [ Attr.name "viewport", Attr.attribute "content" "width=device-width, initial-scale=1" ] []
+            , Html.node "style" []
+                [ Html.text "body {padding: .5em;}"]
+            ]
 
 
 outline : List String
