@@ -13,10 +13,13 @@ An proof-of-concept package for people who don't want to hand-wrangle user inter
 
 **2. Write less code:** Provide presets for the most common layout and state-related Ux patterns.
 
+**3. Mix-and-match with other Ui libraries:** The Api follows established conventions and offers clear boundaries for simple integration within frameworks such as elm-pages and elm-land, with helper libraries such as elm-widgets, and with type-centric libraries such as elm-ui and elm-multitool.
+
+_Goal 3 is still mostly work-in-progress._
 
 ## Non-Features
 
-- No direct control over every pixel. Use elm-ui instead if you want a crafted design.
+- No direct control over every pixel. Use _elm-ui_ if you want a crafted design.
 - No intercepting the Url except for `Filter` which gives you the current query flags. Use Browser.application and friends to roll your own Url decoder.
 - No constraints on your Html. Use _elm-w3_ if correctness is important.
 - This library has been used in three small SPA projects and is very much in flux.
