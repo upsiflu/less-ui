@@ -1,9 +1,9 @@
-module Less exposing (application, Application, mapDocument, Document)
+module Less exposing (application, Application, mapDocument, reroute, Document)
 
 {-| Makes the `Url` the single source of truth for the state of your user interface,
 and hides the corresponding messages from your `update`.
 
-@docs application, Application, mapDocument, Document
+@docs application, Application, mapDocument, reroute, Document
 
 ---
 
@@ -82,12 +82,37 @@ mapDocument toHtml { body, layout, title } =
         }
 
 
+{-| If you want to re-route Urls before rendering, compose such functions left of the Document:
+
+    import Less.Link
+
+    myDocument : Document msg
+    myDocument =
+        { body = ..., layout = ..., title = "..." }
+            |> mapDocument identity
+
+    myReroute : Less.State -> Less.State
+    myReroute =
+        Less.Link.mapLocation
+            (\location -> if location == "/" then "/newHomePage" else location)
+
+    myView : () -> Document msg
+    myView () =
+        Less.reroute myReroute >> myDocument
+
+-}
+reroute : (State -> State) -> Document msg -> Document msg
+reroute fu document { current, previous } =
+    document
+        { current = fu current, previous = Maybe.map fu previous }
+
+
 {-| Keeps the Ui state in the Url.
 -}
 application :
     { init : ( model, Cmd modelMsg )
     , update : modelMsg -> model -> Return modelMsg model
-    , view : model -> ({ current : State, previous : Maybe State } -> Browser.Document (Msg modelMsg))
+    , view : model -> Document modelMsg
     }
     -> Application model modelMsg
 application config =

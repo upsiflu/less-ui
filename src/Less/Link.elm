@@ -3,6 +3,7 @@ module Less.Link exposing
     , fromUrl
     , toHref, apply
     , getStateSearchTerms, getSpaceSeparatedSearchTerms
+    , mapLocation
     , Mutation(..), mutationFromTwoStates
     , Msg(..)
     , State
@@ -25,6 +26,11 @@ module Less.Link exposing
 
 @docs toHref, apply
 @docs getStateSearchTerms, getSpaceSeparatedSearchTerms
+
+
+## Map
+
+@docs mapLocation
 
 
 ## Mutations
@@ -416,8 +422,21 @@ encodeLocation parsedLocation =
 --- stateContainsLocation
 {-
 
-   Location            State           ?
-   b                   a/b/c           yes
+       State   Location
+
+   `bothAreHome () && bothFragmentsAreEqual ()`:
+
+       "/"     "/"
+       "/#f"   "/#f"
+
+   `not (bothAreHome ()) && locationPathIsSegmentOfStatePath ()`
+
+       "/p"    "/"
+       "/p#f"    "/#g"
+
+   `not (bothAreHome ()) && locationIsFragmentOnly () && bothFragmentsAreEqual ()`
+
+       "/p#f"  "#f"
 
 -}
 
@@ -560,6 +579,43 @@ mapFlags fu state =
                 |> String.join "&"
                 |> String.nonEmpty
     }
+
+
+{-| Re-route the Url before the Ui is rendered.
+
+**Use cases:**
+
+  - You want to fuzzy-match locations (typos)
+  - You want to accept aliases for certain paths or fragments
+  - You have deleted a page and want to catch and redirect it to another page
+
+-}
+mapLocation : (Location -> Location) -> State -> State
+mapLocation fu url =
+    let
+        oldLocation : Location
+        oldLocation =
+            url.path
+                ++ (case url.fragment of
+                        Just fragment ->
+                            "#" ++ fragment
+
+                        Nothing ->
+                            ""
+                   )
+    in
+    case String.split "#" (fu oldLocation) of
+        [] ->
+            url
+
+        [ path ] ->
+            { url | path = path }
+
+        path :: fragment ->
+            { url
+                | path = path
+                , fragment = Just (String.join "#" fragment)
+            }
 
 
 {-| Internal function to remove magical assignments ("toggle" and "bounce").
