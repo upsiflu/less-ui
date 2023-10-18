@@ -51,8 +51,6 @@ Ui.inRegion Scene (text "Scene") ++ Ui.inRegion Info (text "Info") ...
 
 ## Try it
 ```shell
-npm install -g elm-watch
-
 cd examples
 npm ci
 npm start
@@ -68,7 +66,6 @@ Read [examples/README.md](http://localhost:8098).
 ## Docs
 ```shell
 npm install -g elm-doc-preview
-
 edp
 ```
 
@@ -132,3 +129,7 @@ In small apps, `less-ui` can reduce the `view` code. In the following example, `
 
   
   ```
+
+# Contribute
+
+I'm always happy to see issues and code contributions from you. Make sure you have a global gitignore to keep editor and OS specific configs out of the loop. All dev prerequisites are listed in examples/package.json and can be installed with `cd examples && npm ci`. Node v11 is required for run-pty.
