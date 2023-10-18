@@ -1,34 +1,46 @@
 # Less power, less control? Less go for it!
 
-An proof-of-concept package for people who don't want to hand-wrangle user interface logic. Don't use it when you need direct control over the user interface. 
+**A proof-of-concept package for people who don't want to hand-wrangle user interface logic.**
 
-[Live demo](https://less-ui.web.app/)
+**[Live demo](https://less-ui.web.app/)**
 
-🐌 I'm curious what you think! Write me on `upsiflu@gmail.com` or issue an [issue on github](https://github.com/upsiflu/less-ui/issues) 🐌
+[Start the demo on your computer](#Examples)
+
+ _I'm curious what you think! Write me on `upsiflu@gmail.com` or add an [issue on github](https://github.com/upsiflu/less-ui/issues)_
 
 
-## Goals
+### 🐌 Goals
 
-**1. Cohesion over flexibility:** The `view` in each module of a SPA should be as self-contained as possible. This benefits small, quick projects the most.
+**1. Cohesion over flexibility:** 
 
-**2. Write less code:** Provide presets for the most common layout and state-related Ux patterns.
+> The `view` in each module of a SPA should be as self-contained as possible. This benefits small, quick projects the most.
 
-**3. Mix-and-match with other Ui libraries:** The Api follows established conventions and offers clear boundaries for simple integration within frameworks such as elm-pages and elm-land, with helper libraries such as elm-widgets, and with type-centric libraries such as elm-ui and elm-multitool.
+**2. Write less code:** 
 
-_Goal 3 is still mostly work-in-progress._
+> Provide presets for the most common layout and state-related Ux patterns.
 
-## Non-Features
+**3. Mix-and-match with other Ui libraries _(still work in progress)_:** 
 
-- No direct control over every pixel. Use _elm-ui_ if you want a crafted design.
-- No intercepting the Url except for `Filter` which gives you the current query flags. Use Browser.application and friends to roll your own Url decoder.
-- No constraints on your Html. Use _elm-w3_ if correctness is important.
-- This library has been used in three small SPA projects and is very much in flux.
+> The Api follows established conventions and offers clear boundaries for simple integration within frameworks such as elm-pages and elm-land, with helper libraries such as elm-widgets, and with type-centric libraries such as _elm-ui_ and _elm-multitool_. _elm-any-type-forms_ is a great fit as it has a similar goal: while less-ui maps interaction and layout patterns into Url state and links, elm-any-type-forms maps your application model into views with state and delta.
 
-## Features
 
-**— Let the Url store all the Ui state** — No more Ui messages in your application. Bonus: you can reproduce the current Ui state by copying the Url. Bonus 2: You can style state transitions for extra smoothness.
+### ~~🐌~~ Non-Features
 
-**— Target several screen regions in a single view** — so you don't need to aggregate Html snippets in some unrelated module.
+- No direct control over every pixel. Use _elm-ui_ if you are a designer.
+- No default Ui widgets. Use _elm-widgets_ or the like.
+- No intercepting the Url (except for `Filter`, a pattern that gives you the current query flags). Use Browser.application and friends to roll your own Url decoder.
+- No constraints on your Html. Use _elm-w3_ if you want compile-time invariants for correctness and accessibility. Note that as of v2.0, _less-ui_ is not yet compatible with _elm-w3_.
+- This library has been used in about three small SPA projects. It's not stable yet.
+
+### 🐌 Features
+
+**— Let the Url store all the Ui state —** No more Ui messages in your application. 
+
+- Use straightforward patterns such as `search`, `goto` or `toggle` to build interactivity. 
+- You can reproduce the current Ui state by copying the Url. 
+- Style state transitions with css for extra smoothness.
+
+**— Target several screen regions in a single view —** so you don't need to push around Html snippets across your modules.
 
 ```elm
 Ui.inRegion Scene (text "Scene") ++ Ui.inRegion Info (text "Info") ...
@@ -46,32 +58,23 @@ Ui.inRegion Scene (text "Scene") ++ Ui.inRegion Info (text "Info") ...
     ┗━━━━━━━━━━━┛
 ```
 
-**— Compose everything:** `inRegion`, `(++)`, `wrap` compose Uis with each other. Uis can be created from anything that renders to Html (`elm-ui`, `elm-widgets`, `String`...) or from a limited set of patterns including `toggle`, `search`, `filter`, `goTo` etc. You can also use widgets that compose Html such as `elm-any-type-form`.
+**— Compose everything:** 
 
-
-## Try it
-```shell
-cd examples
-npm ci
-npm start
-```
-
-Go to [localhost:8001](http://localhost:8001/) and open one of the examples.
-
-Read [the library README.md (this doc)](http://features.localhost:8099/packages/upsiflu/less-ui/latest).
-
-Read [examples/README.md](http://localhost:8098).
+- Create Ui snippets from anything that you can map to `Html` (_elm-html_, _elm-markdown_, _elm-ui_, _elm-widgets_, _String_...) or use the default `Less.Ui.Html` module.
+- Each snippet is a List so you can compose two with `++`.
+- You can also use widgets that compose nested Html snippets such as `elm-any-type-form`.
 
 
 ## Docs
 ```shell
 npm install -g elm-doc-preview
+
 edp
 ```
 
 Now check out [localhost:8000](http://localhost:8000/)
 
-**Verify the doc snippets:**
+**Verify the mini-examples in the comments:**
 
 ```shell
 npm install -g elm-verify-examples
@@ -87,49 +90,50 @@ npm install -g elm-review
 elm-review
 ```
 
-**Outside of the scope of this package:**
 
-This package can help you create predictable and pleasurable interfaces without making design decisions. It is not a complete Ui package.
+## Examples
 
-- No inaccessible, invalid, inconsistently styled Html – Use _elm-w3_, _elm-widgets_, _elm-ui_ and friends.
-- No interactive controls without corresponding Model type – Use _elm-any-type-forms_.
+Includes [Simon Lydell's amazing elm-watch](https://github.com/lydell/elm-watch) for live coding; derived from [this example](https://github.com/lydell/elm-watch/tree/main/example).
 
 
-## Use case
 
-In small apps, `less-ui` can reduce the `view` code. In the following example, `Ui.toggle` adds state without cluttering the model, and `Ui.inRegion` spreads a single view over separate screen regions (branches of the DOM).
+**Start the live server:**
 
-  ```elm
-  import Less.Ui
-  import Less.Ui.Html as Ui exposing (Region(..))
+```shell
+cd examples
 
-  makeTab (name, src, description) =
-      let
-          photo =
-              Ui.html [Html.img [Attr.src src] []]
+npm install -g elm-doc-preview
+npm ci
+npm start
+```
 
-          caption =
-              Ui.html [Html.text description]
-        
-      in
-      Ui.inRegion Scene photo ++ Ui.inRegion Info caption
-          |> Html.toggle []
-              { flag = name
-              , inHeader = True
-              , label = Html.text name 
-              }
+Go to [localhost:8001](http://localhost:8001/) and open one of the examples.
 
-  view =
-      Ui.html [Html.text "Look at these trees:"]
-          ++ List.concatMap makeTab
-            [ ("Elm", "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/East_Coker_elm%2C_2.jpg/440px-East_Coker_elm%2C_2.jpg", "Its planky wood makes the Elm tree a hikers' favorite.")
-            , ("Yggdrasill", "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Om_Yggdrasil_by_Fr%C3%B8lich.jpg/440px-Om_Yggdrasil_by_Fr%C3%B8lich.jpg", "You cannot sleep here but you may find fruit and feathers.")
-            , ("Trie","https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Trie_example.svg/500px-Trie_example.svg.png", "The Trie is a noble pine wihtout wheels.")
-            ]
+Read [the library README.md (this doc)](http://features.localhost:8099/packages/upsiflu/less-ui/latest).
 
-  
-  ```
 
-# Contribute
+
+1. Edit the files in src/ while watching a browser tab pointing at [localhost:8001](localhost:8001). 
+_<small>A note to vscodium users: To activate the language server in your editor, choose "Open Folder..." and select `examples`.</small>_
+1. In that browser tab, you can activate the **Elm debugger** by clicking the `elm-watch` menu in the bottom left corner.
+1. Browse the **documentation** at [localhost:8000](http://localhost:8000/packages/upsiflu/restrictive-examples/latest).
+1. You can see the **Package Readme** on http://localhost:8099/packages/upsiflu/restrictive/latest
+1. Click on the `elm-watch hot` buttons in your terminal output to check for errors.
+
+### Demo
+
+A list of features, with code and examples. 
+[[Features.elm]](../src/Features.elm)
+
+Live server: [features.localhost:8001](http://features.localhost:8001)
+
+latest demo online: https://less-ui.web.app
+
+## Contribute
 
 I'm always happy to see issues and code contributions from you. Make sure you have a global gitignore to keep editor and OS specific configs out of the loop. All dev prerequisites are listed in examples/package.json and can be installed with `cd examples && npm ci`. Node v11 is required for run-pty.
+
+
+<p align="center" style="font-weight:bold;">Have a lot of fun <3</p>
+
+<p align="center" style="font-size:1.5em;">🐌🐌🐌</p>
