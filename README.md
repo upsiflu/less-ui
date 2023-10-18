@@ -1,14 +1,16 @@
 # Less power, less control? Less go for it!
 
-**A proof-of-concept package for people who don't want to hand-wrangle user interface logic**
+**A proof-of-concept package for people who don't want to hand-wrangle user interface logic.**
+
 
 
 **[Live demo](https://less-ui.web.app/)**
 
 [Start the demo on your computer](#examples)
-[Start the demo on your computer](#examples)
 
  _I'm curious what you think! Write me on `upsiflu@gmail.com` or add an [issue on github](https://github.com/upsiflu/less-ui/issues)_
+
+
 
 
 
@@ -38,22 +40,10 @@
 - No intercepting the Url (except for `Filter`, a pattern that gives you the current query flags). Use Browser.application and friends to roll your own Url decoder.
 - No constraints on your Html. Use _elm-w3_ if you want compile-time invariants for correctness and accessibility. Note that as of v2.0, _less-ui_ is not yet compatible with _elm-w3_.
 - This library has been used in about three small SPA projects. It's not stable yet.
-- No direct control over every pixel. Use _elm-ui_ if you are a designer.
-- No default Ui widgets. Use _elm-widgets_ or the like.
-- No intercepting the Url (except for `Filter`, a pattern that gives you the current query flags). Use Browser.application and friends to roll your own Url decoder.
-- No constraints on your Html. Use _elm-w3_ if you want compile-time invariants for correctness and accessibility. Note that as of v2.0, _less-ui_ is not yet compatible with _elm-w3_.
-- This library has been used in about three small SPA projects. It's not stable yet.
 
 
 
 ### 🐌 Features
-
-
-**— Let the Url store all the Ui state —** No more Ui messages in your application. 
-
-- Use straightforward patterns such as `search`, `goto` or `toggle` to build interactivity. 
-- You can reproduce the current Ui state by copying the Url. 
-- Style state transitions with css for extra smoothness.
 
 
 **— Let the Url store all the Ui state —** No more Ui messages in your application. 
