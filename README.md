@@ -1,6 +1,8 @@
 # Less power, less control? Less go for it!
 
-**A proof-of-concept package for people who don't want to hand-wrangle user interface logic.**
+**A proof-of-concept package for people who don't want to hand-wrangle user interface logic**
+
+
 
 
 
@@ -16,7 +18,7 @@
 
 **[Live demo](https://less-ui.web.app/)**
 
-[Start the demo on your computer](#Examples)
+[Start the demo on your computer](#examples)
 
  _I'm curious what you think! Write me on `upsiflu@gmail.com` or add an [issue on github](https://github.com/upsiflu/less-ui/issues)_
 
