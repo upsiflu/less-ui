@@ -64,18 +64,52 @@ text =
 
 codeSpan : String -> Ui.Html region narrowMsg msg
 codeSpan str =
-    if String.startsWith "#!elm " str then
-        String.dropLeft 6 str
-            |> SyntaxHighlight.elm
-            |> Result.unpack
-                (\_ -> Html.text "Error in `code`")
-                SyntaxHighlight.toInlineHtml
-            |> List.singleton
-            |> Ui.singleton
+    if String.startsWith "!#" str then
+        let
+            shebangToLanguage shebang =
+                case shebang of
+                    "#!elm" ->
+                        SyntaxHighlight.elm
+
+                    "#!css" ->
+                        SyntaxHighlight.css
+
+                    "#!javascript" ->
+                        SyntaxHighlight.javascript
+
+                    "#!python" ->
+                        SyntaxHighlight.python
+
+                    "#!sql" ->
+                        SyntaxHighlight.sql
+
+                    "#!xml" ->
+                        SyntaxHighlight.xml
+
+                    "#!json" ->
+                        SyntaxHighlight.json
+
+                    "#!nix" ->
+                        SyntaxHighlight.nix
+
+                    _ ->
+                        SyntaxHighlight.noLang
+        in
+        case String.split " " str of
+            shebang :: code ->
+                Ui.singleton
+                    [ String.join " " code
+                        |> shebangToLanguage shebang
+                        |> Result.unpack
+                            (\_ -> Html.text "Error in `code`")
+                            SyntaxHighlight.toInlineHtml
+                    ]
+
+            _ ->
+                Ui.node "code" [] (text str)
 
     else
-        text str
-            |> Ui.node "code" []
+        Ui.node "code" [] (text str)
 
 
 strong : List (Ui.Html region narrowMsg msg) -> Ui.Html region narrowMsg msg
