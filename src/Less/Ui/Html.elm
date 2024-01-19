@@ -1,6 +1,6 @@
 module Less.Ui.Html exposing
     ( Html, html
-    , toggle, goTo, bounce, filter, search
+    , toggle, atFlag, goTo, bounce, filter, search
     , section, article, node, disclose
     , ol, ul, keyedNode, nest
     , layout, animations, arrangeOverDefaultRegions, Region(..)
@@ -15,7 +15,7 @@ module Less.Ui.Html exposing
 
 [Read more in the `Link` module.](Less-Link)
 
-@docs toggle, goTo, bounce, filter, search
+@docs toggle, atFlag, goTo, bounce, filter, search
 
 
 # Wrap the DOM
@@ -85,6 +85,20 @@ toggle :
 toggle attributes config =
     Toggle attributes config
         >> Ui.wrap
+
+
+
+{- Show a `Ui` exactly when a certain `Flag` is present in the `Url`.
+   Use [`toggle`](#toggle) to let the user toggle the flag.
+-}
+
+
+atFlag :
+    Link.Flag
+    -> Html region narrowMsg msg
+    -> Html region narrowMsg msg
+atFlag flag =
+    toggle [] { flag = flag, inHeader = False, label = [] }
 
 
 {-| Show a `Ui` according to what searchTerms are currently associated with a given category.
@@ -399,8 +413,7 @@ getAttributes mutation =
 
         StateOutside currentSet ->
             { childAttributes = []
-            , childSelector =
-                ( "data-mutation", "state-outside" )
+            , childSelector = ( "data-mutation", "state-outside" )
             , labelAttributes =
                 [ ( "aria-current", "false" )
                 , ( "data-set", currentSet )
@@ -410,8 +423,7 @@ getAttributes mutation =
 
         SwitchedOn ->
             { childAttributes = []
-            , childSelector =
-                ( "data-mutation", "switched-on" )
+            , childSelector = ( "data-mutation", "switched-on" )
             , labelAttributes =
                 [ ( "role", "switch" )
                 , ( "aria-checked", "true" )
@@ -421,8 +433,7 @@ getAttributes mutation =
 
         StillOn ->
             { childAttributes = []
-            , childSelector =
-                ( "data-mutation", "still-on" )
+            , childSelector = ( "data-mutation", "still-on" )
             , labelAttributes =
                 [ ( "role", "switch" )
                 , ( "aria-checked", "true" )
@@ -443,8 +454,7 @@ getAttributes mutation =
 
         StillOff ->
             { childAttributes = []
-            , childSelector =
-                ( "data-mutation", "still-off" )
+            , childSelector = ( "data-mutation", "still-off" )
             , labelAttributes =
                 [ ( "role", "switch" )
                 , ( "aria-checked", "false" )
@@ -484,7 +494,7 @@ wrap states wrapper =
                     let
                         recurse : Html region narrowMsg msg -> Html region narrowMsg msg
                         recurse =
-                            Ui.mapWrapper addAttributes
+                            Ui.mutateWrappers { leafToWrapper = spanWrapper } addAttributes
                     in
                     case innerWrapper of
                         Node config tagName attrs contingent ->
@@ -538,7 +548,11 @@ wrap states wrapper =
                 { childAttributes, childSelector } =
                     getAttributes mutation
             in
-            Ui.mapWrapper addAttributes
+            Ui.mutateWrappers { leafToWrapper = spanWrapper } addAttributes
+
+        spanWrapper : HtmlList (Link.Msg msg) -> Wrapper region narrowMsg msg
+        spanWrapper =
+            Ui.singleton >> Node { onlyInCurrentRegion = True } "span" []
 
         getMutation : Link -> Maybe String -> Mutation
         getMutation =
@@ -675,10 +689,7 @@ wrap states wrapper =
                         ++ [ Html.input
                                 (Attr.value (String.join " " spaceSeparatedSearchTerms)
                                     :: Attr.type_ "search"
-                                    :: Events.onInput
-                                        (\newSearchTerm ->
-                                            Link.UrlCmd (link newSearchTerm)
-                                        )
+                                    :: Events.onInput (link >> Link.UrlCmd)
                                     :: appAttr (Attr.title category :: labelAttributesByMutation mutation)
                                     ++ List.map (Attr.map never) config.attributes
                                 )

@@ -33,7 +33,7 @@ type Shape
     = Circle Int
     | Triangle Int Int Int
     | Rectangle Int Int
-
+ 
 
 shapeSpec =
     let
@@ -46,7 +46,7 @@ shapeSpec =
                     triangle side1 side2 side3
 
                 Rectangle width height ->
-                    rectangle width height
+                     rectangle width height
     in
     tools.custom
         { control = match

@@ -8,11 +8,11 @@ module Less.Ui.Region exposing
     , intersect, isMemberOf, negate, withHeader
     )
 
-{-| Categorise the parts of your [Ui item](Ui)
+{-| Categorise the parts of your [Ui item](Less-Ui)
 
 Note: Much or all of this module is slated for removal.
 
-This helps with [layouting](Ui.Layout) and [progressive disclosure](Ui.Link#toggle)
+This helps with [layouting](Less-Ui#Layout) and [progressive disclosure](Less-Ui-Html#toggle)
 
 @docs Region
 

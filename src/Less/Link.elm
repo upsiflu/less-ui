@@ -106,12 +106,14 @@ The app loads and restores exactly the same Ui state as in the original tab.
       - [x]  [With two back-and-forth targets (bounce)](Less-Ui-Html#bounce)
 
   - Progressive Disclosure
-      - [x]  [Orthogonal; any number can be active (toggle)](Less-Ui-Html#toggle)
+      - [x] Orthogonal; any number of [Flags](#Flag) can [be activated (toggle)](Less-Ui-Html#toggle)
+        - [x][+ React to flags set somewhere else (atFlag)](Less-Ui-Html#atFlag)
       - [ ] Exactly one active at a given Ui node (tab) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8) ☞ [#2](https://github.com/upsiflu/restrictive/issues/2)
       - [ ] One or zero active in the browser tab (dropdown, dialog, popover) ☞ [#8](https://github.com/upsiflu/restrictive/issues/8)
 
-  - Dynamic Links
-      - [x]  [Search](Less-Ui-Html#search) or [Filter](Less-Ui-Html#filter) a [Category](#Category)
+  - Filter
+      - [x][Search](Less-Ui-Html#search)
+        - [x][+ React to filters set somewhere else](Less-Ui-Html#filter) a [Category](#Category)
 
 -}
 type Link
@@ -128,6 +130,9 @@ type Link
 
 
 {-| This happens when a Link is clicked. We want to apply the relative change here.
+
+TODO: What if several links are encoded in the Url?
+
 -}
 fromUrl : Url -> Link
 fromUrl url =
@@ -153,6 +158,25 @@ fromUrl url =
                 _ ->
                     Nothing
 
+        filter : () -> Maybe Link
+        filter () =
+            case
+                getStateSearchTerms "filter" url
+                    |> List.head
+                    |> Maybe.andThen Url.percentDecode
+                    |> Maybe.map (String.split "=")
+            of
+                Just (cat :: term) ->
+                    Just
+                        (Filter
+                            { category = cat
+                            , searchTerm = String.join "=" term
+                            }
+                        )
+
+                _ ->
+                    Nothing
+
         goTo : () -> Link
         goTo () =
             String.dropLeft 1 url.path
@@ -169,6 +193,7 @@ fromUrl url =
                 |> Maybe.map Toggle
     in
     toggle ()
+        |> Maybe.orElseLazy filter
         |> Maybe.orElseLazy bounce
         |> Maybe.withDefault (goTo ())
 

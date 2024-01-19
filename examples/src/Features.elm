@@ -211,9 +211,14 @@ Ui.toggle []
 
 Enter some search terms, then click the following link to toggle the visibility of search term tokens!
 
+[Set some search terms (if you haven't already)](?filter=search=pattern+Url)
+
 [Toggle me the tokens](?toggle=showTokens)
 
-The markdown for this Link is `[Toggle me the tokens](?toggle=showTokens)`,
+The markdown for these Links are 
+`#!md [Set some search terms (if you haven't already)](?filter=search=pattern+Url)` and
+`#!md [Toggle me the tokens](?toggle=showTokens)`
+,
 and here is the `#!elm toggle` pattern that hides and shows the toggles under the TOC:
 
 ```elm
@@ -259,13 +264,19 @@ view () =
 
 body : Ui
 body =
-    viewWelcome ++ viewToc ++ Markdown.syntaxHighlight ++ Ui.animations
-    -- Let's make the default `elm make` Html a bit more delightful...
-        ++ Ui.html 
-            [ Html.node "meta" 
-                [ Attr.name "viewport", Attr.attribute "content" "width=device-width, initial-scale=1" ] []
-            , Html.node "style" []
-                [ Html.text "body {padding: .5em;}"]
+    viewWelcome
+        ++ viewToc
+        ++ testTheToggle
+        ++ Markdown.syntaxHighlight
+        ++ Ui.animations
+        -- Let's make the default `elm make` Html a bit more delightful...
+        ++ Ui.html
+            [ Html.node "meta"
+                [ Attr.name "viewport", Attr.attribute "content" "width=device-width, initial-scale=1" ]
+                []
+            , Html.node "style"
+                []
+                [ Html.text "body {padding: .5em;}" ]
             ]
 
 
@@ -287,6 +298,14 @@ viewToc =
         , label = []
         }
         searchOutline
+        |> Ui.inRegion Toc
+
+
+testTheToggle : Ui
+testTheToggle =
+    Ui.toggle []
+        { flag = "properties", inHeader = False, label = [ Html.text "Property Sheet" ] }
+        (Ui.singleton [ Html.text "PROP\u{00A0}SHEET ON" ])
         |> Ui.inRegion Toc
 
 

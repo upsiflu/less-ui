@@ -10,7 +10,7 @@ module Less.Ui exposing
     , map
     , indexedMapList
     , mapEach
-    , mapWrapper
+    , mutateWrappers
     )
 
 {-| Separate [State](Less-Link#State) and [Layout](#Layout) of interface elements from the main model
@@ -90,12 +90,14 @@ It is usually easier to build exactly the `Ui` you need instead of altering and 
 @docs indexedMapList
 @docs mapEach
 
+@docs mutateWrappers
+
 
 # Slated for removal
 
 The following exports have no application and may be removed in the next release.
 
-@docs mapWrapper
+(currently nothing)
 
 -}
 
@@ -226,11 +228,6 @@ map fu =
         )
 
 
-{-| Modify the type of `wrapper` in the Ui.
-
-⚠️ If you can, build up your Ui with the final `wrapper` type.
-
--}
 mapWrapper : (wrapper -> wrapper2) -> Ui region html wrapper -> Ui region html wrapper2
 mapWrapper fu =
     List.map
@@ -246,6 +243,25 @@ mapWrapper fu =
                     -- Todo: Tail Call Optimize.
                     At innerRegion (mapWrapper fu elements)
         )
+
+
+{-| Modify the type of `wrapper` in the Ui and make sure every direct descendant is a wrapper so it can be modified
+
+⚠️ If you can, build up your Ui with the final `wrapper` type.
+
+-}
+mutateWrappers : { leafToWrapper : html -> wrapper } -> (wrapper -> wrapper2) -> Ui region html wrapper -> Ui region html wrapper2
+mutateWrappers { leafToWrapper } wrapperToWrapper =
+    List.map
+        (\item ->
+            case item of
+                Leaf html ->
+                    Wrap (leafToWrapper html)
+
+                nonLeaf ->
+                    nonLeaf
+        )
+        >> mapWrapper wrapperToWrapper
 
 
 
