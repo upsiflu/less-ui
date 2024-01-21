@@ -64,7 +64,7 @@ text =
 
 codeSpan : String -> Ui.Html region narrowMsg msg
 codeSpan str =
-    if String.startsWith "!#" str then
+    if String.startsWith "#!" str then
         let
             shebangToLanguage shebang =
                 case shebang of
