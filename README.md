@@ -71,6 +71,11 @@ npm install -g elm-doc-preview
 edp
 ```
 
+> Note that you need elm installed to compile the docs locally.
+>
+> - If you use elm-tooling, [you can make some version of elm available globally:](https://elm-tooling.github.io/elm-tooling-cli/faq/#can-i-install-the-tools-globally) `ln -s ~/.elm/elm-tooling/elm/0.19.1/elm ~/.local/bin/elm` (Depending on your distribution, you may need to create the directory `~/.local/bin` and add it to your $PATH)
+> - Otherwise, you can follow the instructions on https://guide.elm-lang.org/install/elm
+
 Now check out [localhost:8000](http://localhost:8000/)
 
 **Verify the mini-examples in the comments:**
