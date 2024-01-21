@@ -67,7 +67,6 @@ Ui.inRegion Scene (text "Scene") ++ Ui.inRegion Info (text "Info") ...
 ```shell
 npm install -g elm-doc-preview
 
-
 edp
 ```
 
@@ -107,6 +106,8 @@ npm install -g elm-doc-preview
 npm ci
 npm start
 ```
+
+> Note: Running the live server may require python, make and gcc c++ installed on your system. If you encounter an error, feel free to open an issue and/or contact me.
 
 Go to [localhost:8001](http://localhost:8001/) and open one of the examples.
 
