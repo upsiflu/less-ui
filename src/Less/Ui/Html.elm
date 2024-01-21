@@ -88,11 +88,9 @@ toggle attributes config =
 
 
 
-{- Show a `Ui` exactly when a certain `Flag` is present in the `Url`.
+{-| Show a `Ui` exactly when a certain `Flag` is present in the `Url`.
    Use [`toggle`](#toggle) to let the user toggle the flag.
 -}
-
-
 atFlag :
     Link.Flag
     -> Html region narrowMsg msg
