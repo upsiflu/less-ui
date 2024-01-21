@@ -6,7 +6,7 @@
 
 [Start the demo on your computer](#examples)
 
- _I'm curious what you think! Write me on `upsiflu@gmail.com` or add an [issue on github](https://github.com/upsiflu/less-ui/issues)_
+_I'm curious what you think! Write me on `upsiflu@gmail.com` or add an [issue on github](https://github.com/upsiflu/less-ui/issues)_
 
 ### 🐌 Goals
 
@@ -108,7 +108,7 @@ Go to [localhost:8001](http://localhost:8001/) and open one of the examples.
 Read [the library README.md (this doc)](http://features.localhost:8099/packages/upsiflu/less-ui/latest).
 
 1. Edit the files in src/ while watching a browser tab pointing at [localhost:8001](localhost:8001).
-_<small>A note to vscodium users: To activate the language server in your editor, choose "Open Folder..." and select `examples`.</small>_
+   _<small>A note to vscodium users: To activate the language server in your editor, choose "Open Folder..." and select `examples`.</small>_
 1. In that browser tab, you can activate the **Elm debugger** by clicking the `elm-watch` menu in the bottom left corner.
 1. Click on the `elm-watch hot` buttons in your terminal output to check for errors.
 
@@ -123,7 +123,7 @@ latest demo online: <https://less-ui.web.app>
 
 ## Contribute
 
-I'm always happy to see issues and code contributions from you. Make sure you have a global gitignore to keep editor and OS specific configs out of the loop. All dev prerequisites are listed in examples/package.json and can be installed with `cd examples && npm ci`. Node v11 is required for run-pty.
+I'm always happy to see issues and code contributions from you. Make sure you have a global gitignore [or a per-repo exclusion](https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files#excluding-local-files-without-creating-a-gitignore-file) to keep editor and OS specific configs out of the loop. For example, if you use vscode, `echo ".vscode" >> .git/info/exclude` will make sure your local config will not be synchronized with the repo. All dev prerequisites are listed in examples/package.json and can be installed with `cd examples && npm ci`. Node v11 is required for run-pty.
 
 <p align="center" style="font-weight:bold;">
     Have a lot of fun <3</p>
