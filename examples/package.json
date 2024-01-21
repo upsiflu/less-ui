@@ -12,7 +12,7 @@
     "deploy": "elm make --optimize src/Features.elm && rsync --remove-source-files index.html public && firebase deploy"
   },
   "devDependencies": {
-    "elm-tooling": "1.12.0",
+    "elm-tooling": "^1.15.0",
     "elm-watch": "1.1.2",
     "esbuild": "0.17.4",
     "run-pty": "4.0.3",
